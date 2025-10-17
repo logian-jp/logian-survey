@@ -21,6 +21,7 @@ export default function RichTextEditor({
   const [isUnderline, setIsUnderline] = useState(false)
   const [textColor, setTextColor] = useState('#000000')
   const [backgroundColor, setBackgroundColor] = useState('#ffffff')
+  const [isComposing, setIsComposing] = useState(false)
 
   const colors = [
     { name: '黒', value: '#000000' },
@@ -45,10 +46,31 @@ export default function RichTextEditor({
   ]
 
   useEffect(() => {
-    if (editorRef.current) {
+    if (editorRef.current && !isComposing) {
+      // カーソル位置を保存
+      const selection = window.getSelection()
+      const range = selection?.getRangeAt(0)
+      const cursorOffset = range?.startOffset || 0
+      
       editorRef.current.innerHTML = value
+      
+      // カーソル位置を復元
+      if (selection && range) {
+        try {
+          const newRange = document.createRange()
+          const textNode = editorRef.current.firstChild
+          if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+            newRange.setStart(textNode, Math.min(cursorOffset, textNode.textContent?.length || 0))
+            newRange.setEnd(textNode, Math.min(cursorOffset, textNode.textContent?.length || 0))
+            selection.removeAllRanges()
+            selection.addRange(newRange)
+          }
+        } catch (e) {
+          // カーソル位置の復元に失敗した場合は無視
+        }
+      }
     }
-  }, [value])
+  }, [value, isComposing])
 
   const execCommand = (command: string, value?: string) => {
     document.execCommand(command, false, value)
@@ -64,16 +86,32 @@ export default function RichTextEditor({
     }
   }
 
-  const handleInput = () => {
-    if (editorRef.current) {
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    if (editorRef.current && !isComposing) {
       onChange(editorRef.current.innerHTML)
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (isComposing) {
+      return
+    }
+    
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       execCommand('insertHTML', '<br>')
+    }
+  }
+
+  const handleCompositionStart = () => {
+    setIsComposing(true)
+  }
+
+  const handleCompositionEnd = () => {
+    setIsComposing(false)
+    // 日本語入力終了時に内容を更新
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML)
     }
   }
 
@@ -213,8 +251,10 @@ export default function RichTextEditor({
         contentEditable
         onInput={handleInput}
         onKeyDown={handleKeyDown}
-        onMouseUp={updateToolbarState}
         onKeyUp={updateToolbarState}
+        onMouseUp={updateToolbarState}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         className="min-h-[120px] p-4 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset prose prose-sm max-w-none"
         style={{ 
           color: textColor,
