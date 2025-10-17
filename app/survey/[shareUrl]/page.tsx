@@ -300,8 +300,12 @@ export default function SurveyPage() {
             </h1>
             {survey?.description && (
               <div 
-                className="text-gray-600 prose prose-sm max-w-none"
+                className="text-gray-600 prose prose-sm max-w-none rich-text-content"
                 dangerouslySetInnerHTML={{ __html: survey.description }}
+                style={{
+                  // リッチテキストのスタイルを保持
+                  color: 'inherit'
+                }}
               />
             )}
           </div>
@@ -601,7 +605,7 @@ export default function SurveyPage() {
                         <div className="mt-2">
                           <p className="text-sm text-yellow-800 font-medium">許可されるファイル形式:</p>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {question.settings.allowedFileTypes.map(fileType => {
+                            {question.settings.allowedFileTypes.map((fileType: string) => {
                               const fileTypeOptions = [
                                 { value: 'image', label: '画像系', extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'] },
                                 { value: 'video', label: '動画系', extensions: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv'] },
