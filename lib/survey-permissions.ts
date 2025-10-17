@@ -1,4 +1,4 @@
-import prisma from './prisma'
+import { prisma } from './prisma'
 
 export type SurveyPermission = 'EDIT' | 'VIEW' | 'ADMIN'
 
