@@ -499,6 +499,11 @@ export default function SurveyPage() {
                       <p className="text-sm text-blue-700">
                         この質問では、あなたの現在位置を自動取得します。位置情報は個人情報のため、取得前に確認いたします。
                       </p>
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-xs text-yellow-800">
+                          ⚠️ localhost環境では位置情報が取得できない場合があります。本番環境（HTTPS）では正常に動作します。
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -532,6 +537,51 @@ export default function SurveyPage() {
                         </p>
                       </div>
                     )}
+
+                    {/* 手動入力の代替手段 */}
+                    <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <p className="text-sm text-gray-700 mb-2">
+                            位置情報が取得できない場合は、手動で入力することもできます：
+                          </p>
+                          <div className="flex space-x-2">
+                            <input
+                              type="text"
+                              placeholder="緯度（例: 35.6762）"
+                              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                              onChange={(e) => {
+                                const lat = e.target.value
+                                const lng = answers[question.id]?.toString().split(',')[1] || ''
+                                if (lat && lng) {
+                                  handleAnswerChange(question.id, `${lat},${lng}`)
+                                }
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="経度（例: 139.6503）"
+                              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                              onChange={(e) => {
+                                const lng = e.target.value
+                                const lat = answers[question.id]?.toString().split(',')[0] || ''
+                                if (lat && lng) {
+                                  handleAnswerChange(question.id, `${lat},${lng}`)
+                                }
+                              }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            例: 東京駅付近 → 緯度: 35.6812, 経度: 139.7671
+                          </p>
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              onClick={() => handleAnswerChange(question.id, '35.6812,139.7671')}
+                              className="text-xs text-blue-600 hover:text-blue-800 underline"
+                            >
+                              テスト用: 東京駅の座標を設定
+                            </button>
+                          </div>
+                    </div>
                   </div>
                 )}
 
