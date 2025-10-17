@@ -52,37 +52,49 @@ export default function RichTextEditor({
       let savedRange: Range | null = null
       
       if (selection && selection.rangeCount > 0) {
-        savedRange = selection.getRangeAt(0).cloneRange()
+        try {
+          savedRange = selection.getRangeAt(0).cloneRange()
+        } catch (e) {
+          // 範囲の保存に失敗した場合は何もしない
+          return
+        }
       }
       
       // 内容を更新
-      editorRef.current.innerHTML = value
-      
-      // カーソル位置を復元
-      if (selection && savedRange) {
-        try {
-          // 新しい範囲を作成
-          const newRange = document.createRange()
-          
-          // テキストノードを探す
-          const walker = document.createTreeWalker(
-            editorRef.current,
-            NodeFilter.SHOW_TEXT,
-            null
-          )
-          
-          let textNode = walker.nextNode()
-          if (textNode) {
-            const textLength = textNode.textContent?.length || 0
-            const offset = Math.min(savedRange.startOffset, textLength)
-            newRange.setStart(textNode, offset)
-            newRange.setEnd(textNode, offset)
-            
-            selection.removeAllRanges()
-            selection.addRange(newRange)
+      const currentContent = editorRef.current.innerHTML
+      if (currentContent !== value) {
+        editorRef.current.innerHTML = value
+        
+        // カーソル位置を復元
+        if (selection && savedRange) {
+          try {
+            // 少し遅延してカーソル位置を復元
+            setTimeout(() => {
+              if (editorRef.current && selection) {
+                const newRange = document.createRange()
+                
+                // テキストノードを探す
+                const walker = document.createTreeWalker(
+                  editorRef.current,
+                  NodeFilter.SHOW_TEXT,
+                  null
+                )
+                
+                let textNode = walker.nextNode()
+                if (textNode) {
+                  const textLength = textNode.textContent?.length || 0
+                  const offset = Math.min(savedRange.startOffset, textLength)
+                  newRange.setStart(textNode, offset)
+                  newRange.setEnd(textNode, offset)
+                  
+                  selection.removeAllRanges()
+                  selection.addRange(newRange)
+                }
+              }
+            }, 10)
+          } catch (e) {
+            // カーソル位置の復元に失敗した場合は無視
           }
-        } catch (e) {
-          // カーソル位置の復元に失敗した場合は無視
         }
       }
     }
@@ -104,47 +116,22 @@ export default function RichTextEditor({
 
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
     if (editorRef.current && !isComposing) {
-      // 遅延実行でカーソル位置を保持
-      setTimeout(() => {
-        if (editorRef.current) {
-          onChange(editorRef.current.innerHTML)
-        }
-      }, 0)
+      // 即座に内容を更新（カーソル位置を保持）
+      onChange(editorRef.current.innerHTML)
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // 日本語入力中はエンターキーをそのまま通す（変換確定用）
+    // 日本語入力中は何も処理しない
     if (isComposing) {
       return
     }
     
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      
-      // カーソル位置を保存
-      const selection = window.getSelection()
-      const range = selection?.getRangeAt(0)
-      
-      if (range) {
-        // 改行を挿入
-        const br = document.createElement('br')
-        range.deleteContents()
-        range.insertNode(br)
-        
-        // カーソルを改行の後に移動
-        range.setStartAfter(br)
-        range.setEndAfter(br)
-        selection?.removeAllRanges()
-        selection?.addRange(range)
-        
-        // 内容を更新（カーソル位置を保持するため遅延実行）
-        setTimeout(() => {
-          if (editorRef.current) {
-            onChange(editorRef.current.innerHTML)
-          }
-        }, 0)
-      }
+    // エンターキーの処理を完全に無効化
+    // ブラウザのデフォルト動作に任せる
+    if (e.key === 'Enter') {
+      // 何もしない - ブラウザのデフォルト改行を使用
+      return
     }
   }
 
@@ -153,11 +140,14 @@ export default function RichTextEditor({
   }
 
   const handleCompositionEnd = () => {
-    setIsComposing(false)
-    // 日本語入力終了時に内容を更新
-    if (editorRef.current) {
-      onChange(editorRef.current.innerHTML)
-    }
+    // 少し遅延してから日本語入力状態を解除
+    setTimeout(() => {
+      setIsComposing(false)
+      // 日本語入力終了時に内容を更新
+      if (editorRef.current) {
+        onChange(editorRef.current.innerHTML)
+      }
+    }, 10)
   }
 
   const handleKeyUp = (e: React.KeyboardEvent) => {
