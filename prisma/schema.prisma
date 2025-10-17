@@ -53,6 +53,7 @@ model User {
   surveys          Survey[]
   surveyUsers      SurveyUser[]
   invitedSurveys   SurveyUser[] @relation("SurveyInviter")
+  questionTemplates QuestionTemplate[]
 }
 
 model VerificationToken {
@@ -186,4 +187,22 @@ model FileUpload {
   url       String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model QuestionTemplate {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  type        QuestionType
+  required    Boolean      @default(false)
+  options     Json?        // For multiple choice, checkbox, etc.
+  settings    Json?        // For additional settings like ordinal structure
+  conditions  Json?        // For conditional logic
+  isPublic    Boolean      @default(false) // 公開テンプレートかどうか
+  usageCount  Int          @default(0)     // 使用回数
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import RichTextEditor from '@/components/RichTextEditor'
 import ConditionalLogicEditor from '@/components/ConditionalLogicEditor'
+import QuestionTemplateSidebar from '@/components/QuestionTemplateSidebar'
 import { ConditionalLogic } from '@/types/conditional'
 
 interface Question {
@@ -28,6 +29,8 @@ interface Question {
 export default function CreateSurvey() {
   const { data: session } = useSession()
   const router = useRouter()
+  const [showSidebar, setShowSidebar] = useState(false)
+  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
   const [survey, setSurvey] = useState({
     title: '',
     description: '',
@@ -146,6 +149,65 @@ export default function CreateSurvey() {
     }
   }
 
+  // テンプレートから質問を追加
+  const handleTemplateSelect = (template: any) => {
+    const newQuestion: Question = {
+      id: `question_${Date.now()}`,
+      type: template.type,
+      title: template.title,
+      description: template.description,
+      required: template.required,
+      order: questions.length,
+      options: template.options ? JSON.parse(template.options) : undefined,
+      settings: template.settings ? JSON.parse(template.settings) : undefined,
+      conditions: template.conditions ? JSON.parse(template.conditions) : undefined
+    }
+    
+    setQuestions([...questions, newQuestion])
+  }
+
+  // ドラッグ&ドロップハンドラー
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleDrop = (e: React.DragEvent, insertIndex?: number) => {
+    e.preventDefault()
+    
+    try {
+      const templateData = e.dataTransfer.getData('application/json')
+      if (templateData) {
+        const template = JSON.parse(templateData)
+        const newQuestion: Question = {
+          id: `question_${Date.now()}`,
+          type: template.type,
+          title: template.title,
+          description: template.description,
+          required: template.required,
+          order: insertIndex !== undefined ? insertIndex : questions.length,
+          options: template.options ? JSON.parse(template.options) : undefined,
+          settings: template.settings ? JSON.parse(template.settings) : undefined,
+          conditions: template.conditions ? JSON.parse(template.conditions) : undefined
+        }
+        
+        if (insertIndex !== undefined) {
+          const newQuestions = [...questions]
+          newQuestions.splice(insertIndex, 0, newQuestion)
+          // 順序を更新
+          newQuestions.forEach((question, index) => {
+            question.order = index
+          })
+          setQuestions(newQuestions)
+        } else {
+          setQuestions([...questions, newQuestion])
+        }
+      }
+    } catch (error) {
+      console.error('ドロップ処理エラー:', error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -200,19 +262,29 @@ export default function CreateSurvey() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* メインコンテンツ */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900">
               新しいアンケートを作成
             </h1>
-            <Link
-              href="/surveys"
-              className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
-            >
-              一覧に戻る
-            </Link>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setShowSidebar(!showSidebar)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
+              >
+                {showSidebar ? 'テンプレートを隠す' : 'テンプレートを表示'}
+              </button>
+              <Link
+                href="/surveys"
+                className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
+              >
+                一覧に戻る
+              </Link>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -260,12 +332,24 @@ export default function CreateSurvey() {
                   </button>
                 </div>
 
-                <div className="space-y-6">
+                <div 
+                  className="space-y-6"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e)}
+                >
                   {questions.map((question, index) => (
-                    <div key={question.id}>
+                    <div 
+                      key={question.id}
+                      onClick={() => setSelectedQuestion(question)}
+                      className={`cursor-pointer ${selectedQuestion?.id === question.id ? 'ring-2 ring-blue-500' : ''}`}
+                    >
                       {/* 質問間の追加ボタン */}
                       {index === 0 && (
-                        <div className="relative group mb-6">
+                        <div 
+                          className="relative group mb-6"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, index)}
+                        >
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               type="button"
@@ -535,7 +619,11 @@ export default function CreateSurvey() {
 
                       {/* 質問間の追加ボタン（最後の質問以外） */}
                       {index < questions.length - 1 && (
-                        <div className="relative group mt-6">
+                        <div 
+                          className="relative group mt-6"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, index + 1)}
+                        >
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               type="button"
@@ -598,6 +686,19 @@ export default function CreateSurvey() {
           </form>
         </div>
       </div>
+
+      {/* テンプレートサイドバー */}
+      {showSidebar && (
+        <QuestionTemplateSidebar
+          onTemplateSelect={handleTemplateSelect}
+          onSaveAsTemplate={(question) => {
+            setSelectedQuestion(question)
+            // テンプレート保存ダイアログはサイドバー内で処理
+          }}
+          currentQuestion={selectedQuestion}
+        />
+      )}
+    </div>
     </div>
   )
 }
