@@ -67,6 +67,8 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error) {
       console.error('Error message:', error.message)
       console.error('Error stack:', error.stack)
+    } else {
+      console.error('Unknown error:', error)
     }
 
     // データベース接続エラーの場合
