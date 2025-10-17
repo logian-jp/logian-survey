@@ -461,7 +461,7 @@ export default function EditSurvey() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* メインコンテンツ */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 overflow-y-auto transition-all duration-300 ${showSidebar ? 'mr-80' : ''}`}>
         <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex justify-between items-center mb-6">
@@ -1061,14 +1061,17 @@ export default function EditSurvey() {
 
       {/* テンプレートサイドバー */}
       {showSidebar && (
-        <QuestionTemplateSidebar
-          onTemplateSelect={handleTemplateSelect}
-          onSaveAsTemplate={(question) => {
-            setSelectedQuestion(question)
-            // テンプレート保存ダイアログはサイドバー内で処理
-          }}
-          currentQuestion={selectedQuestion}
-        />
+        <div className="fixed right-0 top-16 h-[calc(100vh-4rem)] w-80 z-40">
+          <QuestionTemplateSidebar
+            onTemplateSelect={handleTemplateSelect}
+            onSaveAsTemplate={(question) => {
+              setSelectedQuestion(question)
+              // テンプレート保存ダイアログはサイドバー内で処理
+            }}
+            currentQuestion={selectedQuestion}
+            onClose={() => setShowSidebar(false)}
+          />
+        </div>
       )}
     </div>
     </div>
