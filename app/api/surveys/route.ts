@@ -91,15 +91,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const survey = await prisma.survey.create({
-      data: {
-        title,
-        description: description || null,
-        userId: session.user.id,
-      },
+    // アンケート作成と作成者の管理者権限付与をトランザクションで実行
+    const result = await prisma.$transaction(async (tx) => {
+      // アンケートを作成
+      const survey = await tx.survey.create({
+        data: {
+          title,
+          description: description || null,
+          userId: session.user.id,
+        },
+      })
+
+      // 作成者を管理者権限でSurveyUserテーブルに追加
+      await tx.surveyUser.create({
+        data: {
+          userId: session.user.id,
+          surveyId: survey.id,
+          permission: 'ADMIN',
+          invitedBy: session.user.id, // 自分自身を招待者として設定
+          acceptedAt: new Date(), // 即座に承認済みとして設定
+        },
+      })
+
+      return survey
     })
 
-    return NextResponse.json(survey, { status: 201 })
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
     console.error('Failed to create survey:', error)
     return NextResponse.json(

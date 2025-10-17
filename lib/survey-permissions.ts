@@ -39,11 +39,21 @@ export async function checkSurveyPermissions(
     const isOwner = survey.userId === userId
     const userPermission = survey.surveyUsers[0]?.permission
 
+    // 作成者の場合は常に全権限を持つ
+    if (isOwner) {
+      return {
+        canView: true,
+        canEdit: true,
+        canAdmin: true,
+        isOwner: true
+      }
+    }
+
     return {
-      canView: isOwner || !!userPermission,
-      canEdit: isOwner || userPermission === 'EDIT' || userPermission === 'ADMIN',
-      canAdmin: isOwner || userPermission === 'ADMIN',
-      isOwner
+      canView: !!userPermission,
+      canEdit: userPermission === 'EDIT' || userPermission === 'ADMIN',
+      canAdmin: userPermission === 'ADMIN',
+      isOwner: false
     }
   } catch (error) {
     console.error('Error checking survey permissions:', error)
