@@ -145,6 +145,8 @@ enum QuestionType {
   PREFECTURE
   NAME
   AGE_GROUP
+  LOCATION
+  FILE_UPLOAD
 }
 
 model Response {
@@ -166,5 +168,21 @@ model Answer {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  // ファイルアップロード用
+  files      FileUpload[]
+
   @@unique([questionId, responseId])
+}
+
+model FileUpload {
+  id        String   @id @default(cuid())
+  answerId  String
+  answer    Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  filename  String
+  originalName String
+  mimeType  String
+  size      Int
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

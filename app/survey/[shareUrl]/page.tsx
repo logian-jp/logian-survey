@@ -27,6 +27,7 @@ export default function SurveyPage() {
   
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [answers, setAnswers] = useState<{ [key: string]: string | string[] }>({})
+  const [fileUploads, setFileUploads] = useState<{ [key: string]: File[] }>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -70,6 +71,51 @@ export default function SurveyPage() {
       ...prev,
       [questionId]: value
     }))
+  }
+
+  const getCurrentLocation = (questionId: string) => {
+    if (!navigator.geolocation) {
+      setError('このブラウザでは位置情報を取得できません')
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        const locationString = `${latitude},${longitude}`
+        handleAnswerChange(questionId, locationString)
+      },
+      (error) => {
+        console.error('位置情報の取得に失敗しました:', error)
+        setError('位置情報の取得に失敗しました')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
+    )
+  }
+
+  const handleFileUpload = (questionId: string, files: FileList | null) => {
+    if (!files) return
+
+    const fileArray = Array.from(files)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    const validFiles = fileArray.filter(file => file.size <= maxSize)
+
+    if (validFiles.length !== fileArray.length) {
+      setError('一部のファイルが10MBを超えているため、アップロードできません')
+    }
+
+    setFileUploads(prev => ({
+      ...prev,
+      [questionId]: validFiles
+    }))
+
+    // ファイル名を回答として保存
+    const fileNames = validFiles.map(file => file.name).join(',')
+    handleAnswerChange(questionId, fileNames)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -357,6 +403,67 @@ export default function SurveyPage() {
                         <span className="ml-2 text-sm text-gray-700">{option}</span>
                       </label>
                     ))}
+                  </div>
+                )}
+
+                {question.type === 'LOCATION' && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800 mb-2">
+                        📍 位置情報の取得について
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        この質問では、あなたの現在位置を自動取得します。位置情報は個人情報のため、取得前に確認いたします。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => getCurrentLocation(question.id)}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    >
+                      📍 現在位置を取得
+                    </button>
+                    {answers[question.id] && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm text-green-800">
+                          ✅ 位置情報が取得されました
+                        </p>
+                        <p className="text-xs text-green-600 mt-1">
+                          {answers[question.id]}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {question.type === 'FILE_UPLOAD' && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800 mb-2">
+                        📁 ファイルアップロードについて
+                      </p>
+                      <p className="text-sm text-yellow-700">
+                        画像、PDF、Word文書などのファイルをアップロードできます。最大10MBまで対応しています。
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx,.txt"
+                      onChange={(e) => handleFileUpload(question.id, e.target.files)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                    />
+                    {fileUploads[question.id] && fileUploads[question.id].length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700">アップロードされたファイル:</p>
+                        {fileUploads[question.id].map((file, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                            <span className="text-sm text-gray-700">{file.name}</span>
+                            <span className="text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(2)}MB)</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

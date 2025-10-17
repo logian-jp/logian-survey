@@ -44,6 +44,8 @@ export default function CreateSurvey() {
     { value: 'PREFECTURE', label: '都道府県' },
     { value: 'NAME', label: '名前' },
     { value: 'AGE_GROUP', label: '年代' },
+    { value: 'LOCATION', label: '位置情報' },
+    { value: 'FILE_UPLOAD', label: 'ファイルアップロード' },
   ]
 
   const addQuestion = (insertIndex?: number) => {

@@ -154,10 +154,11 @@ export default function SurveysPage() {
           </div>
         ) : (
           <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider z-10">
                     アンケート名
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -186,7 +187,7 @@ export default function SurveysPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {surveys.map((survey) => (
                   <tr key={survey.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="sticky left-0 bg-white px-6 py-4 whitespace-nowrap z-10">
                       <div className="flex items-center">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
@@ -280,6 +281,7 @@ export default function SurveysPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
