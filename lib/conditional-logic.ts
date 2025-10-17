@@ -32,6 +32,7 @@ export function evaluateConditionalLogic(
   return { shouldShow, matchedRules }
 }
 
+
 /**
  * 個別のルールを評価する
  */
@@ -59,6 +60,18 @@ function evaluateRule(rule: ConditionalRule, answers: Record<string, any>): bool
       return !answer || String(answer).trim() === ''
     case 'is_not_empty':
       return answer && String(answer).trim() !== ''
+    case 'is_uploaded':
+      // ファイルアップロードの場合、ファイルが存在するかチェック
+      return answer && (Array.isArray(answer) ? answer.length > 0 : answer)
+    case 'is_not_uploaded':
+      // ファイルアップロードの場合、ファイルが存在しないかチェック
+      return !answer || (Array.isArray(answer) ? answer.length === 0 : !answer)
+    case 'is_acquired':
+      // 位置情報の場合、座標が存在するかチェック
+      return answer && (answer.latitude !== undefined && answer.longitude !== undefined)
+    case 'is_not_acquired':
+      // 位置情報の場合、座標が存在しないかチェック
+      return !answer || (answer.latitude === undefined || answer.longitude === undefined)
     default:
       return false
   }
@@ -105,7 +118,11 @@ function getOperatorText(operator: string): string {
     'greater_than': 'より大きい',
     'less_than': 'より小さい',
     'is_empty': 'が空',
-    'is_not_empty': 'が空でない'
+    'is_not_empty': 'が空でない',
+    'is_uploaded': 'がアップロードされている',
+    'is_not_uploaded': 'がアップロードされていない',
+    'is_acquired': 'が取得されている',
+    'is_not_acquired': 'が取得されていない'
   }
   return operatorMap[operator] || operator
 }

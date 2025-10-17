@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { ConditionalLogic, ConditionalRule, ConditionalRuleUI } from '@/types/conditional'
-import { AVAILABLE_OPERATORS } from '@/lib/conditional-logic'
 
 interface ConditionalLogicEditorProps {
   conditions: ConditionalLogic
@@ -25,6 +24,78 @@ export default function ConditionalLogicEditor({
 
   // 利用可能な質問をフィルタリング（現在の質問より前の質問のみ）
   const filteredQuestions = availableQuestions.filter(q => q.id !== currentQuestionId)
+
+  // 質問タイプに応じた演算子を取得
+  const getOperatorOptions = (questionType: string) => {
+    switch (questionType) {
+      case 'TEXT':
+      case 'TEXTAREA':
+      case 'EMAIL':
+      case 'PHONE':
+        return [
+          { value: 'equals', label: '等しい' },
+          { value: 'not_equals', label: '等しくない' },
+          { value: 'contains', label: '含む' },
+          { value: 'not_contains', label: '含まない' },
+          { value: 'is_empty', label: '空である' },
+          { value: 'is_not_empty', label: '空でない' }
+        ]
+      case 'NUMBER':
+        return [
+          { value: 'equals', label: '等しい' },
+          { value: 'not_equals', label: '等しくない' },
+          { value: 'greater_than', label: 'より大きい' },
+          { value: 'less_than', label: 'より小さい' },
+          { value: 'is_empty', label: '空である' },
+          { value: 'is_not_empty', label: '空でない' }
+        ]
+      case 'RATING':
+        return [
+          { value: 'equals', label: '等しい' },
+          { value: 'not_equals', label: '等しくない' },
+          { value: 'greater_than', label: 'より大きい' },
+          { value: 'less_than', label: 'より小さい' },
+          { value: 'is_empty', label: '空である' },
+          { value: 'is_not_empty', label: '空でない' }
+        ]
+      case 'DATE':
+        return [
+          { value: 'equals', label: '等しい' },
+          { value: 'not_equals', label: '等しくない' },
+          { value: 'greater_than', label: 'より後' },
+          { value: 'less_than', label: 'より前' },
+          { value: 'is_empty', label: '空である' },
+          { value: 'is_not_empty', label: '空でない' }
+        ]
+      case 'MULTIPLE_CHOICE':
+      case 'CHECKBOX':
+        return [
+          { value: 'equals', label: '等しい' },
+          { value: 'not_equals', label: '等しくない' },
+          { value: 'contains', label: '含む' },
+          { value: 'not_contains', label: '含まない' },
+          { value: 'is_empty', label: '空である' },
+          { value: 'is_not_empty', label: '空でない' }
+        ]
+      case 'FILE_UPLOAD':
+        return [
+          { value: 'is_uploaded', label: 'ファイルがアップロードされている' },
+          { value: 'is_not_uploaded', label: 'ファイルがアップロードされていない' }
+        ]
+      case 'LOCATION':
+        return [
+          { value: 'is_acquired', label: '位置情報が取得されている' },
+          { value: 'is_not_acquired', label: '位置情報が取得されていない' }
+        ]
+      default:
+        return [
+          { value: 'equals', label: '等しい' },
+          { value: 'not_equals', label: '等しくない' },
+          { value: 'is_empty', label: '空である' },
+          { value: 'is_not_empty', label: '空でない' }
+        ]
+    }
+  }
 
   useEffect(() => {
     if (conditions.rules) {
@@ -110,6 +181,7 @@ export default function ConditionalLogicEditor({
       showIf
     })
   }
+
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -221,27 +293,45 @@ export default function ConditionalLogicEditor({
                           onChange={(e) => updateRule(rule.id, 'operator', e.target.value)}
                           className="w-full text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-primary focus:border-primary"
                         >
-                          {AVAILABLE_OPERATORS.map(op => (
-                            <option key={op.value} value={op.value}>
-                              {op.label}
-                            </option>
-                          ))}
+                          {(() => {
+                            const selectedQuestion = availableQuestions.find(q => q.id === rule.questionId)
+                            const operatorOptions = selectedQuestion ? getOperatorOptions(selectedQuestion.type) : []
+                            return operatorOptions.map(op => (
+                              <option key={op.value} value={op.value}>
+                                {op.label}
+                              </option>
+                            ))
+                          })()}
                         </select>
                       </div>
 
-                      {/* 値入力 */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          値
-                        </label>
-                        <input
-                          type="text"
-                          value={rule.value}
-                          onChange={(e) => updateRule(rule.id, 'value', e.target.value)}
-                          placeholder="値を入力"
-                          className="w-full text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-primary focus:border-primary"
-                        />
-                      </div>
+                      {/* 値入力（特殊な演算子の場合は非表示） */}
+                      {(() => {
+                        const selectedQuestion = availableQuestions.find(q => q.id === rule.questionId)
+                        const isSpecialOperator = selectedQuestion && 
+                          (selectedQuestion.type === 'FILE_UPLOAD' || selectedQuestion.type === 'LOCATION') &&
+                          (rule.operator === 'is_uploaded' || rule.operator === 'is_not_uploaded' || 
+                           rule.operator === 'is_acquired' || rule.operator === 'is_not_acquired')
+                        
+                        if (isSpecialOperator) {
+                          return null
+                        }
+                        
+                        return (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              値
+                            </label>
+                            <input
+                              type="text"
+                              value={rule.value}
+                              onChange={(e) => updateRule(rule.id, 'value', e.target.value)}
+                              placeholder="値を入力"
+                              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-primary focus:border-primary"
+                            />
+                          </div>
+                        )
+                      })()}
 
                       {/* 論理演算子 */}
                       {index > 0 && (

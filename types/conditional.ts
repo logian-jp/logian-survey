@@ -3,7 +3,7 @@
 export interface ConditionalRule {
   id: string
   questionId: string
-  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty'
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'is_uploaded' | 'is_not_uploaded' | 'is_acquired' | 'is_not_acquired'
   value: string | number | boolean
   logic: 'AND' | 'OR'
 }
@@ -16,7 +16,7 @@ export interface ConditionalLogic {
 
 export interface QuestionCondition {
   questionId: string
-  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty'
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'is_uploaded' | 'is_not_uploaded' | 'is_acquired' | 'is_not_acquired'
   value: string | number | boolean
 }
 
