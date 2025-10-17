@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import RichTextEditor from '@/components/RichTextEditor'
 
 interface Question {
   id: string
@@ -461,15 +462,14 @@ export default function EditSurvey() {
               </div>
 
               <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
                   説明
                 </label>
-                <textarea
-                  id="description"
-                  rows={3}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                <RichTextEditor
                   value={survey.description || ''}
-                  onChange={(e) => setSurvey({ ...survey, description: e.target.value })}
+                  onChange={(value) => setSurvey({ ...survey, description: value })}
+                  placeholder="アンケートの目的や内容について説明してください"
+                  className="mt-1"
                 />
               </div>
 

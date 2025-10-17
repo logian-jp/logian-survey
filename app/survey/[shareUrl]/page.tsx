@@ -299,7 +299,10 @@ export default function SurveyPage() {
               {survey?.title}
             </h1>
             {survey?.description && (
-              <p className="text-gray-600">{survey.description}</p>
+              <div 
+                className="text-gray-600 prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: survey.description }}
+              />
             )}
           </div>
 
