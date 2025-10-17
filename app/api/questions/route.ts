@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
         description: description || null,
         required: required || false,
         order: order || 0,
-        options: options ? JSON.stringify(options) : null,
-        settings: settings ? JSON.stringify(settings) : null,
+        options: options ? JSON.stringify(options) : undefined,
+        settings: settings ? JSON.stringify(settings) : undefined,
       },
     })
 
