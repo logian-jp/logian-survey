@@ -123,6 +123,7 @@ model Question {
   order       Int
   options     Json?        // For multiple choice, checkbox, etc.
   settings    Json?        // For additional settings like ordinal structure
+  conditions  Json?        // For conditional logic
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import RichTextEditor from '@/components/RichTextEditor'
+import ConditionalLogicEditor from '@/components/ConditionalLogicEditor'
+import { ConditionalLogic } from '@/types/conditional'
 
 interface Question {
   id: string
@@ -18,7 +20,9 @@ interface Question {
     ordinalStructure?: boolean
     naHandling?: 'keep' | 'remove' | 'replace'
     naValue?: string
+    allowedFileTypes?: string[]
   }
+  conditions?: ConditionalLogic
 }
 
 export default function CreateSurvey() {
@@ -515,6 +519,18 @@ export default function CreateSurvey() {
                             )}
                           </div>
                         )}
+
+                        {/* 条件分岐設定 */}
+                        <div className="border-t pt-4">
+                          <ConditionalLogicEditor
+                            conditions={question.conditions || { enabled: false, rules: [], showIf: 'all' }}
+                            onChange={(conditions) => updateQuestion(question.id, { conditions })}
+                            availableQuestions={questions
+                              .filter(q => q.id !== question.id && q.order < question.order)
+                              .map(q => ({ id: q.id, title: q.title, type: q.type }))}
+                            currentQuestionId={question.id}
+                          />
+                        </div>
                       </div>
 
                       {/* 質問間の追加ボタン（最後の質問以外） */}
