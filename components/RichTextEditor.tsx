@@ -93,13 +93,35 @@ export default function RichTextEditor({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // 日本語入力中はエンターキーをそのまま通す（変換確定用）
     if (isComposing) {
       return
     }
     
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      execCommand('insertHTML', '<br>')
+      
+      // カーソル位置を保存
+      const selection = window.getSelection()
+      const range = selection?.getRangeAt(0)
+      
+      if (range) {
+        // 改行を挿入
+        const br = document.createElement('br')
+        range.deleteContents()
+        range.insertNode(br)
+        
+        // カーソルを改行の後に移動
+        range.setStartAfter(br)
+        range.setEndAfter(br)
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+        
+        // 内容を更新
+        if (editorRef.current) {
+          onChange(editorRef.current.innerHTML)
+        }
+      }
     }
   }
 
@@ -113,6 +135,29 @@ export default function RichTextEditor({
     if (editorRef.current) {
       onChange(editorRef.current.innerHTML)
     }
+  }
+
+  const handleKeyUp = (e: React.KeyboardEvent) => {
+    // 日本語入力中は処理をスキップ
+    if (isComposing) {
+      return
+    }
+    
+    // エンターキーを押した場合の特別処理
+    if (e.key === 'Enter') {
+      // カーソル位置を適切に設定
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        // カーソルが適切な位置にあることを確認
+        if (range.collapsed) {
+          // カーソルが折りたたまれている場合は何もしない
+          return
+        }
+      }
+    }
+    
+    updateToolbarState()
   }
 
   const ToolbarButton = ({ 
@@ -251,7 +296,7 @@ export default function RichTextEditor({
         contentEditable
         onInput={handleInput}
         onKeyDown={handleKeyDown}
-        onKeyUp={updateToolbarState}
+        onKeyUp={handleKeyUp}
         onMouseUp={updateToolbarState}
         onCompositionStart={handleCompositionStart}
         onCompositionEnd={handleCompositionEnd}
