@@ -29,6 +29,18 @@ interface Survey {
   questions: Question[]
 }
 
+interface Collaborator {
+  id: string
+  user: {
+    id: string
+    name: string | null
+    email: string
+  }
+  permission: 'EDIT' | 'VIEW' | 'ADMIN'
+  invitedAt: string
+  acceptedAt: string | null
+}
+
 export default function EditSurvey() {
   const params = useParams()
   const router = useRouter()
@@ -36,9 +48,14 @@ export default function EditSurvey() {
   const surveyId = params.id as string
   
   const [survey, setSurvey] = useState<Survey | null>(null)
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([])
+  const [activeTab, setActiveTab] = useState<'edit' | 'collaborators'>('edit')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [invitePermission, setInvitePermission] = useState<'EDIT' | 'VIEW' | 'ADMIN'>('EDIT')
+  const [isInviting, setIsInviting] = useState(false)
 
   const questionTypes = [
     { value: 'TEXT', label: 'テキスト入力' },
@@ -59,6 +76,7 @@ export default function EditSurvey() {
   useEffect(() => {
     if (session && surveyId) {
       fetchSurvey()
+      fetchCollaborators()
     }
   }, [session, surveyId])
 
@@ -75,6 +93,72 @@ export default function EditSurvey() {
       setError('アンケートの読み込みに失敗しました')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchCollaborators = async () => {
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/collaborators`)
+      if (response.ok) {
+        const data = await response.json()
+        setCollaborators(data.survey.collaborators)
+      }
+    } catch (error) {
+      console.error('Failed to fetch collaborators:', error)
+    }
+  }
+
+  const inviteCollaborator = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!inviteEmail) return
+
+    setIsInviting(true)
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/collaborators`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: inviteEmail,
+          permission: invitePermission,
+        }),
+      })
+
+      if (response.ok) {
+        setInviteEmail('')
+        setInvitePermission('EDIT')
+        fetchCollaborators()
+        alert('ユーザーを招待しました')
+      } else {
+        const errorData = await response.json()
+        alert(errorData.message || '招待に失敗しました')
+      }
+    } catch (error) {
+      console.error('Failed to invite collaborator:', error)
+      alert('招待に失敗しました')
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
+  const removeCollaborator = async (collaboratorId: string) => {
+    if (!confirm('このユーザーのアクセス権限を削除しますか？')) return
+
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/collaborators/${collaboratorId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        fetchCollaborators()
+        alert('ユーザーのアクセス権限を削除しました')
+      } else {
+        alert('削除に失敗しました')
+      }
+    } catch (error) {
+      console.error('Failed to remove collaborator:', error)
+      alert('削除に失敗しました')
     }
   }
 
@@ -297,24 +381,55 @@ export default function EditSurvey() {
               >
                 一覧に戻る
               </Link>
-              <button
-                onClick={handleShare}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-              >
-                公開する
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {isSaving ? '保存中...' : '保存'}
-              </button>
+              {activeTab === 'edit' && (
+                <>
+                  <button
+                    onClick={handleShare}
+                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                  >
+                    公開する
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {isSaving ? '保存中...' : '保存'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="space-y-6">
-            {/* アンケート基本情報 */}
+          {/* タブナビゲーション */}
+          <div className="border-b border-gray-200 mb-6">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('edit')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'edit'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                アンケート編集
+              </button>
+              <button
+                onClick={() => setActiveTab('collaborators')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'collaborators'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                協力者管理
+              </button>
+            </nav>
+          </div>
+
+          {activeTab === 'edit' && (
+            <div className="space-y-6">
+              {/* アンケート基本情報 */}
             <div className="space-y-4">
               <div>
                 <label htmlFor="title" className="block text-sm font-medium text-gray-700">
@@ -664,8 +779,116 @@ export default function EditSurvey() {
               </button>
             </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'collaborators' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">協力者管理</h3>
+              
+              {/* 新しい協力者を招待 */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                <h4 className="text-md font-medium text-gray-900 mb-3">新しいユーザーを招待</h4>
+                <form onSubmit={inviteCollaborator} className="flex space-x-4">
+                  <div className="flex-1">
+                    <input
+                      type="email"
+                      placeholder="メールアドレス"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <select
+                      value={invitePermission}
+                      onChange={(e) => setInvitePermission(e.target.value as 'EDIT' | 'VIEW' | 'ADMIN')}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                    >
+                      <option value="VIEW">閲覧のみ</option>
+                      <option value="EDIT">編集可能</option>
+                      <option value="ADMIN">管理者</option>
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isInviting}
+                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {isInviting ? '招待中...' : '招待'}
+                  </button>
+                </form>
+              </div>
+
+              {/* 協力者一覧 */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-3">現在の協力者</h4>
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          ユーザー
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          権限
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          招待日時
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          操作
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {collaborators.map((collaborator) => (
+                        <tr key={collaborator.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {collaborator.user.name || collaborator.user.email}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {collaborator.user.email}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              collaborator.permission === 'ADMIN' 
+                                ? 'bg-red-100 text-red-800'
+                                : collaborator.permission === 'EDIT'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {collaborator.permission === 'ADMIN' ? '管理者' : 
+                               collaborator.permission === 'EDIT' ? '編集' : '閲覧'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(collaborator.invitedAt).toLocaleDateString('ja-JP')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => removeCollaborator(collaborator.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              削除
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
+  </div>
   )
 }

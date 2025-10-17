@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { canViewSurvey, canEditSurvey } from '@/lib/survey-permissions'
 
 export async function GET(
   request: NextRequest,
@@ -16,10 +17,29 @@ export async function GET(
 
     const surveyId = params.id
 
+    // 権限チェック
+    const hasViewPermission = await canViewSurvey(session.user.id, surveyId)
+    if (!hasViewPermission) {
+      return NextResponse.json(
+        { message: 'No permission to view this survey' },
+        { status: 403 }
+      )
+    }
+
     const survey = await prisma.survey.findFirst({
       where: {
         id: surveyId,
-        userId: session.user.id,
+        OR: [
+          { userId: session.user.id },
+          {
+            surveyUsers: {
+              some: {
+                userId: session.user.id,
+                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
+              }
+            }
+          }
+        ]
       },
       include: {
         questions: {
@@ -88,12 +108,18 @@ export async function PUT(
     const surveyId = params.id
     const { title, description, status } = await request.json()
 
-    // アンケートの存在確認と権限チェック
-    const existingSurvey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        userId: session.user.id,
-      },
+    // 権限チェック
+    const hasEditPermission = await canEditSurvey(session.user.id, surveyId)
+    if (!hasEditPermission) {
+      return NextResponse.json(
+        { message: 'No permission to edit this survey' },
+        { status: 403 }
+      )
+    }
+
+    // アンケートの存在確認
+    const existingSurvey = await prisma.survey.findUnique({
+      where: { id: surveyId }
     })
 
     if (!existingSurvey) {
