@@ -13,7 +13,17 @@ export async function GET(request: NextRequest) {
 
     const surveys = await prisma.survey.findMany({
       where: {
-        userId: session.user.id,
+        OR: [
+          { userId: session.user.id },
+          {
+            surveyUsers: {
+              some: {
+                userId: session.user.id,
+                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
+              }
+            }
+          }
+        ]
       },
       include: {
         _count: {
@@ -21,6 +31,21 @@ export async function GET(request: NextRequest) {
             responses: true,
           },
         },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        surveyUsers: {
+          where: {
+            userId: session.user.id
+          },
+          select: {
+            permission: true
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc',
@@ -35,6 +60,8 @@ export async function GET(request: NextRequest) {
       shareUrl: survey.shareUrl,
       createdAt: survey.createdAt,
       responseCount: survey._count.responses,
+      owner: survey.user,
+      userPermission: survey.userId === session.user.id ? 'OWNER' : survey.surveyUsers[0]?.permission || 'VIEW',
     }))
 
     return NextResponse.json(surveysWithResponseCount)

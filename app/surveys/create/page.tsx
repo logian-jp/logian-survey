@@ -482,6 +482,7 @@ export default function CreateSurvey() {
                         </div>
                       )}
                     </div>
+                    </div>
                   ))}
 
                   {/* 最後に質問を追加するボタン */}

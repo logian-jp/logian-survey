@@ -12,6 +12,12 @@ interface Survey {
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED'
   createdAt: string
   responseCount: number
+  owner: {
+    id: string
+    name: string | null
+    email: string
+  }
+  userPermission: 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW'
 }
 
 export default function Dashboard() {
@@ -120,18 +126,29 @@ export default function Dashboard() {
                 <div className="text-sm text-gray-500 mb-4">
                   <p>回答数: {survey.responseCount}件</p>
                   <p>作成日: {new Date(survey.createdAt).toLocaleDateString('ja-JP')}</p>
+                  <p>所有者: {survey.owner.name || survey.owner.email}</p>
+                  <p>あなたの権限: {
+                    survey.userPermission === 'OWNER' ? '所有者' :
+                    survey.userPermission === 'ADMIN' ? '管理者' :
+                    survey.userPermission === 'EDIT' ? '編集' : '閲覧'
+                  }</p>
                 </div>
                 
                 <div className="flex space-x-2">
-                  <Link
-                    href={`/surveys/${survey.id}/edit`}
-                    className="flex-1 text-center py-2 px-3 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    編集
-                  </Link>
+                  {(survey.userPermission === 'OWNER' || survey.userPermission === 'ADMIN' || survey.userPermission === 'EDIT') && (
+                    <Link
+                      href={`/surveys/${survey.id}/edit`}
+                      className="flex-1 text-center py-2 px-3 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    >
+                      編集
+                    </Link>
+                  )}
                   <Link
                     href={`/surveys/${survey.id}/responses`}
-                    className="flex-1 text-center py-2 px-3 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                    className={`text-center py-2 px-3 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors ${
+                      (survey.userPermission === 'OWNER' || survey.userPermission === 'ADMIN' || survey.userPermission === 'EDIT') 
+                        ? 'flex-1' : 'w-full'
+                    }`}
                   >
                     回答を見る
                   </Link>

@@ -12,6 +12,12 @@ interface Survey {
   shareUrl: string | null
   createdAt: string
   responseCount: number
+  owner: {
+    id: string
+    name: string | null
+    email: string
+  }
+  userPermission: 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW'
 }
 
 export default function SurveysPage() {
@@ -51,6 +57,36 @@ export default function SurveysPage() {
         return 'bg-red-100 text-red-800'
       default:
         return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getPermissionBadge = (permission: string) => {
+    switch (permission) {
+      case 'OWNER':
+        return 'bg-purple-100 text-purple-800'
+      case 'ADMIN':
+        return 'bg-red-100 text-red-800'
+      case 'EDIT':
+        return 'bg-blue-100 text-blue-800'
+      case 'VIEW':
+        return 'bg-gray-100 text-gray-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getPermissionText = (permission: string) => {
+    switch (permission) {
+      case 'OWNER':
+        return '所有者'
+      case 'ADMIN':
+        return '管理者'
+      case 'EDIT':
+        return '編集'
+      case 'VIEW':
+        return '閲覧'
+      default:
+        return '閲覧'
     }
   }
 
@@ -125,6 +161,12 @@ export default function SurveysPage() {
                     アンケート名
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    所有者
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    あなたの権限
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ステータス
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -159,6 +201,16 @@ export default function SurveysPage() {
                           )}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {survey.owner.name || survey.owner.email}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPermissionBadge(survey.userPermission)}`}>
+                        {getPermissionText(survey.userPermission)}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(survey.status)}`}>
@@ -198,27 +250,31 @@ export default function SurveysPage() {
                       {new Date(survey.createdAt).toLocaleDateString('ja-JP')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <Link
-                        href={`/surveys/${survey.id}/edit`}
-                        className="text-primary hover:text-primary/80"
-                      >
-                        編集
-                      </Link>
+                      {(survey.userPermission === 'OWNER' || survey.userPermission === 'ADMIN' || survey.userPermission === 'EDIT') && (
+                        <Link
+                          href={`/surveys/${survey.id}/edit`}
+                          className="text-primary hover:text-primary/80"
+                        >
+                          編集
+                        </Link>
+                      )}
                       <Link
                         href={`/surveys/${survey.id}/responses`}
                         className="text-green-600 hover:text-green-800"
                       >
                         回答を見る
                       </Link>
-                      <button
-                        onClick={() => {
-                          const url = `/api/surveys/${survey.id}/export?format=raw`
-                          window.open(url, '_blank')
-                        }}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        CSV出力
-                      </button>
+                      {(survey.userPermission === 'OWNER' || survey.userPermission === 'ADMIN') && (
+                        <button
+                          onClick={() => {
+                            const url = `/api/surveys/${survey.id}/export?format=raw`
+                            window.open(url, '_blank')
+                          }}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          CSV出力
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
