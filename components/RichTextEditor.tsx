@@ -47,21 +47,37 @@ export default function RichTextEditor({
 
   useEffect(() => {
     if (editorRef.current && !isComposing) {
-      // カーソル位置を保存
+      // 現在のカーソル位置を保存
       const selection = window.getSelection()
-      const range = selection?.getRangeAt(0)
-      const cursorOffset = range?.startOffset || 0
+      let savedRange: Range | null = null
       
+      if (selection && selection.rangeCount > 0) {
+        savedRange = selection.getRangeAt(0).cloneRange()
+      }
+      
+      // 内容を更新
       editorRef.current.innerHTML = value
       
       // カーソル位置を復元
-      if (selection && range) {
+      if (selection && savedRange) {
         try {
+          // 新しい範囲を作成
           const newRange = document.createRange()
-          const textNode = editorRef.current.firstChild
-          if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-            newRange.setStart(textNode, Math.min(cursorOffset, textNode.textContent?.length || 0))
-            newRange.setEnd(textNode, Math.min(cursorOffset, textNode.textContent?.length || 0))
+          
+          // テキストノードを探す
+          const walker = document.createTreeWalker(
+            editorRef.current,
+            NodeFilter.SHOW_TEXT,
+            null
+          )
+          
+          let textNode = walker.nextNode()
+          if (textNode) {
+            const textLength = textNode.textContent?.length || 0
+            const offset = Math.min(savedRange.startOffset, textLength)
+            newRange.setStart(textNode, offset)
+            newRange.setEnd(textNode, offset)
+            
             selection.removeAllRanges()
             selection.addRange(newRange)
           }
@@ -88,7 +104,12 @@ export default function RichTextEditor({
 
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
     if (editorRef.current && !isComposing) {
-      onChange(editorRef.current.innerHTML)
+      // 遅延実行でカーソル位置を保持
+      setTimeout(() => {
+        if (editorRef.current) {
+          onChange(editorRef.current.innerHTML)
+        }
+      }, 0)
     }
   }
 
@@ -117,10 +138,12 @@ export default function RichTextEditor({
         selection?.removeAllRanges()
         selection?.addRange(range)
         
-        // 内容を更新
-        if (editorRef.current) {
-          onChange(editorRef.current.innerHTML)
-        }
+        // 内容を更新（カーソル位置を保持するため遅延実行）
+        setTimeout(() => {
+          if (editorRef.current) {
+            onChange(editorRef.current.innerHTML)
+          }
+        }, 0)
       }
     }
   }
