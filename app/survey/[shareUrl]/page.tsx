@@ -32,6 +32,7 @@ export default function SurveyPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [locationLoading, setLocationLoading] = useState<{ [key: string]: boolean }>({})
 
   useEffect(() => {
     if (shareUrl) {
@@ -79,20 +80,45 @@ export default function SurveyPage() {
       return
     }
 
+    // ローディング状態を設定
+    setLocationLoading(prev => ({ ...prev, [questionId]: true }))
+    setError('')
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords
         const locationString = `${latitude},${longitude}`
         handleAnswerChange(questionId, locationString)
+        setLocationLoading(prev => ({ ...prev, [questionId]: false }))
+        console.log('位置情報取得成功:', { latitude, longitude })
       },
       (error) => {
         console.error('位置情報の取得に失敗しました:', error)
-        setError('位置情報の取得に失敗しました')
+        setLocationLoading(prev => ({ ...prev, [questionId]: false }))
+        
+        let errorMessage = '位置情報の取得に失敗しました'
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = '位置情報の使用が拒否されました。ブラウザの設定で位置情報を許可してください。'
+            break
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = '位置情報が利用できません。GPSがオフになっている可能性があります。'
+            break
+          case error.TIMEOUT:
+            errorMessage = '位置情報の取得がタイムアウトしました。もう一度お試しください。'
+            break
+          default:
+            errorMessage = `位置情報の取得に失敗しました: ${error.message}`
+            break
+        }
+        
+        setError(errorMessage)
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000
+        timeout: 15000, // タイムアウトを15秒に延長
+        maximumAge: 30000 // キャッシュ時間を30秒に短縮
       }
     )
   }
@@ -477,9 +503,24 @@ export default function SurveyPage() {
                     <button
                       type="button"
                       onClick={() => getCurrentLocation(question.id)}
-                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      disabled={locationLoading[question.id]}
+                      className={`w-full px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                        locationLoading[question.id]
+                          ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                     >
-                      📍 現在位置を取得
+                      {locationLoading[question.id] ? (
+                        <span className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          位置情報を取得中...
+                        </span>
+                      ) : (
+                        '📍 現在位置を取得'
+                      )}
                     </button>
                     {answers[question.id] && (
                       <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -487,7 +528,7 @@ export default function SurveyPage() {
                           ✅ 位置情報が取得されました
                         </p>
                         <p className="text-xs text-green-600 mt-1">
-                          {answers[question.id]}
+                          緯度: {answers[question.id].toString().split(',')[0]}, 経度: {answers[question.id].toString().split(',')[1]}
                         </p>
                       </div>
                     )}
