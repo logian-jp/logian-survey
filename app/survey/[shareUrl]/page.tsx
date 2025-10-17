@@ -97,15 +97,73 @@ export default function SurveyPage() {
     )
   }
 
-  const handleFileUpload = (questionId: string, files: FileList | null) => {
+  const getAcceptString = (allowedFileTypes: string[] | undefined) => {
+    if (!allowedFileTypes || allowedFileTypes.length === 0) {
+      return "image/*,.pdf,.doc,.docx,.txt"
+    }
+
+    const fileTypeOptions = [
+      { value: 'image', extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'] },
+      { value: 'video', extensions: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv'] },
+      { value: 'pdf', extensions: ['.pdf'] },
+      { value: 'python', extensions: ['.py', '.pyw', '.pyc', '.pyo'] },
+      { value: 'r', extensions: ['.r', '.R', '.RData', '.rds'] },
+      { value: 'document', extensions: ['.doc', '.docx', '.txt', '.rtf'] },
+      { value: 'spreadsheet', extensions: ['.xls', '.xlsx', '.csv'] },
+      { value: 'presentation', extensions: ['.ppt', '.pptx'] },
+      { value: 'archive', extensions: ['.zip', '.rar', '.7z', '.tar', '.gz'] },
+      { value: 'code', extensions: ['.js', '.ts', '.html', '.css', '.json', '.xml', '.sql'] },
+    ]
+
+    const allowedExtensions = allowedFileTypes.flatMap(fileType => {
+      const option = fileTypeOptions.find(opt => opt.value === fileType)
+      return option?.extensions || []
+    })
+
+    return allowedExtensions.join(',')
+  }
+
+  const handleFileUpload = (questionId: string, files: FileList | null, allowedFileTypes: string[] | undefined) => {
     if (!files) return
 
     const fileArray = Array.from(files)
     const maxSize = 10 * 1024 * 1024 // 10MB
-    const validFiles = fileArray.filter(file => file.size <= maxSize)
-
-    if (validFiles.length !== fileArray.length) {
+    
+    // ファイルサイズチェック
+    const sizeValidFiles = fileArray.filter(file => file.size <= maxSize)
+    if (sizeValidFiles.length !== fileArray.length) {
       setError('一部のファイルが10MBを超えているため、アップロードできません')
+    }
+
+    // ファイル形式チェック
+    let validFiles = sizeValidFiles
+    if (allowedFileTypes && allowedFileTypes.length > 0) {
+      const fileTypeOptions = [
+        { value: 'image', extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'] },
+        { value: 'video', extensions: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv'] },
+        { value: 'pdf', extensions: ['.pdf'] },
+        { value: 'python', extensions: ['.py', '.pyw', '.pyc', '.pyo'] },
+        { value: 'r', extensions: ['.r', '.R', '.RData', '.rds'] },
+        { value: 'document', extensions: ['.doc', '.docx', '.txt', '.rtf'] },
+        { value: 'spreadsheet', extensions: ['.xls', '.xlsx', '.csv'] },
+        { value: 'presentation', extensions: ['.ppt', '.pptx'] },
+        { value: 'archive', extensions: ['.zip', '.rar', '.7z', '.tar', '.gz'] },
+        { value: 'code', extensions: ['.js', '.ts', '.html', '.css', '.json', '.xml', '.sql'] },
+      ]
+
+      const allowedExtensions = allowedFileTypes.flatMap(fileType => {
+        const option = fileTypeOptions.find(opt => opt.value === fileType)
+        return option?.extensions || []
+      })
+
+      validFiles = sizeValidFiles.filter(file => {
+        const extension = '.' + file.name.split('.').pop()?.toLowerCase()
+        return allowedExtensions.includes(extension)
+      })
+
+      if (validFiles.length !== sizeValidFiles.length) {
+        setError('一部のファイルが許可されていない形式です')
+      }
     }
 
     setFileUploads(prev => ({
@@ -445,12 +503,39 @@ export default function SurveyPage() {
                       <p className="text-sm text-yellow-700">
                         画像、PDF、Word文書などのファイルをアップロードできます。最大10MBまで対応しています。
                       </p>
+                      {question.settings?.allowedFileTypes?.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-sm text-yellow-800 font-medium">許可されるファイル形式:</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {question.settings.allowedFileTypes.map(fileType => {
+                              const fileTypeOptions = [
+                                { value: 'image', label: '画像系', extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'] },
+                                { value: 'video', label: '動画系', extensions: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv'] },
+                                { value: 'pdf', label: 'PDF', extensions: ['.pdf'] },
+                                { value: 'python', label: 'Python', extensions: ['.py', '.pyw', '.pyc', '.pyo'] },
+                                { value: 'r', label: 'R', extensions: ['.r', '.R', '.RData', '.rds'] },
+                                { value: 'document', label: '文書', extensions: ['.doc', '.docx', '.txt', '.rtf'] },
+                                { value: 'spreadsheet', label: '表計算', extensions: ['.xls', '.xlsx', '.csv'] },
+                                { value: 'presentation', label: 'プレゼンテーション', extensions: ['.ppt', '.pptx'] },
+                                { value: 'archive', label: 'アーカイブ', extensions: ['.zip', '.rar', '.7z', '.tar', '.gz'] },
+                                { value: 'code', label: 'コード', extensions: ['.js', '.ts', '.html', '.css', '.json', '.xml', '.sql'] },
+                              ]
+                              const option = fileTypeOptions.find(opt => opt.value === fileType)
+                              return option?.extensions.map(ext => (
+                                <span key={ext} className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">
+                                  {ext}
+                                </span>
+                              ))
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <input
                       type="file"
                       multiple
-                      accept="image/*,.pdf,.doc,.docx,.txt"
-                      onChange={(e) => handleFileUpload(question.id, e.target.files)}
+                      accept={getAcceptString(question.settings?.allowedFileTypes)}
+                      onChange={(e) => handleFileUpload(question.id, e.target.files, question.settings?.allowedFileTypes)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                     />
                     {fileUploads[question.id] && fileUploads[question.id].length > 0 && (

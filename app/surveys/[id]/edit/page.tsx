@@ -75,6 +75,19 @@ export default function EditSurvey() {
     { value: 'FILE_UPLOAD', label: 'ファイルアップロード' },
   ]
 
+  const fileTypeOptions = [
+    { value: 'image', label: '画像系', extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'] },
+    { value: 'video', label: '動画系', extensions: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv'] },
+    { value: 'pdf', label: 'PDF', extensions: ['.pdf'] },
+    { value: 'python', label: 'Python', extensions: ['.py', '.pyw', '.pyc', '.pyo'] },
+    { value: 'r', label: 'R', extensions: ['.r', '.R', '.RData', '.rds'] },
+    { value: 'document', label: '文書', extensions: ['.doc', '.docx', '.txt', '.rtf'] },
+    { value: 'spreadsheet', label: '表計算', extensions: ['.xls', '.xlsx', '.csv'] },
+    { value: 'presentation', label: 'プレゼンテーション', extensions: ['.ppt', '.pptx'] },
+    { value: 'archive', label: 'アーカイブ', extensions: ['.zip', '.rar', '.7z', '.tar', '.gz'] },
+    { value: 'code', label: 'コード', extensions: ['.js', '.ts', '.html', '.css', '.json', '.xml', '.sql'] },
+  ]
+
   useEffect(() => {
     if (session && surveyId) {
       fetchSurvey()
@@ -714,6 +727,49 @@ export default function EditSurvey() {
                               + 選択肢を追加
                             </button>
                           </div>
+                        </div>
+                      )}
+
+                      {/* ファイルアップロード設定 */}
+                      {question.type === 'FILE_UPLOAD' && (
+                        <div className="border-t pt-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-3">許可するファイル形式</h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            {fileTypeOptions.map((fileType) => (
+                              <label key={fileType.value} className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  checked={question.settings?.allowedFileTypes?.includes(fileType.value) || false}
+                                  onChange={(e) => {
+                                    const currentTypes = question.settings?.allowedFileTypes || []
+                                    const newTypes = e.target.checked
+                                      ? [...currentTypes, fileType.value]
+                                      : currentTypes.filter(type => type !== fileType.value)
+                                    updateQuestion(question.id, {
+                                      settings: { ...question.settings, allowedFileTypes: newTypes }
+                                    })
+                                  }}
+                                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                                />
+                                <span className="text-sm text-gray-700">{fileType.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {question.settings?.allowedFileTypes?.length > 0 && (
+                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <p className="text-sm text-blue-800 font-medium mb-2">許可されるファイル形式:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {question.settings.allowedFileTypes.map(fileType => {
+                                  const option = fileTypeOptions.find(opt => opt.value === fileType)
+                                  return option?.extensions.map(ext => (
+                                    <span key={ext} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                      {ext}
+                                    </span>
+                                  ))
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
