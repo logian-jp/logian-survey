@@ -18,8 +18,7 @@ export async function GET(request: NextRequest) {
           {
             surveyUsers: {
               some: {
-                userId: session.user.id,
-                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
+                userId: session.user.id
               }
             }
           }
@@ -52,17 +51,22 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const surveysWithResponseCount = surveys.map(survey => ({
-      id: survey.id,
-      title: survey.title,
-      description: survey.description,
-      status: survey.status,
-      shareUrl: survey.shareUrl,
-      createdAt: survey.createdAt,
-      responseCount: survey._count.responses,
-      owner: survey.user,
-      userPermission: survey.userId === session.user.id ? 'OWNER' : survey.surveyUsers[0]?.permission || 'VIEW',
-    }))
+    const surveysWithResponseCount = surveys.map(survey => {
+      const isOwner = survey.userId === session.user.id
+      const userPermission = survey.surveyUsers[0]?.permission
+
+      return {
+        id: survey.id,
+        title: survey.title,
+        description: survey.description,
+        status: survey.status,
+        shareUrl: survey.shareUrl,
+        createdAt: survey.createdAt,
+        responseCount: survey._count.responses,
+        owner: survey.user,
+        userPermission: isOwner ? 'OWNER' : userPermission || 'VIEW',
+      }
+    })
 
     return NextResponse.json(surveysWithResponseCount)
   } catch (error) {
