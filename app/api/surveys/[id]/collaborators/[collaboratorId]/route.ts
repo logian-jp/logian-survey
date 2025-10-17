@@ -1,7 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
+import { canAdminSurvey } from '@/lib/survey-permissions'
 
 // 協力者の権限を更新
 export async function PUT(
@@ -26,26 +27,10 @@ export async function PUT(
       )
     }
 
-    // アンケートの所有者かADMIN権限があるかチェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id,
-                permission: 'ADMIN'
-              }
-            }
-          }
-        ]
-      }
-    })
-
-    if (!survey) {
-      return NextResponse.json({ message: 'Survey not found or no permission' }, { status: 404 })
+    // アンケートの管理者権限があるかチェック
+    const hasAdminPermission = await canAdminSurvey(session.user.id, surveyId)
+    if (!hasAdminPermission) {
+      return NextResponse.json({ message: 'このアンケートの管理者権限がありません' }, { status: 403 })
     }
 
     // 協力者を更新
@@ -93,26 +78,10 @@ export async function DELETE(
     const surveyId = params.id
     const collaboratorId = params.collaboratorId
 
-    // アンケートの所有者かADMIN権限があるかチェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id,
-                permission: 'ADMIN'
-              }
-            }
-          }
-        ]
-      }
-    })
-
-    if (!survey) {
-      return NextResponse.json({ message: 'Survey not found or no permission' }, { status: 404 })
+    // アンケートの管理者権限があるかチェック
+    const hasAdminPermission = await canAdminSurvey(session.user.id, surveyId)
+    if (!hasAdminPermission) {
+      return NextResponse.json({ message: 'このアンケートの管理者権限がありません' }, { status: 403 })
     }
 
     // 協力者を削除

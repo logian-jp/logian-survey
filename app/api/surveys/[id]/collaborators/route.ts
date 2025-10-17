@@ -1,7 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
+import { canAdminSurvey } from '@/lib/survey-permissions'
 
 // アンケートの協力者一覧を取得
 export async function GET(
@@ -17,22 +18,15 @@ export async function GET(
 
     const surveyId = params.id
 
-    // アンケートの所有者または協力者かチェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id,
-                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
-              }
-            }
-          }
-        ]
-      },
+    // アンケートの管理者権限があるかチェック
+    const hasAdminPermission = await canAdminSurvey(session.user.id, surveyId)
+    if (!hasAdminPermission) {
+      return NextResponse.json({ message: 'このアンケートの管理者権限がありません' }, { status: 403 })
+    }
+
+    // アンケート情報を取得
+    const survey = await prisma.survey.findUnique({
+      where: { id: surveyId },
       include: {
         user: {
           select: {
@@ -108,26 +102,19 @@ export async function POST(
       )
     }
 
-    // アンケートの所有者かADMIN権限があるかチェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id,
-                permission: 'ADMIN'
-              }
-            }
-          }
-        ]
-      }
+    // アンケートの管理者権限があるかチェック
+    const hasAdminPermission = await canAdminSurvey(session.user.id, surveyId)
+    if (!hasAdminPermission) {
+      return NextResponse.json({ message: 'このアンケートの管理者権限がありません' }, { status: 403 })
+    }
+
+    // アンケートの存在確認
+    const survey = await prisma.survey.findUnique({
+      where: { id: surveyId }
     })
 
     if (!survey) {
-      return NextResponse.json({ message: 'Survey not found or no permission' }, { status: 404 })
+      return NextResponse.json({ message: 'アンケートが見つかりません' }, { status: 404 })
     }
 
     // 招待するユーザーを検索
@@ -136,7 +123,12 @@ export async function POST(
     })
 
     if (!invitedUser) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 })
+      return NextResponse.json({ message: 'このメールアドレスで登録されているユーザーが見つかりません。まずユーザーにアカウント登録をしてもらってください。' }, { status: 404 })
+    }
+
+    // 自分自身を招待しようとしているかチェック
+    if (invitedUser.id === session.user.id) {
+      return NextResponse.json({ message: '自分自身を招待することはできません' }, { status: 400 })
     }
 
     // 既に招待されているかチェック
@@ -150,7 +142,7 @@ export async function POST(
     })
 
     if (existingInvitation) {
-      return NextResponse.json({ message: 'User already invited' }, { status: 400 })
+      return NextResponse.json({ message: 'このユーザーは既に招待されています' }, { status: 400 })
     }
 
     // 招待を作成
