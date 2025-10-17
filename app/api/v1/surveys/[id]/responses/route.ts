@@ -1,0 +1,244 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+// APIキー認証のヘルパー関数
+async function authenticateApiKey(request: NextRequest) {
+  const apiKey = request.headers.get('x-api-key')
+  if (!apiKey) {
+    return null
+  }
+
+  const validApiKey = process.env.API_KEY
+  if (apiKey !== validApiKey) {
+    return null
+  }
+
+  return { apiKey }
+}
+
+// ユーザー認証のヘルパー関数
+async function authenticateUser(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return null
+  }
+  return session.user
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // APIキーまたはユーザー認証をチェック
+    const apiUser = await authenticateApiKey(request)
+    const user = await authenticateUser(request)
+
+    if (!apiUser && !user) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    const surveyId = params.id
+    const { searchParams } = new URL(request.url)
+    const limit = parseInt(searchParams.get('limit') || '100')
+    const offset = parseInt(searchParams.get('offset') || '0')
+    const format = searchParams.get('format') || 'json' // json, csv
+
+    // アンケートの存在確認と権限チェック
+    const survey = await prisma.survey.findFirst({
+      where: {
+        id: surveyId,
+        // ユーザー認証の場合、自分のアンケートのみ
+        ...(user && !apiUser ? { userId: user.id } : {}),
+      },
+      include: {
+        questions: {
+          orderBy: {
+            order: 'asc',
+          },
+        },
+      },
+    })
+
+    if (!survey) {
+      return NextResponse.json(
+        { message: 'Survey not found' },
+        { status: 404 }
+      )
+    }
+
+    // 回答を取得
+    const responses = await prisma.response.findMany({
+      where: {
+        surveyId: surveyId,
+      },
+      include: {
+        answers: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+      skip: offset,
+    })
+
+    if (format === 'csv') {
+      // CSV形式で出力
+      const csvData = generateCSVData(survey, responses)
+      
+      return new NextResponse(csvData, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="survey_${surveyId}_responses.csv"`,
+        },
+      })
+    }
+
+    // JSON形式で出力
+    const responsesWithAnswers = responses.map(response => {
+      const answersMap: { [key: string]: string } = {}
+      response.answers.forEach(answer => {
+        answersMap[answer.questionId] = answer.value || ''
+      })
+
+      return {
+        id: response.id,
+        createdAt: response.createdAt,
+        answers: answersMap,
+      }
+    })
+
+    return NextResponse.json({
+      survey: {
+        id: survey.id,
+        title: survey.title,
+        description: survey.description,
+      },
+      responses: responsesWithAnswers,
+      pagination: {
+        limit,
+        offset,
+        total: responses.length,
+      },
+    })
+  } catch (error) {
+    console.error('Failed to fetch responses:', error)
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const surveyId = params.id
+    const { answers } = await request.json()
+
+    if (!answers) {
+      return NextResponse.json(
+        { message: 'Answers are required' },
+        { status: 400 }
+      )
+    }
+
+    // アンケートが存在し、公開中かチェック
+    const survey = await prisma.survey.findFirst({
+      where: {
+        id: surveyId,
+        status: 'ACTIVE',
+      },
+    })
+
+    if (!survey) {
+      return NextResponse.json(
+        { message: 'Survey not found or not active' },
+        { status: 404 }
+      )
+    }
+
+    // 回答を作成
+    const response = await prisma.response.create({
+      data: {
+        surveyId: surveyId,
+      },
+    })
+
+    // 各質問の回答を作成
+    for (const [questionId, value] of Object.entries(answers)) {
+      if (value !== null && value !== undefined && value !== '') {
+        let answerValue: string
+
+        if (Array.isArray(value)) {
+          // 複数選択の場合、カンマ区切りで保存
+          answerValue = value.join(',')
+        } else {
+          answerValue = String(value)
+        }
+
+        await prisma.answer.create({
+          data: {
+            questionId: questionId,
+            responseId: response.id,
+            value: answerValue,
+          },
+        })
+      }
+    }
+
+    return NextResponse.json({
+      id: response.id,
+      message: 'Response submitted successfully',
+    }, { status: 201 })
+  } catch (error) {
+    console.error('Failed to submit response:', error)
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+function generateCSVData(survey: any, responses: any[]) {
+  const questions = survey.questions
+  const questionMap: { [key: string]: any } = {}
+
+  // ヘッダー行を生成
+  const headers = ['回答ID', '回答日時']
+  questions.forEach((question: any) => {
+    headers.push(question.title)
+    questionMap[question.id] = question
+  })
+
+  // データ行を生成
+  const rows: string[] = []
+  rows.push(headers.join(','))
+
+  responses.forEach((response: any) => {
+    const rowData = [
+      response.id,
+      response.createdAt.toISOString(),
+    ]
+
+    questions.forEach((question: any) => {
+      const answer = response.answers.find((a: any) => a.questionId === question.id)
+      rowData.push(escapeCSVValue(answer?.value || ''))
+    })
+
+    rows.push(rowData.join(','))
+  })
+
+  return rows.join('\n')
+}
+
+function escapeCSVValue(value: string): string {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}

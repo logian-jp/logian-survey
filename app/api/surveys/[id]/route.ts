@@ -1,0 +1,124 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    const surveyId = params.id
+
+    const survey = await prisma.survey.findFirst({
+      where: {
+        id: surveyId,
+        userId: session.user.id,
+      },
+      include: {
+        questions: {
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        _count: {
+          select: {
+            responses: true,
+          },
+        },
+      },
+    })
+
+    if (!survey) {
+      return NextResponse.json(
+        { message: 'Survey not found' },
+        { status: 404 }
+      )
+    }
+
+    // 質問のオプションをパース
+    const questionsWithParsedOptions = survey.questions.map(question => ({
+      id: question.id,
+      type: question.type,
+      title: question.title,
+      description: question.description,
+      required: question.required,
+      order: question.order,
+      options: question.options ? JSON.parse(question.options as string) : null,
+      settings: question.settings ? JSON.parse(question.settings as string) : null,
+    }))
+
+    return NextResponse.json({
+      id: survey.id,
+      title: survey.title,
+      description: survey.description,
+      status: survey.status,
+      shareUrl: survey.shareUrl,
+      createdAt: survey.createdAt,
+      updatedAt: survey.updatedAt,
+      responseCount: survey._count.responses,
+      questions: questionsWithParsedOptions,
+    })
+  } catch (error) {
+    console.error('Failed to fetch survey:', error)
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    const surveyId = params.id
+    const { title, description, status } = await request.json()
+
+    // アンケートの存在確認と権限チェック
+    const existingSurvey = await prisma.survey.findFirst({
+      where: {
+        id: surveyId,
+        userId: session.user.id,
+      },
+    })
+
+    if (!existingSurvey) {
+      return NextResponse.json(
+        { message: 'Survey not found' },
+        { status: 404 }
+      )
+    }
+
+    // アンケートを更新
+    const updatedSurvey = await prisma.survey.update({
+      where: { id: surveyId },
+      data: {
+        ...(title && { title }),
+        ...(description !== undefined && { description }),
+        ...(status && { status }),
+      },
+    })
+
+    return NextResponse.json(updatedSurvey)
+  } catch (error) {
+    console.error('Failed to update survey:', error)
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
