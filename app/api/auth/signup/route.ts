@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         message: 'サーバーエラーが発生しました',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
       },
       { status: 500 }
     )
