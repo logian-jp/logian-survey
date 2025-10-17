@@ -145,8 +145,8 @@ export async function POST(request: NextRequest) {
             description: question.description || null,
             required: question.required || false,
             order: i,
-            options: question.options ? JSON.stringify(question.options) : null,
-            settings: question.settings ? JSON.stringify(question.settings) : null,
+            options: question.options ? JSON.stringify(question.options) : undefined,
+            settings: question.settings ? JSON.stringify(question.settings) : undefined,
           },
         })
       }
