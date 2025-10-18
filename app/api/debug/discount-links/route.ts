@@ -1,0 +1,53 @@
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.email) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    // 管理者権限のチェック
+    if (session.user.email !== 'noutomi0729@gmail.com') {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
+
+    console.log('=== Debug Discount Links ===')
+    
+    const discountLinks = await prisma.discountLink.findMany({
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        isActive: true,
+        validFrom: true,
+        validUntil: true,
+        createdAt: true,
+        updatedAt: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+
+    console.log('Found discount links:', discountLinks.length)
+    discountLinks.forEach(link => {
+      console.log(`- ${link.code}: isActive=${link.isActive}, validFrom=${link.validFrom}, validUntil=${link.validUntil}`)
+    })
+
+    return NextResponse.json({
+      count: discountLinks.length,
+      links: discountLinks
+    })
+  } catch (error) {
+    console.error('Debug discount links error:', error)
+    return NextResponse.json(
+      { message: 'Internal server error', error: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    )
+  }
+}

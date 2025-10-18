@@ -545,6 +545,9 @@ export default function DiscountLinksPage() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ステータス
+                    <div className="text-xs text-gray-400 font-normal">
+                      (アクティブ/利用可能)
+                    </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     アクション
@@ -619,13 +622,22 @@ export default function DiscountLinksPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        isLinkValid(link)
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {isLinkValid(link) ? '有効' : '無効'}
-                      </span>
+                      <div className="flex flex-col space-y-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          link.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {link.isActive ? 'アクティブ' : '非アクティブ'}
+                        </span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          isLinkValid(link)
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {isLinkValid(link) ? '利用可能' : '利用不可'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
