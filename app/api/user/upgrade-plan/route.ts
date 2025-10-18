@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     console.log('Found user ID:', user.id)
     console.log('Found user email:', user.email)
     console.log(`Processing payment: ${planType} - ¥${amount} - ${paymentMethod}`)
+    console.log('Request body:', { planType, paymentMethod, amount })
     
     // 現在のプランを確認
     const currentPlan = await prisma.userPlan.findUnique({
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
         where: { userId: user.id }
       })
       console.log('Plan after update verification:', updatedPlan)
+      console.log('Updated plan type:', updatedPlan?.planType)
+      console.log('Updated plan status:', updatedPlan?.status)
       
     } catch (error) {
       console.error('Failed to update user plan:', error)
@@ -81,9 +84,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // セッション更新のためのユーザー情報を取得
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        userPlan: true
+      }
+    })
+
     return NextResponse.json({
       message: 'Plan upgraded successfully',
-      userPlan
+      userPlan,
+      user: updatedUser
     })
   } catch (error) {
     console.error('Failed to upgrade plan:', error)

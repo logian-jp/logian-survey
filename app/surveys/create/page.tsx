@@ -30,7 +30,7 @@ interface Question {
 export default function CreateSurvey() {
   const { data: session } = useSession()
   const router = useRouter()
-  const [showSidebar, setShowSidebar] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(true)
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
   const [survey, setSurvey] = useState({
     title: '',

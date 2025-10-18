@@ -66,7 +66,7 @@ export default function EditSurvey() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [invitePermission, setInvitePermission] = useState<'EDIT' | 'VIEW' | 'ADMIN'>('EDIT')
   const [isInviting, setIsInviting] = useState(false)
-  const [showSidebar, setShowSidebar] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(true)
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
 
   const questionTypes = [

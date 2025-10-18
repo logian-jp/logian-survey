@@ -53,7 +53,23 @@ export default function QuestionTemplateSidebar({
       const response = await fetch(`/api/question-templates?includePublic=${showPublic}`)
       if (response.ok) {
         const data = await response.json()
-        setTemplates(data)
+        // デフォルトテンプレートを優先表示するようにソート
+        const sortedData = data.sort((a: QuestionTemplate, b: QuestionTemplate) => {
+          const aIsDefault = a.title.startsWith('[デフォルト]')
+          const bIsDefault = b.title.startsWith('[デフォルト]')
+          
+          if (aIsDefault && !bIsDefault) return -1
+          if (!aIsDefault && bIsDefault) return 1
+          
+          // デフォルトテンプレート内では使用回数順
+          if (aIsDefault && bIsDefault) {
+            return b.usageCount - a.usageCount
+          }
+          
+          // その他は使用回数順
+          return b.usageCount - a.usageCount
+        })
+        setTemplates(sortedData)
       }
     } catch (error) {
       console.error('テンプレート取得エラー:', error)
@@ -138,7 +154,16 @@ export default function QuestionTemplateSidebar({
   const filteredTemplates = templates.filter(template =>
     template.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     template.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  ).sort((a, b) => {
+    // 検索結果でもデフォルトテンプレートを優先表示
+    const aIsDefault = a.title.startsWith('[デフォルト]')
+    const bIsDefault = b.title.startsWith('[デフォルト]')
+    
+    if (aIsDefault && !bIsDefault) return -1
+    if (!aIsDefault && bIsDefault) return 1
+    
+    return 0
+  })
 
   const toggleExpanded = (templateId: string) => {
     setExpandedTemplate(expandedTemplate === templateId ? null : templateId)

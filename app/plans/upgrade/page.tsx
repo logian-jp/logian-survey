@@ -201,22 +201,55 @@ export default function UpgradePage() {
         console.log('Upgrade successful:', result)
         setIsSuccess(true)
         
-        // プラン情報を再取得して確認
-        try {
-          const planResponse = await fetch(`/api/user/plan?t=${Date.now()}`)
-          if (planResponse.ok) {
-            const planData = await planResponse.json()
-            console.log('Updated plan data:', planData)
+        // データベース更新の完了を待機
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // プラン情報を再取得して確認（複数回試行）
+        let planVerified = false
+        for (let i = 0; i < 5; i++) {
+          try {
+            console.log(`Verifying plan update (attempt ${i + 1}/5)`)
+            const planResponse = await fetch(`/api/user/plan?t=${Date.now()}`)
+            if (planResponse.ok) {
+              const planData = await planResponse.json()
+              console.log('Updated plan data:', planData)
+              if (planData.planType === planType) {
+                console.log('Plan verification successful!')
+                planVerified = true
+                break
+              } else {
+                console.log(`Plan type mismatch: expected ${planType}, got ${planData.planType}`)
+                console.log('Full plan data:', planData)
+                if (i < 4) {
+                  await new Promise(resolve => setTimeout(resolve, 1000)) // 1秒待機
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to verify plan update (attempt ${i + 1}):`, error)
+            if (i < 4) {
+              await new Promise(resolve => setTimeout(resolve, 1000)) // 1秒待機
+            }
           }
-        } catch (error) {
-          console.error('Failed to verify plan update:', error)
+        }
+        
+        if (!planVerified) {
+          console.warn('Plan verification failed, but proceeding with redirect')
         }
         
         // セッションを更新してからリダイレクト
         try {
           // セッション情報を更新
-          await fetch('/api/auth/session?update=true')
-          console.log('Session refreshed')
+          const sessionResponse = await fetch('/api/user/refresh-session', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+          if (sessionResponse.ok) {
+            const sessionData = await sessionResponse.json()
+            console.log('Session refreshed:', sessionData)
+          }
         } catch (error) {
           console.error('Failed to refresh session:', error)
         }

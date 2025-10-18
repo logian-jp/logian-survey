@@ -40,6 +40,8 @@ export async function GET() {
     })
 
     console.log('Found user plan:', userPlan)
+    console.log('User plan type:', userPlan?.planType)
+    console.log('User plan status:', userPlan?.status)
 
     // プランが存在しない場合は無料プランを作成
     if (!userPlan) {

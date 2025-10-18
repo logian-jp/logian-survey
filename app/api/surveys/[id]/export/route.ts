@@ -91,41 +91,44 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
   const headers: string[] = ['回答ID', '回答日時']
   const questionMap: { [key: string]: any } = {}
 
-  questions.forEach((question: any) => {
-    const parsedSettings = question.settings ? JSON.parse(question.settings) : {}
-    
-    // 個人情報の除外チェック
-    if (!includePersonalData && ['NAME', 'EMAIL', 'PHONE'].includes(question.type)) {
-      return
-    }
+    questions.forEach((question: any) => {
+      const parsedSettings = question.settings ? JSON.parse(question.settings) : {}
+      
+      // 個人情報の除外チェック
+      if (!includePersonalData && ['NAME', 'EMAIL', 'PHONE'].includes(question.type)) {
+        return
+      }
 
-    if (format === 'raw') {
-      headers.push(question.title)
-      questionMap[question.id] = { question, settings: parsedSettings }
-    } else {
-      // 分析用の列を生成
-      if (['RADIO', 'SELECT', 'PREFECTURE', 'AGE_GROUP'].includes(question.type)) {
-        if (parsedSettings.ordinalStructure) {
-          // 順序構造がある場合、数値変換
+      if (format === 'raw') {
+        headers.push(question.title)
+        questionMap[question.id] = { question, settings: parsedSettings }
+      } else {
+        // 分析用の列を生成
+        if (question.type === 'AGE_GROUP') {
+          // 年齢グループは順序構造があるカテゴリ変数として1列で表示
           headers.push(`${question.title}_numeric`)
-        } else {
-          // 順序構造がない場合、One-Hot Encoding
+        } else if (['RADIO', 'SELECT', 'PREFECTURE'].includes(question.type)) {
+          if (parsedSettings.ordinalStructure) {
+            // 順序構造がある場合、数値変換
+            headers.push(`${question.title}_numeric`)
+          } else {
+            // 順序構造がない場合、One-Hot Encoding
+            const options = getQuestionOptions(question)
+            options.forEach(option => {
+              headers.push(`${question.title}_${option}`)
+            })
+          }
+        } else if (question.type === 'CHECKBOX') {
           const options = getQuestionOptions(question)
           options.forEach(option => {
             headers.push(`${question.title}_${option}`)
           })
+        } else {
+          headers.push(question.title)
         }
-      } else if (question.type === 'CHECKBOX') {
-        const options = getQuestionOptions(question)
-        options.forEach(option => {
-          headers.push(`${question.title}_${option}`)
-        })
-      } else {
-        headers.push(question.title)
+        questionMap[question.id] = { question, settings: parsedSettings }
       }
-      questionMap[question.id] = { question, settings: parsedSettings }
-    }
-  })
+    })
 
   // データ行を生成
   const rows: string[] = []
@@ -138,9 +141,16 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
     ]
     const answerMap: { [key: string]: string } = {}
     
-    // 回答をマップに変換
+    // 回答をマップに変換（データ整合性チェック付き）
     response.answers.forEach((answer: any) => {
-      answerMap[answer.questionId] = answer.value
+      // 質問IDが存在するかチェック
+      const question = questions.find((q: any) => q.id === answer.questionId)
+      if (question) {
+        answerMap[answer.questionId] = answer.value
+        console.log(`Valid answer mapping: Q${question.title} -> ${answer.value}`)
+      } else {
+        console.warn(`Invalid answer mapping: questionId ${answer.questionId} not found`)
+      }
     })
 
     questions.forEach((question: any) => {
@@ -157,7 +167,11 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
         rowData.push(escapeCSVValue(answer))
       } else {
         // 分析用のデータ変換
-        if (['RADIO', 'SELECT', 'PREFECTURE'].includes(question.type)) {
+        if (question.type === 'AGE_GROUP') {
+          // 年齢グループは順序構造があるカテゴリ変数として1列で表示
+          const numericValue = convertToNumeric(question, answer)
+          rowData.push(escapeCSVValue(String(numericValue)))
+        } else if (['RADIO', 'SELECT', 'PREFECTURE'].includes(question.type)) {
           if (parsedSettings.ordinalStructure) {
             // 順序構造がある場合、数値変換
             const numericValue = convertToNumeric(question, answer)
@@ -170,10 +184,6 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
               rowData.push(escapeCSVValue(isSelected))
             })
           }
-        } else if (question.type === 'AGE_GROUP') {
-          // 年齢グループは順序構造があるカテゴリ変数として1列で表示
-          const numericValue = convertToNumeric(question, answer)
-          rowData.push(escapeCSVValue(String(numericValue)))
         } else if (question.type === 'CHECKBOX') {
           // 複数選択の場合、One-Hot Encoding
           const options = getQuestionOptions(question)
@@ -241,8 +251,12 @@ function getQuestionOptions(question: any): string[] {
 }
 
 function convertToNumeric(question: any, answer: string): number {
+  console.log(`Converting to numeric: ${question.type} - "${answer}"`)
+  
   if (question.type === 'AGE_GROUP') {
-    return convertAgeGroupToNumber(answer)
+    const numericValue = convertAgeGroupToNumber(answer)
+    console.log(`Age group conversion: "${answer}" -> ${numericValue}`)
+    return numericValue
   }
   
   if (question.type === 'PREFECTURE') {
@@ -259,12 +273,16 @@ function convertToNumeric(question: any, answer: string): number {
       '九州': 8,
       '沖縄': 9,
     }
-    return regionMap[region] || 0
+    const numericValue = regionMap[region] || 0
+    console.log(`Prefecture conversion: "${answer}" -> region: "${region}" -> ${numericValue}`)
+    return numericValue
   }
   
   // その他の場合は選択肢のインデックスを返す
   const options = getQuestionOptions(question)
-  return options.indexOf(answer) + 1
+  const numericValue = options.indexOf(answer) + 1
+  console.log(`Generic conversion: "${answer}" -> index: ${options.indexOf(answer)} -> ${numericValue}`)
+  return numericValue
 }
 
 function formatToTokyoTime(dateString: string): string {

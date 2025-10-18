@@ -68,6 +68,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'タイトルとタイプは必須です' }, { status: 400 })
     }
 
+    // ユーザーが存在するか確認
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id }
+    })
+
+    if (!user) {
+      console.error('User not found in database:', session.user.id)
+      return NextResponse.json({
+        message: 'ユーザーがデータベースに存在しません',
+        userId: session.user.id
+      }, { status: 400 })
+    }
+
+    console.log('Creating template for user:', user.name, user.email, user.id)
+
     const template = await prisma.questionTemplate.create({
       data: {
         title,
