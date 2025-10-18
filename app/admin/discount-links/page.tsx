@@ -183,26 +183,33 @@ export default function DiscountLinksPage() {
     }
   }
 
-  const toggleLinkStatus = async (linkId: string, isActive: boolean) => {
+  const toggleLinkStatus = async (linkId: string, currentIsActive: boolean) => {
     try {
+      const newIsActive = !currentIsActive
+      console.log(`Toggling discount link ${linkId} from ${currentIsActive} to ${newIsActive}`)
+      
       const response = await fetch(`/api/admin/discount-links/${linkId}/toggle`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ isActive: !isActive }),
+        body: JSON.stringify({ isActive: newIsActive }),
       })
 
       if (response.ok) {
         const result = await response.json()
+        console.log('Toggle response:', result)
+        
+        // ローカル状態を更新
         setDiscountLinks(prev => 
           prev.map(link => 
-            link.id === linkId ? { ...link, isActive: !isActive } : link
+            link.id === linkId ? { ...link, isActive: newIsActive } : link
           )
         )
-        alert(`割引リンクを${!isActive ? '有効化' : '無効化'}しました`)
+        alert(`割引リンクを${newIsActive ? '有効化' : '無効化'}しました`)
       } else {
         const error = await response.json()
+        console.error('Toggle failed:', error)
         alert(`ステータスの更新に失敗しました: ${error.message}`)
       }
     } catch (error) {

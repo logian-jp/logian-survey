@@ -118,6 +118,37 @@ export default function DiscountLinkDetailPage() {
     return now >= validFrom && now <= validUntil && link.isActive
   }
 
+  const toggleLinkStatus = async (linkId: string, currentIsActive: boolean) => {
+    try {
+      const newIsActive = !currentIsActive
+      console.log(`Toggling discount link ${linkId} from ${currentIsActive} to ${newIsActive}`)
+      
+      const response = await fetch(`/api/admin/discount-links/${linkId}/toggle`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isActive: newIsActive }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Toggle response:', result)
+        
+        // ローカル状態を更新
+        setDiscountLink(prev => prev ? { ...prev, isActive: newIsActive } : null)
+        alert(`割引リンクを${newIsActive ? '有効化' : '無効化'}しました`)
+      } else {
+        const error = await response.json()
+        console.error('Toggle failed:', error)
+        alert(`ステータスの更新に失敗しました: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Failed to update link status:', error)
+      alert('エラーが発生しました')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -266,13 +297,25 @@ export default function DiscountLinkDetailPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     ステータス
                   </label>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    isLinkValid(discountLink)
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {isLinkValid(discountLink) ? '有効' : '無効'}
-                  </span>
+                  <div className="flex items-center space-x-3">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      discountLink.isActive
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {discountLink.isActive ? '有効' : '無効'}
+                    </span>
+                    <button
+                      onClick={() => toggleLinkStatus(discountLink.id, discountLink.isActive)}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                        discountLink.isActive
+                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                          : 'bg-green-100 text-green-700 hover:bg-green-200'
+                      }`}
+                    >
+                      {discountLink.isActive ? '無効化' : '有効化'}
+                    </button>
+                  </div>
                 </div>
               </div>
               {discountLink.description && (
