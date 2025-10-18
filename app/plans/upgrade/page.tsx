@@ -213,12 +213,12 @@ export default function UpgradePage() {
             if (planResponse.ok) {
               const planData = await planResponse.json()
               console.log('Updated plan data:', planData)
-              if (planData.planType === planType) {
+              if (planData.planType === plan.id) {
                 console.log('Plan verification successful!')
                 planVerified = true
                 break
               } else {
-                console.log(`Plan type mismatch: expected ${planType}, got ${planData.planType}`)
+                console.log(`Plan type mismatch: expected ${plan.id}, got ${planData.planType}`)
                 console.log('Full plan data:', planData)
                 if (i < 4) {
                   await new Promise(resolve => setTimeout(resolve, 1000)) // 1秒待機

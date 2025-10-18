@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { QuestionType } from '@prisma/client'
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -68,7 +69,7 @@ export async function POST() {
       {
         title: '[デフォルト] お名前',
         description: '回答者のお名前を入力してください',
-        type: 'NAME',
+        type: QuestionType.NAME,
         required: true,
         isPublic: true,
         userId: adminUser.id
@@ -76,7 +77,7 @@ export async function POST() {
       {
         title: '[デフォルト] メールアドレス',
         description: '連絡先のメールアドレスを入力してください',
-        type: 'EMAIL',
+        type: QuestionType.EMAIL,
         required: true,
         isPublic: true,
         userId: adminUser.id
@@ -84,7 +85,7 @@ export async function POST() {
       {
         title: '[デフォルト] 電話番号',
         description: '連絡先の電話番号を入力してください',
-        type: 'PHONE',
+        type: QuestionType.PHONE,
         required: false,
         isPublic: true,
         userId: adminUser.id
@@ -92,7 +93,7 @@ export async function POST() {
       {
         title: '[デフォルト] 年齢',
         description: 'あなたの年齢を教えてください',
-        type: 'AGE_GROUP',
+        type: QuestionType.AGE_GROUP,
         required: true,
         isPublic: true,
         userId: adminUser.id
@@ -100,7 +101,7 @@ export async function POST() {
       {
         title: '[デフォルト] 性別',
         description: 'あなたの性別を教えてください',
-        type: 'RADIO',
+        type: QuestionType.RADIO,
         required: true,
         options: ['男性', '女性', 'その他', '回答しない'],
         isPublic: true,
@@ -109,7 +110,7 @@ export async function POST() {
       {
         title: '[デフォルト] 都道府県',
         description: 'お住まいの都道府県を教えてください',
-        type: 'PREFECTURE',
+        type: QuestionType.PREFECTURE,
         required: true,
         isPublic: true,
         userId: adminUser.id
@@ -117,7 +118,7 @@ export async function POST() {
       {
         title: '[デフォルト] 満足度評価',
         description: 'このサービスについてどの程度満足していますか？',
-        type: 'RADIO',
+        type: QuestionType.RADIO,
         required: true,
         options: ['非常に満足', '満足', 'どちらでもない', '不満', '非常に不満'],
         settings: { ordinalStructure: true },
@@ -127,7 +128,7 @@ export async function POST() {
       {
         title: '[デフォルト] 推奨度',
         description: 'このサービスを他の人に推奨しますか？',
-        type: 'RADIO',
+        type: QuestionType.RADIO,
         required: true,
         options: ['絶対に推奨する', '推奨する', 'どちらでもない', '推奨しない', '絶対に推奨しない'],
         settings: { ordinalStructure: true },
@@ -137,7 +138,7 @@ export async function POST() {
       {
         title: '[デフォルト] 改善点',
         description: '改善してほしい点があれば教えてください',
-        type: 'TEXTAREA',
+        type: QuestionType.TEXTAREA,
         required: false,
         isPublic: true,
         userId: adminUser.id
@@ -145,7 +146,7 @@ export async function POST() {
       {
         title: '[デフォルト] その他のご意見',
         description: 'その他ご意見やご要望がございましたらお聞かせください',
-        type: 'TEXTAREA',
+        type: QuestionType.TEXTAREA,
         required: false,
         isPublic: true,
         userId: adminUser.id
