@@ -75,6 +75,12 @@ export async function GET() {
     const planConfigs = await prisma.planConfig.findMany({
       where: { isActive: true }
     })
+    
+    console.log('=== Analytics Debug ===')
+    console.log('Found plan configs:', planConfigs.length)
+    console.log('Plan configs:', planConfigs.map(p => ({ planType: p.planType, name: p.name, price: p.price })))
+    console.log('User plans found:', userPlans.length)
+    console.log('User plans:', userPlans.map(up => ({ planType: up.planType, userId: up.userId })))
 
     // 今月の売上計算
     let monthlyRevenue = 0
@@ -86,8 +92,14 @@ export async function GET() {
         const revenue = planConfig.price
         monthlyRevenue += revenue
         revenueBreakdown[planConfig.name] = (revenueBreakdown[planConfig.name] || 0) + revenue
+        console.log(`Revenue calculation: ${userPlan.planType} -> ${planConfig.name} -> ¥${revenue}`)
+      } else {
+        console.log(`No plan config found for: ${userPlan.planType}`)
       }
     }
+    
+    console.log('Monthly revenue calculated:', monthlyRevenue)
+    console.log('Revenue breakdown:', revenueBreakdown)
 
     // 過去6ヶ月のユーザー推移
     const userGrowthData = []

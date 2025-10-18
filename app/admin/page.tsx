@@ -113,6 +113,7 @@ export default function AdminDashboard() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [selectedFormat, setSelectedFormat] = useState<'raw' | 'normalized' | 'standardized'>('raw')
   const [includePersonalData, setIncludePersonalData] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(false)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -184,6 +185,30 @@ export default function AdminDashboard() {
     }
   }
 
+  const initializePlanConfig = async () => {
+    setIsInitializing(true)
+    try {
+      const response = await fetch('/api/admin/init-plan-config', {
+        method: 'POST'
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        alert(`プラン設定を初期化しました: ${result.count}個のプランが作成されました`)
+        // データを再取得
+        fetchStats()
+      } else {
+        const errorData = await response.json()
+        alert(`プラン設定の初期化に失敗しました: ${errorData.message}`)
+      }
+    } catch (error) {
+      console.error('Plan config initialization error:', error)
+      alert('プラン設定の初期化中にエラーが発生しました')
+    } finally {
+      setIsInitializing(false)
+    }
+  }
+
   const formatToTokyoTime = (dateString: string): string => {
     const date = new Date(dateString)
     const tokyoTime = new Date(date.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
@@ -225,6 +250,13 @@ export default function AdminDashboard() {
               <p className="text-sm text-gray-600">システム全体の統計情報とデータ管理</p>
             </div>
               <div className="flex items-center space-x-4">
+                <button
+                  onClick={initializePlanConfig}
+                  disabled={isInitializing}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm disabled:opacity-50"
+                >
+                  {isInitializing ? '初期化中...' : 'プラン設定初期化'}
+                </button>
                 <Link
                   href="/admin/plan-config"
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
