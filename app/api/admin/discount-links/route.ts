@@ -44,6 +44,9 @@ export async function GET() {
       })
 
       console.log('Found discount links:', discountLinks.length)
+      discountLinks.forEach(link => {
+        console.log(`- ${link.code}: isActive=${link.isActive}, validFrom=${link.validFrom}, validUntil=${link.validUntil}`)
+      })
       return NextResponse.json(discountLinks)
     } catch (error: any) {
       if (error.code === 'P2022') {

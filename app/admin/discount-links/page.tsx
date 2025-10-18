@@ -104,6 +104,9 @@ export default function DiscountLinksPage() {
       if (response.ok) {
         const data = await response.json()
         console.log('Received discount links:', data)
+        data.forEach((link: any) => {
+          console.log(`Frontend received: ${link.code} - isActive: ${link.isActive}, validFrom: ${link.validFrom}, validUntil: ${link.validUntil}`)
+        })
         setDiscountLinks(data)
       } else {
         const errorData = await response.json()
@@ -201,11 +204,13 @@ export default function DiscountLinksPage() {
         console.log('Toggle response:', result)
         
         // ローカル状態を更新
-        setDiscountLinks(prev => 
-          prev.map(link => 
+        setDiscountLinks(prev => {
+          const updated = prev.map(link => 
             link.id === linkId ? { ...link, isActive: newIsActive } : link
           )
-        )
+          console.log('Updated discount links state:', updated.map(l => ({ code: l.code, isActive: l.isActive })))
+          return updated
+        })
         alert(`割引リンクを${newIsActive ? '有効化' : '無効化'}しました`)
       } else {
         const error = await response.json()
