@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { AnnouncementType, AnnouncementStatus } from '@prisma/client'
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -121,8 +120,8 @@ export async function PUT(
         type,
         priority: priority || 0,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-        targetPlans: targetPlans ? JSON.stringify(targetPlans) : null,
-        conditions: conditions ? JSON.stringify(conditions) : null
+        targetPlans: targetPlans ? targetPlans : undefined,
+        conditions: conditions ? conditions : undefined
       }
     })
 
