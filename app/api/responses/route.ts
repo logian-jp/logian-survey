@@ -18,6 +18,9 @@ export async function POST(request: NextRequest) {
         id: surveyId,
         status: 'ACTIVE',
       },
+      include: {
+        questions: true,
+      },
     })
 
     if (!survey) {
@@ -27,6 +30,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 質問IDの存在確認
+    const validQuestionIds = new Set(survey.questions.map(q => q.id))
+    const submittedQuestionIds = Object.keys(answers)
+    
+    for (const questionId of submittedQuestionIds) {
+      if (!validQuestionIds.has(questionId)) {
+        console.error(`Invalid questionId: ${questionId} for survey: ${surveyId}`)
+        return NextResponse.json(
+          { message: `Invalid question ID: ${questionId}` },
+          { status: 400 }
+        )
+      }
+    }
+
     // 回答を作成
     const response = await prisma.response.create({
       data: {
@@ -34,9 +51,18 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 各質問の回答を作成
+    // 各質問の回答を作成（トランザクション内で実行）
+    const answerPromises = []
+    
     for (const [questionId, value] of Object.entries(answers)) {
       if (value !== null && value !== undefined && value !== '') {
+        // 質問の存在を再確認
+        const question = survey.questions.find(q => q.id === questionId)
+        if (!question) {
+          console.error(`Question not found: ${questionId}`)
+          continue
+        }
+        
         let answerValue: string
 
         if (Array.isArray(value)) {
@@ -46,15 +72,20 @@ export async function POST(request: NextRequest) {
           answerValue = String(value)
         }
 
-        await prisma.answer.create({
-          data: {
-            questionId: questionId,
-            responseId: response.id,
-            value: answerValue,
-          },
-        })
+        answerPromises.push(
+          prisma.answer.create({
+            data: {
+              questionId: questionId,
+              responseId: response.id,
+              value: answerValue,
+            },
+          })
+        )
       }
     }
+    
+    // すべての回答を並行して作成
+    await Promise.all(answerPromises)
 
     return NextResponse.json({ message: 'Response submitted successfully' })
   } catch (error) {
