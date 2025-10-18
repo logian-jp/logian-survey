@@ -168,8 +168,16 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
           // 複数選択の場合、One-Hot Encoding
           const options = getQuestionOptions(question)
           const selectedOptions = answer ? answer.split(',') : []
+          console.log('CHECKBOX processing:', {
+            questionId: question.id,
+            questionTitle: question.title,
+            answer: answer,
+            selectedOptions: selectedOptions,
+            options: options
+          })
           options.forEach(option => {
             const isSelected = selectedOptions.includes(option) ? '1' : '0'
+            console.log(`Option "${option}": isSelected=${isSelected}`)
             rowData.push(escapeCSVValue(isSelected))
           })
         } else {
@@ -186,8 +194,23 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
 }
 
 function getQuestionOptions(question: any): string[] {
+  console.log('getQuestionOptions called for question:', {
+    id: question.id,
+    type: question.type,
+    title: question.title,
+    options: question.options,
+    optionsType: typeof question.options
+  })
+  
   if (question.options) {
-    return JSON.parse(question.options)
+    try {
+      const parsed = JSON.parse(question.options)
+      console.log('Parsed options:', parsed)
+      return parsed
+    } catch (error) {
+      console.error('Failed to parse options:', error, 'Raw options:', question.options)
+      return []
+    }
   }
   
   if (question.type === 'PREFECTURE') {

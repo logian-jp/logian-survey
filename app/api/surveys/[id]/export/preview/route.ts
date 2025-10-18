@@ -159,8 +159,16 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
           // 複数選択の場合、One-Hot Encoding
           const options = getQuestionOptions(question)
           const selectedOptions = answer ? answer.split(',') : []
+          console.log('CHECKBOX processing (preview):', {
+            questionId: question.id,
+            questionTitle: question.title,
+            answer: answer,
+            selectedOptions: selectedOptions,
+            options: options
+          })
           options.forEach(option => {
             const isSelected = selectedOptions.includes(option) ? '1' : '0'
+            console.log(`Option "${option}": isSelected=${isSelected}`)
             rowData.push(escapeCSVValue(isSelected))
           })
         } else {
