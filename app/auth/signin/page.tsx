@@ -18,18 +18,31 @@ export default function SignIn() {
     setError('')
 
     try {
+      console.log('Attempting login with:', { email, password: '***' })
       const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
       })
 
+      console.log('SignIn result:', result)
+      
       if (result?.error) {
-        setError('ログインに失敗しました')
-      } else {
+        console.error('Login error:', result.error)
+        setError('ログインに失敗しました: ' + result.error)
+      } else if (result?.ok) {
+        console.log('Login successful, redirecting to dashboard')
+        // セッションを確認してからリダイレクト
+        const session = await getSession()
+        console.log('Current session:', session)
         router.push('/dashboard')
+        router.refresh() // ページを強制リフレッシュ
+      } else {
+        console.log('Login result was neither error nor ok:', result)
+        setError('ログインに失敗しました')
       }
     } catch (error) {
+      console.error('Login exception:', error)
       setError('ログインに失敗しました')
     } finally {
       setIsLoading(false)
