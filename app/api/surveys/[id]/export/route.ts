@@ -50,14 +50,18 @@ export async function GET(
     // CSVデータを生成
     const csvData = generateCSVData(survey, format, includePersonalData)
 
-    // CSVファイル名を生成
+    // CSVファイル名を生成（URLエンコードして安全にする）
     const timestamp = new Date().toISOString().split('T')[0]
     const filename = `${survey.title}_${format}_${timestamp}.csv`
+    const encodedFilename = encodeURIComponent(filename)
 
-    return new NextResponse(csvData, {
+    // UTF-8 BOMを追加して日本語文字を正しく処理
+    const csvWithBOM = '\uFEFF' + csvData
+
+    return new NextResponse(csvWithBOM, {
       headers: {
-        'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
       },
     })
   } catch (error) {
@@ -143,7 +147,7 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
         rowData.push(escapeCSVValue(answer))
       } else {
         // 分析用のデータ変換
-        if (['RADIO', 'SELECT', 'PREFECTURE', 'AGE_GROUP'].includes(question.type)) {
+        if (['RADIO', 'SELECT', 'PREFECTURE'].includes(question.type)) {
           if (parsedSettings.ordinalStructure) {
             // 順序構造がある場合、数値変換
             const numericValue = convertToNumeric(question, answer)
@@ -156,6 +160,10 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
               rowData.push(escapeCSVValue(isSelected))
             })
           }
+        } else if (question.type === 'AGE_GROUP') {
+          // 年齢グループは順序構造があるカテゴリ変数として1列で表示
+          const numericValue = convertToNumeric(question, answer)
+          rowData.push(escapeCSVValue(String(numericValue)))
         } else if (question.type === 'CHECKBOX') {
           // 複数選択の場合、One-Hot Encoding
           const options = getQuestionOptions(question)

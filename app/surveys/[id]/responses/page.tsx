@@ -47,6 +47,11 @@ function formatToTokyoTime(dateString: string): string {
   return tokyoTime.toISOString().replace('T', ' ').slice(0, 16)
 }
 
+function stripHtmlTags(html: string): string {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, '')
+}
+
 function CSVPreviewTable({ csvData }: CSVPreviewTableProps) {
   if (!csvData) {
     return <div className="text-gray-500 text-center py-4">プレビューを生成中...</div>
@@ -282,7 +287,7 @@ export default function SurveyResponsesPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">{survey.title}</h1>
               {survey.description && (
-                <p className="mt-1 text-sm text-gray-600">{survey.description}</p>
+                <p className="mt-1 text-sm text-gray-600">{stripHtmlTags(survey.description)}</p>
               )}
             </div>
             <Link

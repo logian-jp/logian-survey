@@ -138,7 +138,7 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
         rowData.push(escapeCSVValue(answer))
       } else {
         // 分析用のデータ変換
-        if (['RADIO', 'SELECT', 'PREFECTURE', 'AGE_GROUP'].includes(question.type)) {
+        if (['RADIO', 'SELECT', 'PREFECTURE'].includes(question.type)) {
           if (parsedSettings.ordinalStructure) {
             // 順序構造がある場合、数値変換
             const numericValue = convertToNumeric(question, answer)
@@ -151,6 +151,10 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
               rowData.push(escapeCSVValue(isSelected))
             })
           }
+        } else if (question.type === 'AGE_GROUP') {
+          // 年齢グループは順序構造があるカテゴリ変数として1列で表示
+          const numericValue = convertToNumeric(question, answer)
+          rowData.push(escapeCSVValue(String(numericValue)))
         } else if (question.type === 'CHECKBOX') {
           // 複数選択の場合、One-Hot Encoding
           const options = getQuestionOptions(question)
