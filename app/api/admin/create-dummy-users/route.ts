@@ -24,31 +24,31 @@ export async function POST() {
         name: '田中太郎',
         email: 'tanaka@example.com',
         password: '$2a$12$YighOovnfpquXOYbwH2Xx.zSQGt0qygXZOQluaoS8R3TJWJKxgIQG', // password123
-        role: 'USER'
+        role: 'USER' as const
       },
       {
         name: '佐藤花子',
         email: 'sato@example.com',
         password: '$2a$12$YighOovnfpquXOYbwH2Xx.zSQGt0qygXZOQluaoS8R3TJWJKxgIQG',
-        role: 'USER'
+        role: 'USER' as const
       },
       {
         name: '鈴木一郎',
         email: 'suzuki@example.com',
         password: '$2a$12$YighOovnfpquXOYbwH2Xx.zSQGt0qygXZOQluaoS8R3TJWJKxgIQG',
-        role: 'USER'
+        role: 'USER' as const
       },
       {
         name: '高橋美咲',
         email: 'takahashi@example.com',
         password: '$2a$12$YighOovnfpquXOYbwH2Xx.zSQGt0qygXZOQluaoS8R3TJWJKxgIQG',
-        role: 'USER'
+        role: 'USER' as const
       },
       {
         name: '山田健太',
         email: 'yamada@example.com',
         password: '$2a$12$YighOovnfpquXOYbwH2Xx.zSQGt0qygXZOQluaoS8R3TJWJKxgIQG',
-        role: 'USER'
+        role: 'USER' as const
       }
     ]
     
@@ -66,7 +66,7 @@ export async function POST() {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
         
         // ランダムなプランを割り当て
-        const planTypes = ['STANDARD', 'PROFESSIONAL', 'ENTERPRISE', 'ONETIME_UNLIMITED']
+        const planTypes = ['STANDARD', 'PROFESSIONAL', 'ENTERPRISE', 'ONETIME_UNLIMITED'] as const
         const randomPlan = planTypes[Math.floor(Math.random() * planTypes.length)]
         
         await prisma.userPlan.create({
