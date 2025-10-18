@@ -22,6 +22,7 @@ export default function RichTextEditor({
   const [textColor, setTextColor] = useState('#000000')
   const [backgroundColor, setBackgroundColor] = useState('#ffffff')
   const [isComposing, setIsComposing] = useState(false)
+  const [headingLevel, setHeadingLevel] = useState<'normal' | 'h2' | 'h3' | 'h4'>('normal')
 
   const colors = [
     { name: '黒', value: '#000000' },
@@ -104,6 +105,52 @@ export default function RichTextEditor({
     document.execCommand(command, false, value)
     editorRef.current?.focus()
     updateToolbarState()
+  }
+
+  const setHeading = (level: 'normal' | 'h2' | 'h3' | 'h4') => {
+    if (editorRef.current) {
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        const container = range.commonAncestorContainer
+        
+        // 現在の見出しタグを取得
+        let currentHeading = container.nodeType === Node.TEXT_NODE 
+          ? container.parentElement 
+          : container as Element
+        
+        // 見出しタグまで遡る
+        while (currentHeading && !['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(currentHeading.tagName)) {
+          currentHeading = currentHeading.parentElement
+        }
+        
+        if (level === 'normal') {
+          // 通常のテキストに変換
+          if (currentHeading && ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(currentHeading.tagName)) {
+            const span = document.createElement('span')
+            span.innerHTML = currentHeading.innerHTML
+            currentHeading.parentNode?.replaceChild(span, currentHeading)
+          }
+        } else {
+          // 見出しタグに変換
+          const headingTag = level.toUpperCase()
+          if (currentHeading && currentHeading.tagName !== headingTag) {
+            const newHeading = document.createElement(headingTag)
+            newHeading.innerHTML = currentHeading.innerHTML
+            currentHeading.parentNode?.replaceChild(newHeading, currentHeading)
+          } else if (!currentHeading) {
+            // 選択されたテキストを見出しに変換
+            const contents = range.extractContents()
+            const heading = document.createElement(headingTag)
+            heading.appendChild(contents)
+            range.insertNode(heading)
+          }
+        }
+        
+        setHeadingLevel(level)
+        onChange(editorRef.current.innerHTML)
+      }
+    }
   }
 
   const updateToolbarState = () => {
@@ -225,6 +272,23 @@ export default function RichTextEditor({
           >
             <u>U</u>
           </ToolbarButton>
+        </div>
+
+        <div className="w-px h-6 bg-gray-300"></div>
+
+        {/* 見出し */}
+        <div className="flex items-center gap-1">
+          <select
+            value={headingLevel}
+            onChange={(e) => setHeading(e.target.value as 'normal' | 'h2' | 'h3' | 'h4')}
+            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white"
+            title="見出しレベル"
+          >
+            <option value="normal">通常テキスト</option>
+            <option value="h2">見出し2</option>
+            <option value="h3">見出し3</option>
+            <option value="h4">見出し4</option>
+          </select>
         </div>
 
         <div className="w-px h-6 bg-gray-300"></div>

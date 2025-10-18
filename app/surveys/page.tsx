@@ -10,6 +10,12 @@ function formatToTokyoTime(dateString: string): string {
   return tokyoTime.toISOString().replace('T', ' ').slice(0, 16)
 }
 
+function stripHtmlTags(html: string): string {
+  if (!html) return ''
+  // HTMLタグを除去
+  return html.replace(/<[^>]*>/g, '')
+}
+
 interface Survey {
   id: string
   title: string
@@ -223,10 +229,13 @@ export default function SurveysPage() {
                             {survey.title}
                           </div>
                           {survey.description && (
-                            <div className="text-sm text-gray-500 truncate" title={survey.description}>
-                              {survey.description.length > 40 
-                                ? `${survey.description.substring(0, 40)}...` 
-                                : survey.description}
+                            <div className="text-sm text-gray-500 truncate" title={stripHtmlTags(survey.description)}>
+                              {(() => {
+                                const plainText = stripHtmlTags(survey.description)
+                                return plainText.length > 40 
+                                  ? `${plainText.substring(0, 40)}...` 
+                                  : plainText
+                              })()}
                             </div>
                           )}
                         </div>
