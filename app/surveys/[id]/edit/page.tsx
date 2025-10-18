@@ -85,6 +85,8 @@ export default function EditSurvey() {
     { value: 'AGE_GROUP', label: '年代' },
     { value: 'LOCATION', label: '位置情報' },
     { value: 'FILE_UPLOAD', label: 'ファイルアップロード' },
+    { value: 'SECTION', label: 'セクション' },
+    { value: 'PAGE_BREAK', label: '改ページ' },
   ]
 
   const fileTypeOptions = [
@@ -693,10 +695,20 @@ export default function EditSurvey() {
                       onClick={() => setSelectedQuestion(question)}
                       className={`cursor-pointer ${selectedQuestion?.id === question.id ? 'ring-2 ring-blue-500' : ''}`}
                     >
-                      <div className="border border-gray-300 rounded-lg p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+                      <div className={`border rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow ${
+                        question.type === 'SECTION' ? 'border-blue-300 bg-blue-50' :
+                        question.type === 'PAGE_BREAK' ? 'border-orange-300 bg-orange-50' :
+                        'border-gray-300 bg-white'
+                      }`}>
                       <div className="flex justify-between items-start mb-4">
-                        <span className="text-sm font-semibold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
-                          質問 {index + 1}
+                        <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
+                          question.type === 'SECTION' ? 'text-blue-700 bg-blue-100' :
+                          question.type === 'PAGE_BREAK' ? 'text-orange-700 bg-orange-100' :
+                          'text-gray-700 bg-gray-100'
+                        }`}>
+                          {question.type === 'SECTION' ? 'セクション' :
+                           question.type === 'PAGE_BREAK' ? '改ページ' :
+                           `質問 ${index + 1}`}
                         </span>
                         <div className="flex space-x-2">
                           <button
@@ -728,7 +740,9 @@ export default function EditSurvey() {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
-                          質問タイプ
+                          {question.type === 'SECTION' ? 'セクションタイプ' :
+                           question.type === 'PAGE_BREAK' ? '要素タイプ' :
+                           '質問タイプ'}
                         </label>
                         <select
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
@@ -743,45 +757,76 @@ export default function EditSurvey() {
                         </select>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          質問文 *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-                          value={question.title}
-                          onChange={(e) => updateQuestion(question.id, { title: e.target.value })}
-                          placeholder="質問を入力してください"
-                        />
-                      </div>
+                      {question.type === 'SECTION' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            セクション名
+                          </label>
+                          <input
+                            type="text"
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                            value={question.title}
+                            onChange={(e) => updateQuestion(question.id, { title: e.target.value })}
+                            placeholder="セクション名を入力してください"
+                          />
+                        </div>
+                      )}
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          説明（任意）
-                        </label>
-                        <input
-                          type="text"
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-                          value={question.description || ''}
-                          onChange={(e) => updateQuestion(question.id, { description: e.target.value })}
-                          placeholder="追加の説明があれば入力してください"
-                        />
-                      </div>
+                      {question.type === 'PAGE_BREAK' && (
+                        <div className="text-center py-4">
+                          <div className="text-gray-500 text-sm">
+                            <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m7-7H5" />
+                            </svg>
+                            改ページ
+                          </div>
+                        </div>
+                      )}
 
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`required-${question.id}`}
-                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                          checked={question.required}
-                          onChange={(e) => updateQuestion(question.id, { required: e.target.checked })}
-                        />
-                        <label htmlFor={`required-${question.id}`} className="ml-2 block text-sm text-gray-700">
-                          必須項目
-                        </label>
-                      </div>
+                      {question.type !== 'SECTION' && question.type !== 'PAGE_BREAK' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            質問文 *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                            value={question.title}
+                            onChange={(e) => updateQuestion(question.id, { title: e.target.value })}
+                            placeholder="質問を入力してください"
+                          />
+                        </div>
+                      )}
+
+                      {question.type !== 'SECTION' && question.type !== 'PAGE_BREAK' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            説明（任意）
+                          </label>
+                          <RichTextEditor
+                            value={question.description || ''}
+                            onChange={(value) => updateQuestion(question.id, { description: value })}
+                            placeholder="追加の説明があれば入力してください（改行可能）"
+                            className="min-h-[100px]"
+                          />
+                        </div>
+                      )}
+
+                      {question.type !== 'SECTION' && question.type !== 'PAGE_BREAK' && (
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`required-${question.id}`}
+                            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                            checked={question.required}
+                            onChange={(e) => updateQuestion(question.id, { required: e.target.checked })}
+                          />
+                          <label htmlFor={`required-${question.id}`} className="ml-2 block text-sm text-gray-700">
+                            必須項目
+                          </label>
+                        </div>
+                      )}
 
                         {/* 分析設定 */}
                         {['RADIO', 'CHECKBOX', 'SELECT', 'RATING', 'PREFECTURE', 'AGE_GROUP'].includes(question.type) && (

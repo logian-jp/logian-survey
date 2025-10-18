@@ -154,6 +154,8 @@ enum QuestionType {
   AGE_GROUP
   LOCATION
   FILE_UPLOAD
+  SECTION
+  PAGE_BREAK
 }
 
 model Response {
