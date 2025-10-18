@@ -22,9 +22,17 @@ export async function POST(request: NextRequest) {
       order,
     } = await request.json()
 
-    if (!surveyId || !type || !title) {
+    if (!surveyId || !type) {
       return NextResponse.json(
-        { message: 'Survey ID, type, and title are required' },
+        { message: 'Survey ID and type are required' },
+        { status: 400 }
+      )
+    }
+
+    // PAGE_BREAKとSECTION以外はtitleが必須
+    if (type !== 'PAGE_BREAK' && type !== 'SECTION' && !title) {
+      return NextResponse.json(
+        { message: 'Title is required for this question type' },
         { status: 400 }
       )
     }
@@ -48,7 +56,7 @@ export async function POST(request: NextRequest) {
       data: {
         surveyId,
         type,
-        title,
+        title: title || (type === 'PAGE_BREAK' ? '改ページ' : type === 'SECTION' ? 'セクション' : ''),
         description: description || null,
         required: required || false,
         order: order || 0,

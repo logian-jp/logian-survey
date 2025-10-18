@@ -89,6 +89,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
+    console.log('Creating survey for user:', session.user.id)
+    console.log('Session user:', session.user)
+
+    // ユーザーの存在確認
+    let user = await prisma.user.findUnique({
+      where: { id: session.user.id }
+    })
+
+    if (!user) {
+      console.log('User not found, creating new user...')
+      // ユーザーが存在しない場合は作成
+      user = await prisma.user.create({
+        data: {
+          id: session.user.id,
+          name: session.user.name,
+          email: session.user.email,
+          image: session.user.image,
+        }
+      })
+      console.log('User created:', user)
+    } else {
+      console.log('User found:', user)
+    }
+
     const { title, description, maxResponses, endDate, targetResponses } = await request.json()
 
     if (!title) {

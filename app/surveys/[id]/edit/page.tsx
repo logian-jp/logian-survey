@@ -227,13 +227,13 @@ export default function EditSurvey() {
     })
   }
 
-  const addQuestion = (insertIndex?: number) => {
+  const addQuestion = (insertIndex?: number, questionType: string = 'TEXT') => {
     if (!survey) return
     
     const newQuestion: Question = {
       id: `question_${Date.now()}`,
-      type: 'TEXT',
-      title: '',
+      type: questionType,
+      title: questionType === 'PAGE_BREAK' ? '改ページ' : questionType === 'SECTION' ? 'セクション' : '',
       required: false,
       order: insertIndex !== undefined ? insertIndex : survey.questions.length,
       settings: {

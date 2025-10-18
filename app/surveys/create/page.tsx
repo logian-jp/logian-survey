@@ -74,11 +74,11 @@ export default function CreateSurvey() {
     { value: 'code', label: 'コード', extensions: ['.js', '.ts', '.html', '.css', '.json', '.xml', '.sql'] },
   ]
 
-  const addQuestion = (insertIndex?: number) => {
+  const addQuestion = (insertIndex?: number, questionType: string = 'TEXT') => {
     const newQuestion: Question = {
       id: `question_${Date.now()}`,
-      type: 'TEXT',
-      title: '',
+      type: questionType,
+      title: questionType === 'PAGE_BREAK' ? '改ページ' : questionType === 'SECTION' ? 'セクション' : '',
       required: false,
       order: insertIndex !== undefined ? insertIndex : questions.length,
       settings: {

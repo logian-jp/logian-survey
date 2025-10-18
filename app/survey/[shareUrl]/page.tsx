@@ -33,12 +33,47 @@ export default function SurveyPage() {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [locationLoading, setLocationLoading] = useState<{ [key: string]: boolean }>({})
+  
+  // ページ遷移用の状態
+  const [currentPage, setCurrentPage] = useState(0)
+  const [pages, setPages] = useState<{ questions: any[], pageNumber: number }[]>([])
 
   useEffect(() => {
     if (shareUrl) {
       fetchSurvey()
     }
   }, [shareUrl])
+
+  // ページ分割ロジック
+  useEffect(() => {
+    if (survey?.questions) {
+      const pageGroups: { questions: any[], pageNumber: number }[] = []
+      let currentPageGroup: any[] = []
+      let pageNumber = 1
+
+      survey.questions.forEach((question) => {
+        if (question.type === 'PAGE_BREAK') {
+          if (currentPageGroup.length > 0) {
+            pageGroups.push({ questions: currentPageGroup, pageNumber })
+            currentPageGroup = []
+            pageNumber++
+          }
+        } else if (question.type === 'SECTION') {
+          // セクションタイトルを追加
+          currentPageGroup.push({ ...question, isSection: true })
+        } else {
+          currentPageGroup.push(question)
+        }
+      })
+
+      // 最後のページを追加
+      if (currentPageGroup.length > 0) {
+        pageGroups.push({ questions: currentPageGroup, pageNumber })
+      }
+
+      setPages(pageGroups)
+    }
+  }, [survey])
 
   const fetchSurvey = async () => {
     try {
@@ -244,6 +279,21 @@ export default function SurveyPage() {
     }
   }
 
+  const nextPage = () => {
+    if (currentPage < pages.length - 1) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
+  const prevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const isLastPage = currentPage === pages.length - 1
+  const isFirstPage = currentPage === 0
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -311,12 +361,20 @@ export default function SurveyPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {survey?.questions.map((question, index) => (
-              <div key={question.id} className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  {question.title}
-                  {question.required && <span className="text-red-500 ml-1">*</span>}
-                </label>
+            {pages.length > 0 && pages[currentPage] && (
+              <div className="page-content">
+                {pages[currentPage].questions.map((question, questionIndex) => (
+                    <div key={question.id} className="space-y-2 mb-6">
+                      {question.isSection ? (
+                        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                          <h3 className="text-lg font-semibold text-blue-900">{question.title}</h3>
+                        </div>
+                      ) : (
+                        <>
+                          <label className="block text-sm font-medium text-gray-700">
+                            {question.title}
+                            {question.required && <span className="text-red-500 ml-1">*</span>}
+                          </label>
                 
                 {question.description && (
                   <p className="text-sm text-gray-500">{question.description}</p>
@@ -378,7 +436,7 @@ export default function SurveyPage() {
 
                 {question.type === 'RADIO' && question.options && (
                   <div className="space-y-2">
-                    {question.options.map((option, optionIndex) => (
+                    {question.options.map((option: string, optionIndex: number) => (
                       <label key={optionIndex} className="flex items-center">
                         <input
                           type="radio"
@@ -396,7 +454,7 @@ export default function SurveyPage() {
 
                 {question.type === 'CHECKBOX' && question.options && (
                   <div className="space-y-2">
-                    {question.options.map((option, optionIndex) => (
+                    {question.options.map((option: string, optionIndex: number) => (
                       <label key={optionIndex} className="flex items-center">
                         <input
                           type="checkbox"
@@ -425,7 +483,7 @@ export default function SurveyPage() {
                     onChange={(e) => handleAnswerChange(question.id, e.target.value)}
                   >
                     <option value="">選択してください</option>
-                    {question.options.map((option, optionIndex) => (
+                    {question.options.map((option: string, optionIndex: number) => (
                       <option key={optionIndex} value={option}>
                         {option}
                       </option>
@@ -481,7 +539,7 @@ export default function SurveyPage() {
 
                 {question.type === 'RATING' && (
                   <div className="space-y-2">
-                    {(question.options || ['1', '2', '3', '4', '5']).map((option, optionIndex) => (
+                    {(question.options || ['1', '2', '3', '4', '5']).map((option: string, optionIndex: number) => (
                       <label key={optionIndex} className="flex items-center">
                         <input
                           type="radio"
@@ -649,22 +707,89 @@ export default function SurveyPage() {
                     )}
                   </div>
                 )}
+                        </>
+                      )}
+                    </div>
+                ))}
               </div>
-            ))}
+            )}
 
             {error && (
               <div className="text-red-600 text-sm text-center">{error}</div>
             )}
 
-            <div className="flex justify-center">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-primary text-primary-foreground px-8 py-3 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {isSubmitting ? '送信中...' : '回答を送信'}
-              </button>
-            </div>
+            {/* ページネーションUI */}
+            {pages.length > 1 && (
+              <div className="mt-8">
+                {/* ページ進捗インジケーター */}
+                <div className="flex justify-center mb-4">
+                  <div className="flex space-x-2">
+                    {pages.map((_, index) => (
+                      <div
+                        key={index}
+                        className={`w-3 h-3 rounded-full ${
+                          index === currentPage ? 'bg-primary' : 'bg-gray-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* ページ番号表示 */}
+                <div className="text-center text-sm text-gray-600 mb-4">
+                  {currentPage + 1} / {pages.length} ページ
+                </div>
+
+                {/* ナビゲーションボタン */}
+                <div className="flex justify-between">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      prevPage()
+                    }}
+                    disabled={isFirstPage}
+                    className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    前へ
+                  </button>
+
+                  {isLastPage ? (
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="bg-primary text-primary-foreground px-8 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                      {isSubmitting ? '送信中...' : '回答を送信'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        nextPage()
+                      }}
+                      className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                    >
+                      次へ
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 単一ページの場合の送信ボタン */}
+            {pages.length <= 1 && (
+              <div className="flex justify-center mt-8">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-primary text-primary-foreground px-8 py-3 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? '送信中...' : '回答を送信'}
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </div>
