@@ -8,6 +8,7 @@ import RichTextEditor from '@/components/RichTextEditor'
 import ConditionalLogicEditor from '@/components/ConditionalLogicEditor'
 import QuestionTemplateSidebar from '@/components/QuestionTemplateSidebar'
 import { ConditionalLogic } from '@/types/conditional'
+import { canUseLocationTracking } from '@/lib/plan-limits'
 
 interface Question {
   id: string
@@ -84,7 +85,7 @@ export default function EditSurvey() {
     { value: 'PREFECTURE', label: '都道府県' },
     { value: 'NAME', label: '名前' },
     { value: 'AGE_GROUP', label: '年代' },
-    { value: 'LOCATION', label: '位置情報' },
+    ...(canUseLocationTracking(userPlan?.planType || 'FREE') ? [{ value: 'LOCATION', label: '位置情報' }] : []),
     { value: 'FILE_UPLOAD', label: 'ファイルアップロード' },
     { value: 'SECTION', label: 'セクション' },
     { value: 'PAGE_BREAK', label: '改ページ' },

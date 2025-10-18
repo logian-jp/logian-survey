@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { PLAN_LIMITS } from '@/lib/plan-limits'
+import LocationMap from '@/components/LocationMap'
 
 interface Question {
   id: string
@@ -151,6 +152,9 @@ export default function SurveyResponsesPage() {
   const [isLoadingPreview, setIsLoadingPreview] = useState(false)
   const [userPlan, setUserPlan] = useState<any>(null)
   const [exportError, setExportError] = useState<string>('')
+  const [showMap, setShowMap] = useState(false)
+  const [locationData, setLocationData] = useState<any[]>([])
+  const [selectedLocation, setSelectedLocation] = useState<any>(null)
 
   useEffect(() => {
     if (session && surveyId) {
@@ -174,8 +178,42 @@ export default function SurveyResponsesPage() {
   useEffect(() => {
     if (survey) {
       fetchCSVPreview()
+      extractLocationData()
     }
   }, [survey, selectedFormat, includePersonalData])
+
+  const extractLocationData = () => {
+    if (!survey) return
+
+    const locations: any[] = []
+    
+    survey.responses.forEach(response => {
+      response.answers.forEach(answer => {
+        const question = survey.questions.find(q => q.id === answer.questionId)
+        if (question?.type === 'LOCATION' && answer.value) {
+          const [latitude, longitude] = answer.value.split(',').map(Number)
+          if (!isNaN(latitude) && !isNaN(longitude)) {
+            locations.push({
+              id: answer.id,
+              latitude,
+              longitude,
+              responseId: response.id,
+              createdAt: response.createdAt,
+              answers: response.answers.reduce((acc, a) => {
+                const q = survey.questions.find(q => q.id === a.questionId)
+                if (q && a.value) {
+                  acc[q.title] = formatAnswerValue(a.value, q)
+                }
+                return acc
+              }, {} as { [key: string]: string })
+            })
+          }
+        }
+      })
+    })
+
+    setLocationData(locations)
+  }
 
   const fetchSurveyResponses = async () => {
     try {
@@ -505,11 +543,42 @@ export default function SurveyResponsesPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">回答一覧</h2>
-            </div>
-            <div className="overflow-x-auto">
+          <>
+            {/* 位置情報マップ */}
+            {locationData.length > 0 && (
+              <div className="mb-8 bg-white shadow-sm rounded-lg">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">位置情報マップ</h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        回答者の位置情報をマップ上で確認できます
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowMap(!showMap)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {showMap ? 'マップを非表示' : 'マップを表示'}
+                    </button>
+                  </div>
+                </div>
+                {showMap && (
+                  <div className="p-6">
+                    <LocationMap 
+                      locations={locationData}
+                      onLocationClick={setSelectedLocation}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">回答一覧</h2>
+              </div>
+              <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -546,8 +615,9 @@ export default function SurveyResponsesPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {/* ページネーション（必要に応じて） */}

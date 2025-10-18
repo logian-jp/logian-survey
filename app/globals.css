@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Leaflet CSS */
+@import 'leaflet/dist/leaflet.css';
+
 /* 動画埋め込み用のスタイル */
 .video-embed {
   margin: 1rem 0;

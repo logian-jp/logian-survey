@@ -48,7 +48,8 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
       'custom_branding',
       'api_integration',
       'priority_support',
-      'video_embedding'
+      'video_embedding',
+      'location_tracking'
     ],
     price: 9800
   },
@@ -69,7 +70,8 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
       'sso_integration',
       'custom_domain',
       'sla_guarantee',
-      'video_embedding'
+      'video_embedding',
+      'location_tracking'
     ],
     price: 29800
   },
@@ -102,6 +104,11 @@ export function getPlanLimits(planType: string): PlanLimits {
 export function canUseVideoEmbedding(planType: string): boolean {
   const limits = getPlanLimits(planType)
   return limits.features.includes('video_embedding')
+}
+
+export function canUseLocationTracking(planType: string): boolean {
+  const limits = getPlanLimits(planType)
+  return limits.features.includes('location_tracking')
 }
 
 export function checkPlanFeature(planType: string, feature: string): boolean {

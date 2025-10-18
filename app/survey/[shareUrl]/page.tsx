@@ -348,7 +348,7 @@ export default function SurveyPage() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               {survey?.title}
             </h1>
-            {survey?.description && (
+            {survey?.description && currentPage === 0 && (
               <div 
                 className="text-gray-600 prose prose-sm max-w-none rich-text-content"
                 dangerouslySetInnerHTML={{ __html: survey.description }}
