@@ -29,9 +29,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
+    console.log('=== Plan Upgrade Debug ===')
     console.log('Session user ID:', session.user.id)
+    console.log('Session user email:', session.user.email)
     console.log('Found user ID:', user.id)
+    console.log('Found user email:', user.email)
     console.log(`Processing payment: ${planType} - ¥${amount} - ${paymentMethod}`)
+    
+    // 現在のプランを確認
+    const currentPlan = await prisma.userPlan.findUnique({
+      where: { userId: user.id }
+    })
+    console.log('Current plan before update:', currentPlan)
     
     // 実際のStripe連携は後で実装
     // ここでは単純にプランを更新
@@ -54,6 +63,13 @@ export async function POST(request: NextRequest) {
       })
       
       console.log('User plan updated successfully:', userPlan)
+      
+      // 更新後の確認
+      const updatedPlan = await prisma.userPlan.findUnique({
+        where: { userId: user.id }
+      })
+      console.log('Plan after update verification:', updatedPlan)
+      
     } catch (error) {
       console.error('Failed to update user plan:', error)
       return NextResponse.json(

@@ -173,9 +173,21 @@ export default function UpgradePage() {
         const result = await response.json()
         console.log('Upgrade successful:', result)
         setIsSuccess(true)
+        
+        // プラン情報を再取得して確認
+        try {
+          const planResponse = await fetch('/api/user/plan')
+          if (planResponse.ok) {
+            const planData = await planResponse.json()
+            console.log('Updated plan data:', planData)
+          }
+        } catch (error) {
+          console.error('Failed to verify plan update:', error)
+        }
+        
         // 3秒後にダッシュボードにリダイレクト
         setTimeout(() => {
-          router.push('/dashboard')
+          router.push('/dashboard?refresh=' + Date.now()) // キャッシュを回避
         }, 3000)
       } else {
         const errorData = await response.json()

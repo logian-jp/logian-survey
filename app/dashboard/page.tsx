@@ -58,11 +58,22 @@ export default function Dashboard() {
     }
   }, [session])
 
+  // URLパラメータのrefreshを検出してプラン情報を強制更新
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('refresh')) {
+      console.log('Refresh parameter detected, forcing plan update')
+      fetchUserPlan()
+    }
+  }, [])
+
   const fetchUserPlan = async () => {
     try {
-      const response = await fetch('/api/user/plan')
+      // キャッシュバスターを追加して常に最新の情報を取得
+      const response = await fetch(`/api/user/plan?t=${Date.now()}`)
       if (response.ok) {
         const data = await response.json()
+        console.log('Fetched user plan:', data)
         setUserPlan(data)
       } else {
         // APIエラーの場合は無料プランを設定
@@ -159,8 +170,16 @@ export default function Dashboard() {
                       現在のプラン: {userPlan.planType === 'FREE' ? '基本プラン' : 
                                    userPlan.planType === 'STANDARD' ? 'スタンダードプラン' :
                                    userPlan.planType === 'PROFESSIONAL' ? 'プロフェッショナルプラン' :
-                                   'エンタープライズプラン'}
+                                   userPlan.planType === 'ENTERPRISE' ? 'エンタープライズプラン' :
+                                   userPlan.planType === 'ONETIME_UNLIMITED' ? '単発無制限プラン' :
+                                   '不明なプラン'}
                     </h3>
+                    {/* デバッグ情報（開発時のみ表示） */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="text-xs text-gray-500 mb-2">
+                        デバッグ: {JSON.stringify(userPlan, null, 2)}
+                      </div>
+                    )}
                     <p className="text-xs sm:text-sm text-blue-700">
                       <span className="block sm:inline">アンケート作成: {PLAN_LIMITS[userPlan.planType]?.maxSurveys === -1 ? '無制限' : `${PLAN_LIMITS[userPlan.planType]?.maxSurveys}個`}</span>
                       <span className="hidden sm:inline"> | </span>
