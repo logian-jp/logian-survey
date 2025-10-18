@@ -122,9 +122,10 @@ export async function GET() {
     // 解約予測（過去30日間のアクティビティが少ないユーザー）
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     
+    // lastLoginAtフィールドが存在しないため、updatedAtを使用
     const inactiveUsers = await prisma.user.findMany({
       where: {
-        lastLoginAt: {
+        updatedAt: {
           lt: thirtyDaysAgo
         },
         userPlan: {
@@ -215,7 +216,7 @@ export async function GET() {
           id: user.id,
           email: user.email,
           name: user.name,
-          lastLoginAt: user.lastLoginAt,
+          lastLoginAt: user.updatedAt, // updatedAtを使用
           planType: user.userPlan?.planType
         })),
         

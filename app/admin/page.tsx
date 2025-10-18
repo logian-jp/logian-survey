@@ -266,7 +266,7 @@ export default function AdminDashboard() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">今月売上</dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        ¥{analytics?.monthlyRevenue.toLocaleString() || 0}
+                        ¥{analytics?.monthlyRevenue?.toLocaleString() || 0}
                       </dd>
                     </dl>
                   </div>
@@ -287,7 +287,7 @@ export default function AdminDashboard() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">来月売上予測</dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        ¥{analytics?.predictedNextMonthRevenue.toLocaleString() || 0}
+                        ¥{analytics?.predictedNextMonthRevenue?.toLocaleString() || 0}
                       </dd>
                     </dl>
                   </div>
@@ -310,7 +310,7 @@ export default function AdminDashboard() {
                       <dd className={`text-lg font-medium ${
                         (analytics?.userGrowthRate || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {analytics?.userGrowthRate.toFixed(1) || 0}%
+                        {analytics?.userGrowthRate?.toFixed(1) || 0}%
                       </dd>
                     </dl>
                   </div>
@@ -353,21 +353,21 @@ export default function AdminDashboard() {
                     <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <span className="text-sm text-gray-600">今月売上</span>
                       <span className="text-lg font-semibold text-gray-900">
-                        ¥{analytics.monthlyRevenue.toLocaleString()}
+                        ¥{analytics.monthlyRevenue?.toLocaleString() || 0}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                       <span className="text-sm text-gray-600">来月予測</span>
                       <span className="text-lg font-semibold text-blue-600">
-                        ¥{analytics.predictedNextMonthRevenue.toLocaleString()}
+                        ¥{analytics.predictedNextMonthRevenue?.toLocaleString() || 0}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                       <span className="text-sm text-gray-600">成長率</span>
                       <span className={`text-lg font-semibold ${
-                        analytics.revenueGrowthRate >= 0 ? 'text-green-600' : 'text-red-600'
+                        (analytics.revenueGrowthRate || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {analytics.revenueGrowthRate.toFixed(1)}%
+                        {analytics.revenueGrowthRate?.toFixed(1) || 0}%
                       </span>
                     </div>
                   </div>
@@ -382,7 +382,7 @@ export default function AdminDashboard() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
-                      <Tooltip formatter={(value) => [`¥${value.toLocaleString()}`, '売上']} />
+                      <Tooltip formatter={(value) => [`¥${value?.toLocaleString() || 0}`, '売上']} />
                       <Line 
                         type="monotone" 
                         dataKey="revenue" 
@@ -413,7 +413,7 @@ export default function AdminDashboard() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -422,7 +422,7 @@ export default function AdminDashboard() {
                         <Cell key={`cell-${index}`} fill={`hsl(${index * 60}, 70%, 50%)`} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => [`¥${value.toLocaleString()}`, '売上']} />
+                    <Tooltip formatter={(value) => [`¥${value?.toLocaleString() || 0}`, '売上']} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -508,7 +508,7 @@ export default function AdminDashboard() {
                           {user.planType}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {user.lastLoginAt ? formatToTokyoTime(user.lastLoginAt) : '未ログイン'}
+                          {user.lastLoginAt ? formatToTokyoTime(user.lastLoginAt) : '未更新'}
                         </td>
                       </tr>
                     ))}
