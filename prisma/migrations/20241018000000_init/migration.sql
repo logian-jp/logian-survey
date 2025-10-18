@@ -3,8 +3,10 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT,
     "email" TEXT NOT NULL,
+    "emailVerified" TIMESTAMP(3),
+    "image" TEXT,
     "password" TEXT,
-    "role" TEXT NOT NULL DEFAULT 'USER',
+    "role" "UserRole" NOT NULL DEFAULT 'USER',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -53,10 +55,13 @@ CREATE TABLE "Survey" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
-    "isPublished" BOOLEAN NOT NULL DEFAULT false,
+    "status" "SurveyStatus" NOT NULL DEFAULT 'DRAFT',
     "shareUrl" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "maxResponses" INTEGER,
+    "endDate" TIMESTAMP(3),
+    "targetResponses" INTEGER,
     "userId" TEXT NOT NULL,
 
     CONSTRAINT "Survey_pkey" PRIMARY KEY ("id")
@@ -67,7 +72,7 @@ CREATE TABLE "Question" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
-    "type" TEXT NOT NULL,
+    "type" "QuestionType" NOT NULL,
     "required" BOOLEAN NOT NULL DEFAULT false,
     "order" INTEGER NOT NULL,
     "options" JSONB,
@@ -81,38 +86,53 @@ CREATE TABLE "Question" (
 );
 
 -- CreateTable
+CREATE TABLE "Response" (
+    "id" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "surveyId" TEXT NOT NULL,
+
+    CONSTRAINT "Response_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Answer" (
     "id" TEXT NOT NULL,
-    "value" JSONB NOT NULL,
+    "value" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "questionId" TEXT NOT NULL,
+    "responseId" TEXT NOT NULL,
 
     CONSTRAINT "Answer_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "UserRole" (
+CREATE TABLE "SurveyUser" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "surveyId" TEXT NOT NULL,
-    "role" TEXT NOT NULL,
+    "permission" "SurveyPermission" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "UserRole_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "SurveyUser_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "FileUpload" (
+CREATE TABLE "QuestionTemplate" (
     "id" TEXT NOT NULL,
-    "filename" TEXT NOT NULL,
-    "originalName" TEXT NOT NULL,
-    "mimeType" TEXT NOT NULL,
-    "size" INTEGER NOT NULL,
-    "path" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "type" TEXT NOT NULL,
+    "required" BOOLEAN NOT NULL DEFAULT false,
+    "options" JSONB,
+    "settings" JSONB,
+    "conditions" JSONB,
+    "isPublic" BOOLEAN NOT NULL DEFAULT false,
+    "usageCount" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "answerId" TEXT NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" TEXT NOT NULL,
 
-    CONSTRAINT "FileUpload_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "QuestionTemplate_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -134,7 +154,7 @@ CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationTok
 CREATE UNIQUE INDEX "Survey_shareUrl_key" ON "Survey"("shareUrl");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "UserRole_userId_surveyId_key" ON "UserRole"("userId", "surveyId");
+CREATE UNIQUE INDEX "SurveyUser_userId_surveyId_key" ON "SurveyUser"("userId", "surveyId");
 
 -- AddForeignKey
 ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -149,35 +169,19 @@ ALTER TABLE "Survey" ADD CONSTRAINT "Survey_userId_fkey" FOREIGN KEY ("userId") 
 ALTER TABLE "Question" ADD CONSTRAINT "Question_surveyId_fkey" FOREIGN KEY ("surveyId") REFERENCES "Survey"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Response" ADD CONSTRAINT "Response_surveyId_fkey" FOREIGN KEY ("surveyId") REFERENCES "Survey"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Answer" ADD CONSTRAINT "Answer_questionId_fkey" FOREIGN KEY ("questionId") REFERENCES "Question"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "UserRole" ADD CONSTRAINT "UserRole_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Answer" ADD CONSTRAINT "Answer_responseId_fkey" FOREIGN KEY ("responseId") REFERENCES "Response"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "UserRole" ADD CONSTRAINT "UserRole_surveyId_fkey" FOREIGN KEY ("surveyId") REFERENCES "Survey"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "SurveyUser" ADD CONSTRAINT "SurveyUser_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "FileUpload" ADD CONSTRAINT "FileUpload_answerId_fkey" FOREIGN KEY ("answerId") REFERENCES "Answer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- CreateTable
-CREATE TABLE "QuestionTemplate" (
-    "id" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "description" TEXT,
-    "type" TEXT NOT NULL,
-    "required" BOOLEAN NOT NULL DEFAULT false,
-    "options" JSONB,
-    "settings" JSONB,
-    "conditions" JSONB,
-    "isPublic" BOOLEAN NOT NULL DEFAULT false,
-    "usageCount" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "userId" TEXT NOT NULL,
-
-    CONSTRAINT "QuestionTemplate_pkey" PRIMARY KEY ("id")
-);
+ALTER TABLE "SurveyUser" ADD CONSTRAINT "SurveyUser_surveyId_fkey" FOREIGN KEY ("surveyId") REFERENCES "Survey"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "QuestionTemplate" ADD CONSTRAINT "QuestionTemplate_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
