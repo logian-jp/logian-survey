@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/admin-auth'
 
+// 動的レンダリングを強制
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     await requireAdmin()
