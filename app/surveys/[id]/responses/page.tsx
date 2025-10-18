@@ -37,6 +37,99 @@ interface Survey {
   responses: Response[]
 }
 
+interface CSVPreviewTableProps {
+  csvData: string
+}
+
+function formatToTokyoTime(dateString: string): string {
+  const date = new Date(dateString)
+  const tokyoTime = new Date(date.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
+  return tokyoTime.toISOString().replace('T', ' ').slice(0, 16)
+}
+
+function CSVPreviewTable({ csvData }: CSVPreviewTableProps) {
+  if (!csvData) {
+    return <div className="text-gray-500 text-center py-4">プレビューを生成中...</div>
+  }
+
+  const lines = csvData.split('\n').filter(line => line.trim())
+  if (lines.length === 0) {
+    return <div className="text-gray-500 text-center py-4">データがありません</div>
+  }
+
+  // CSVの解析を改善（引用符で囲まれた値も正しく処理）
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = []
+    let current = ''
+    let inQuotes = false
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          // エスケープされた引用符
+          current += '"'
+          i++ // 次の文字をスキップ
+        } else {
+          // 引用符の開始/終了
+          inQuotes = !inQuotes
+        }
+      } else if (char === ',' && !inQuotes) {
+        // カンマで区切り
+        result.push(current)
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    
+    result.push(current)
+    return result
+  }
+
+  const headers = parseCSVLine(lines[0])
+  const dataRows = lines.slice(1).map(line => parseCSVLine(line))
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            {headers.map((header, index) => (
+              <th key={index} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {dataRows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="hover:bg-gray-50">
+              {row.map((cell, cellIndex) => (
+                <td key={cellIndex} className="px-4 py-3 text-sm text-gray-900">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {dataRows.length >= 5 && (
+            <tr className="bg-gray-50">
+              <td colSpan={headers.length} className="px-4 py-3 text-center text-sm text-gray-500">
+                <div className="flex items-center justify-center">
+                  <span className="mr-2">〜〜〜</span>
+                  <span>まだ続きがあります</span>
+                  <span className="ml-2">〜〜〜</span>
+                </div>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function SurveyResponsesPage() {
   const params = useParams()
   const router = useRouter()
@@ -48,12 +141,20 @@ export default function SurveyResponsesPage() {
   const [error, setError] = useState('')
   const [selectedFormat, setSelectedFormat] = useState<'raw' | 'normalized' | 'standardized'>('raw')
   const [includePersonalData, setIncludePersonalData] = useState(false)
+  const [csvPreview, setCsvPreview] = useState<string>('')
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
 
   useEffect(() => {
     if (session && surveyId) {
       fetchSurveyResponses()
     }
   }, [session, surveyId])
+
+  useEffect(() => {
+    if (survey) {
+      fetchCSVPreview()
+    }
+  }, [survey, selectedFormat, includePersonalData])
 
   const fetchSurveyResponses = async () => {
     try {
@@ -68,6 +169,31 @@ export default function SurveyResponsesPage() {
       setError('データの読み込みに失敗しました')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchCSVPreview = async () => {
+    if (!survey) return
+    
+    setIsLoadingPreview(true)
+    try {
+      const params = new URLSearchParams({
+        format: selectedFormat,
+        includePersonalData: includePersonalData.toString(),
+      })
+      
+      const response = await fetch(`/api/surveys/${surveyId}/export/preview?${params}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setCsvPreview(data.preview)
+      } else {
+        console.error('Failed to fetch CSV preview')
+      }
+    } catch (error) {
+      console.error('CSV preview error:', error)
+    } finally {
+      setIsLoadingPreview(false)
     }
   }
 
@@ -280,6 +406,30 @@ export default function SurveyResponsesPage() {
           </div>
         </div>
 
+        {/* CSVプレビュー */}
+        {survey.responses.length > 0 && (
+          <div className="mb-8 bg-white shadow-sm rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">CSVプレビュー</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                設定に基づくCSVの先頭5行を表示しています
+              </p>
+            </div>
+            <div className="p-6">
+              {isLoadingPreview ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-gray-500">プレビューを生成中...</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <CSVPreviewTable csvData={csvPreview} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* 回答テーブル */}
         {survey.responses.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow-sm">
@@ -320,7 +470,7 @@ export default function SurveyResponsesPage() {
                         {response.id.substring(0, 8)}...
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(response.createdAt).toLocaleString('ja-JP')}
+                        {formatToTokyoTime(response.createdAt)}
                       </td>
                       {survey.questions.map((question) => (
                         <td key={question.id} className="px-6 py-4 text-sm text-gray-900 max-w-xs">

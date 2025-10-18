@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -74,9 +74,9 @@ export async function POST(request: Request) {
         description: description || null,
         type,
         required: required || false,
-        options: options ? JSON.stringify(options) : undefined,
-        settings: settings ? JSON.stringify(settings) : undefined,
-        conditions: conditions ? JSON.stringify(conditions) : undefined,
+        options: options !== undefined ? options : undefined,
+        settings: settings !== undefined ? settings : undefined,
+        conditions: conditions !== undefined ? conditions : undefined,
         isPublic: isPublic || false,
         userId: session.user.id
       }

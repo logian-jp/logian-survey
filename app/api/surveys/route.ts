@@ -63,6 +63,9 @@ export async function GET(request: NextRequest) {
         shareUrl: survey.shareUrl,
         createdAt: survey.createdAt,
         responseCount: survey._count.responses,
+        maxResponses: survey.maxResponses,
+        endDate: survey.endDate,
+        targetResponses: survey.targetResponses,
         owner: survey.user,
         userPermission: isOwner ? 'OWNER' : userPermission || 'VIEW',
       }
@@ -86,7 +89,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const { title, description } = await request.json()
+    const { title, description, maxResponses, endDate, targetResponses } = await request.json()
 
     if (!title) {
       return NextResponse.json(
@@ -102,6 +105,9 @@ export async function POST(request: NextRequest) {
         data: {
           title,
           description: description || null,
+          maxResponses: maxResponses || null,
+          endDate: endDate || null,
+          targetResponses: targetResponses || null,
           userId: session.user.id,
         },
       })

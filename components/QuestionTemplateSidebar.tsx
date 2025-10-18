@@ -41,6 +41,7 @@ export default function QuestionTemplateSidebar({
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [templateTitle, setTemplateTitle] = useState('')
   const [templateIsPublic, setTemplateIsPublic] = useState(false)
+  const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null)
 
   useEffect(() => {
     fetchTemplates()
@@ -137,6 +138,112 @@ export default function QuestionTemplateSidebar({
     template.description?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const toggleExpanded = (templateId: string) => {
+    setExpandedTemplate(expandedTemplate === templateId ? null : templateId)
+  }
+
+  const renderTemplatePreview = (template: QuestionTemplate) => {
+    if (expandedTemplate !== template.id) return null
+
+    return (
+      <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="space-y-2 text-xs">
+          {/* 質問文 */}
+          <div>
+            <span className="font-medium text-gray-700">質問文:</span>
+            <p className="text-gray-600 mt-1">{template.title}</p>
+          </div>
+
+          {/* 説明 */}
+          {template.description && (
+            <div>
+              <span className="font-medium text-gray-700">説明:</span>
+              <p className="text-gray-600 mt-1">{template.description}</p>
+            </div>
+          )}
+
+          {/* 選択肢 */}
+          {Array.isArray(template.options) && template.options.length > 0 && (
+            <div>
+              <span className="font-medium text-gray-700">選択肢:</span>
+              <ul className="mt-1 space-y-1">
+                {template.options.map((option, index) => (
+                  <li key={index} className="text-gray-600">
+                    {index + 1}. {option}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* ファイルアップロード設定 */}
+          {template.type === 'FILE_UPLOAD' && template.settings?.allowedFileTypes && (
+            <div>
+              <span className="font-medium text-gray-700">許可ファイル形式:</span>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {template.settings.allowedFileTypes.map((fileType: string) => (
+                  <span key={fileType} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                    {fileType}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 分析設定 */}
+          {template.settings && (
+            <div>
+              <span className="font-medium text-gray-700">分析設定:</span>
+              <div className="mt-1 space-y-1">
+                {template.settings.ordinalStructure && (
+                  <div className="text-gray-600">✓ 順序構造あり</div>
+                )}
+                {template.settings.naHandling && (
+                  <div className="text-gray-600">
+                    NA処理: {template.settings.naHandling === 'keep' ? '保持' : 
+                             template.settings.naHandling === 'remove' ? '行削除' : '置換'}
+                  </div>
+                )}
+                {template.settings.naValue && (
+                  <div className="text-gray-600">置換値: {template.settings.naValue}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 条件分岐 */}
+          {template.conditions && template.conditions.enabled && (
+            <div>
+              <span className="font-medium text-gray-700">条件分岐:</span>
+              <div className="mt-1 text-gray-600">
+                {template.conditions.rules?.length > 0 ? (
+                  <div>
+                    {template.conditions.showIf === 'all' ? 'すべて' : 'いずれか'}の条件を満たす場合に表示
+                    <div className="mt-1 text-xs">
+                      {template.conditions.rules.map((rule: any, index: number) => (
+                        <div key={index} className="text-gray-500">
+                          • {rule.questionTitle} {rule.operator} {rule.value || '値'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div>条件設定あり</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 必須設定 */}
+          <div>
+            <span className="font-medium text-gray-700">必須:</span>
+            <span className="ml-1 text-gray-600">{template.required ? 'はい' : 'いいえ'}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-80 bg-white border-l border-gray-200 h-full overflow-y-auto">
       <div className="p-4 border-b border-gray-200">
@@ -152,6 +259,9 @@ export default function QuestionTemplateSidebar({
               </svg>
             </button>
           )}
+        </div>
+        <div className="mb-3 text-xs text-gray-500">
+          サイドバーのテンプレートを「クリック」で追加、または「ドラッグ&ドロップ」で設問間や末尾に追加できます。
         </div>
         
         {/* 検索バー */}
@@ -206,44 +316,85 @@ export default function QuestionTemplateSidebar({
             {filteredTemplates.map((template) => (
               <div
                 key={template.id}
-                className="border border-gray-200 rounded-lg p-3 hover:border-primary hover:shadow-sm transition-all cursor-pointer"
-                onClick={() => handleTemplateUse(template)}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/json', JSON.stringify(template))
-                  e.dataTransfer.effectAllowed = 'copy'
-                }}
+                className="border border-gray-200 rounded-lg p-3 hover:border-primary hover:shadow-sm transition-all"
               >
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="text-sm font-medium text-gray-900 line-clamp-2">
-                    {template.title}
-                  </h4>
-                  <div className="flex items-center space-x-1 ml-2">
-                    {template.isPublic && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        公開
+                <div 
+                  className="cursor-pointer"
+                  onClick={() => handleTemplateUse(template)}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/json', JSON.stringify(template))
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="text-sm font-medium text-gray-900 line-clamp-2">
+                      {template.title}
+                    </h4>
+                    <div className="flex items-center space-x-1 ml-2">
+                      {template.isPublic && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          公開
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-500">
+                        {template.usageCount}回使用
                       </span>
+                    </div>
+                  </div>
+                  
+                  {template.description && (
+                    <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+                      {template.description}
+                    </p>
+                  )}
+                  {/* プレビュー: オプションや設定の概要 */}
+                  <div className="mb-2">
+                    {Array.isArray(template.options) && template.options.length > 0 && (
+                      <div className="text-[11px] text-gray-500">
+                        選択肢: {template.options.slice(0, 5).join(' / ')}{template.options.length > 5 ? ' …' : ''}
+                      </div>
                     )}
+                    {template.type === 'FILE_UPLOAD' && template.settings?.allowedFileTypes && (
+                      <div className="text-[11px] text-gray-500">
+                        許可形式: {template.settings.allowedFileTypes.join(', ')}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      {getQuestionTypeLabel(template.type)}
+                    </span>
                     <span className="text-xs text-gray-500">
-                      {template.usageCount}回使用
+                      {template.user.name || template.user.email}
                     </span>
                   </div>
                 </div>
-                
-                {template.description && (
-                  <p className="text-xs text-gray-600 line-clamp-2 mb-2">
-                    {template.description}
-                  </p>
-                )}
-                
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    {getQuestionTypeLabel(template.type)}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {template.user.name || template.user.email}
-                  </span>
+
+                {/* 詳細表示ボタン */}
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleExpanded(template.id)
+                    }}
+                    className="w-full text-xs text-blue-600 hover:text-blue-800 transition-colors flex items-center justify-center space-x-1"
+                  >
+                    <span>{expandedTemplate === template.id ? '詳細を隠す' : '詳細を表示'}</span>
+                    <svg 
+                      className={`w-3 h-3 transition-transform ${expandedTemplate === template.id ? 'rotate-180' : ''}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 </div>
+
+                {/* 詳細プレビュー */}
+                {renderTemplatePreview(template)}
               </div>
             ))}
           </div>

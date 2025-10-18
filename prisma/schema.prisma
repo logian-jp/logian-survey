@@ -78,6 +78,11 @@ model Survey {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
+  // 回答設定
+  maxResponses    Int?      // 回答数上限（null = 制限なし）
+  endDate         DateTime? // 回答終了日時（null = 制限なし）
+  targetResponses Int?      // 回答数目標値（null = 目標なし）
+
   userId      String
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   questions   Question[]

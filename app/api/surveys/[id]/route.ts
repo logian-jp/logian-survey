@@ -80,6 +80,9 @@ export async function GET(
       description: survey.description,
       status: survey.status,
       shareUrl: survey.shareUrl,
+      maxResponses: survey.maxResponses,
+      endDate: survey.endDate,
+      targetResponses: survey.targetResponses,
       createdAt: survey.createdAt,
       updatedAt: survey.updatedAt,
       responseCount: survey._count.responses,
@@ -106,7 +109,7 @@ export async function PUT(
     }
 
     const surveyId = params.id
-    const { title, description, status } = await request.json()
+    const { title, description, status, maxResponses, endDate, targetResponses } = await request.json()
 
     // 権限チェック
     const hasEditPermission = await canEditSurvey(session.user.id, surveyId)
@@ -136,6 +139,9 @@ export async function PUT(
         ...(title && { title }),
         ...(description !== undefined && { description }),
         ...(status && { status }),
+        maxResponses: maxResponses !== undefined ? maxResponses : null,
+        endDate: endDate !== undefined ? endDate : null,
+        targetResponses: targetResponses !== undefined ? targetResponses : null,
       },
     })
 

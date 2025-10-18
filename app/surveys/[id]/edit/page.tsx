@@ -32,6 +32,10 @@ interface Survey {
   description?: string
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED'
   shareUrl?: string | null
+  maxResponses?: number | null
+  endDate?: string | null
+  targetResponses?: number | null
+  responseCount?: number
   questions: Question[]
 }
 
@@ -55,7 +59,7 @@ export default function EditSurvey() {
   
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
-  const [activeTab, setActiveTab] = useState<'edit' | 'collaborators'>('edit')
+  const [activeTab, setActiveTab] = useState<'edit' | 'collaborators' | 'settings'>('edit')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -300,9 +304,9 @@ export default function EditSurvey() {
       description: template.description,
       required: template.required,
       order: survey.questions.length,
-      options: template.options ? JSON.parse(template.options) : undefined,
-      settings: template.settings ? JSON.parse(template.settings) : undefined,
-      conditions: template.conditions ? JSON.parse(template.conditions) : undefined
+      options: Array.isArray(template.options) ? template.options : template.options ?? undefined,
+      settings: typeof template.settings === 'object' ? template.settings : template.settings ?? undefined,
+      conditions: typeof template.conditions === 'object' ? template.conditions : template.conditions ?? undefined
     }
     
     setSurvey({
@@ -333,9 +337,9 @@ export default function EditSurvey() {
           description: template.description,
           required: template.required,
           order: insertIndex !== undefined ? insertIndex : survey.questions.length,
-          options: template.options ? JSON.parse(template.options) : undefined,
-          settings: template.settings ? JSON.parse(template.settings) : undefined,
-          conditions: template.conditions ? JSON.parse(template.conditions) : undefined
+          options: Array.isArray(template.options) ? template.options : template.options ?? undefined,
+          settings: typeof template.settings === 'object' ? template.settings : template.settings ?? undefined,
+          conditions: typeof template.conditions === 'object' ? template.conditions : template.conditions ?? undefined
         }
         
         if (insertIndex !== undefined) {
@@ -358,6 +362,51 @@ export default function EditSurvey() {
     }
   }
 
+  const handleSaveSettings = async () => {
+    if (!survey) return
+    
+    setIsSaving(true)
+    setError('')
+
+    try {
+      console.log('Saving settings:', {
+        maxResponses: survey.maxResponses,
+        endDate: survey.endDate,
+        targetResponses: survey.targetResponses
+      })
+
+      // アンケート設定のみを更新
+      const response = await fetch(`/api/surveys/${surveyId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: survey.title,
+          description: survey.description,
+          maxResponses: survey.maxResponses,
+          endDate: survey.endDate,
+          targetResponses: survey.targetResponses,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      console.log('Settings saved successfully')
+      
+      // アンケートデータを再取得
+      await fetchSurvey()
+      alert('設定が保存されました')
+    } catch (error) {
+      console.error('Failed to save settings:', error)
+      setError('設定の保存に失敗しました')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleSave = async () => {
     if (!survey) return
     
@@ -374,6 +423,9 @@ export default function EditSurvey() {
         body: JSON.stringify({
           title: survey.title,
           description: survey.description,
+          maxResponses: survey.maxResponses,
+          endDate: survey.endDate,
+          targetResponses: survey.targetResponses,
         }),
       })
 
@@ -398,6 +450,8 @@ export default function EditSurvey() {
         })
       }
 
+      // アンケートデータを再取得
+      await fetchSurvey()
       alert('アンケートが保存されました')
     } catch (error) {
       console.error('Failed to save survey:', error)
@@ -515,6 +569,16 @@ export default function EditSurvey() {
                 アンケート編集
               </button>
               <button
+                onClick={() => setActiveTab('settings')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'settings'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                設定
+              </button>
+              <button
                 onClick={() => setActiveTab('collaborators')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'collaborators'
@@ -597,44 +661,39 @@ export default function EditSurvey() {
                 </button>
               </div>
 
-              <div 
-                className="space-y-6"
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e)}
-              >
+              <div className="space-y-6">
                 {survey.questions.map((question, index) => (
-                  <div 
-                    key={question.id}
-                    onClick={() => setSelectedQuestion(question)}
-                    className={`cursor-pointer ${selectedQuestion?.id === question.id ? 'ring-2 ring-blue-500' : ''}`}
-                  >
-                    {/* 質問間の追加ボタン */}
-                    {index === 0 && (
-                      <div 
-                        className="relative group mb-6"
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, index)}
-                      >
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              addQuestion(index)
-                            }}
-                            className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors"
-                            title="ここに質問を追加"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                          </button>
-                        </div>
-                        <div className="h-8 border-l-2 border-dashed border-gray-300 ml-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div key={question.id}>
+                    {/* 質問前のドロップゾーン */}
+                    <div 
+                      className="relative group mb-6"
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, index)}
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            addQuestion(index)
+                          }}
+                          className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors"
+                          title="ここに質問を追加"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
                       </div>
-                    )}
+                      <div className="h-8 border-l-2 border-dashed border-gray-300 ml-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    </div>
 
-                    <div className="border border-gray-300 rounded-lg p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+                    {/* 質問本体 */}
+                    <div 
+                      onClick={() => setSelectedQuestion(question)}
+                      className={`cursor-pointer ${selectedQuestion?.id === question.id ? 'ring-2 ring-blue-500' : ''}`}
+                    >
+                      <div className="border border-gray-300 rounded-lg p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
                       <div className="flex justify-between items-start mb-4">
                         <span className="text-sm font-semibold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
                           質問 {index + 1}
@@ -880,36 +939,35 @@ export default function EditSurvey() {
                           currentQuestionId={question.id}
                         />
                       </div>
-                    </div>
-
-                    {/* 質問間の追加ボタン（最後の質問以外） */}
-                    {index < survey.questions.length - 1 && (
-                      <div 
-                        className="relative group mt-6"
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, index + 1)}
-                      >
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              addQuestion(index + 1)
-                            }}
-                            className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors"
-                            title="ここに質問を追加"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                          </button>
-                        </div>
-                        <div className="h-8 border-l-2 border-dashed border-gray-300 ml-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                       </div>
-                    )}
-                </div>
-                </div>
+                    </div>
+                  </div>
+                  </div>
                 ))}
+
+                {/* 最後の質問の後のドロップゾーン */}
+                <div 
+                  className="relative group mt-6"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, survey.questions.length)}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        addQuestion()
+                      }}
+                      className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors"
+                      title="ここに質問を追加"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="h-8 border-l-2 border-dashed border-gray-300 ml-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
 
                 {/* 最後に質問を追加するボタン */}
                 <div className="flex justify-center pt-6">
@@ -947,6 +1005,143 @@ export default function EditSurvey() {
               >
                 {isSaving ? '保存中...' : '保存'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">回答設定</h3>
+              
+              <div className="space-y-6">
+                {/* 回答数上限設定 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    回答数上限
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input
+                      type="number"
+                      min="1"
+                      value={survey.maxResponses || ''}
+                      onChange={(e) => setSurvey({
+                        ...survey,
+                        maxResponses: e.target.value ? parseInt(e.target.value) : null
+                      })}
+                      className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      placeholder="制限なし"
+                    />
+                    <span className="text-sm text-gray-500">
+                      件（空白で制限なし）
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    設定した件数に達すると、自動的に回答受付を終了します
+                  </p>
+                </div>
+
+                {/* 回答終了日時設定 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    回答終了日時
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input
+                      type="datetime-local"
+                      value={survey.endDate ? new Date(survey.endDate).toISOString().slice(0, 16) : ''}
+                      onChange={(e) => setSurvey({
+                        ...survey,
+                        endDate: e.target.value ? new Date(e.target.value).toISOString() : null
+                      })}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                    />
+                    <button
+                      onClick={() => setSurvey({ ...survey, endDate: null })}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      クリア
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    設定した日時に自動的に回答受付を終了します
+                  </p>
+                </div>
+
+                {/* 回答数目標値設定 */}
+                {!survey.maxResponses && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      回答数目標値
+                    </label>
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="number"
+                        min="1"
+                        value={survey.targetResponses || ''}
+                        onChange={(e) => setSurvey({
+                          ...survey,
+                          targetResponses: e.target.value ? parseInt(e.target.value) : null
+                        })}
+                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        placeholder="目標なし"
+                      />
+                      <span className="text-sm text-gray-500">
+                        件（回答率計算用）
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      回答率の計算に使用されます。回答数上限を設定している場合は不要です
+                    </p>
+                  </div>
+                )}
+
+                {/* 現在の回答状況 */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">現在の回答状況</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">現在の回答数:</span>
+                      <span className="ml-2 font-medium">{survey.responseCount || 0}件</span>
+                    </div>
+                    {survey.maxResponses && (
+                      <div>
+                        <span className="text-gray-600">上限まで:</span>
+                        <span className="ml-2 font-medium">
+                          {Math.max(0, survey.maxResponses - (survey.responseCount || 0))}件
+                        </span>
+                      </div>
+                    )}
+                    {survey.targetResponses && (
+                      <div>
+                        <span className="text-gray-600">目標達成率:</span>
+                        <span className="ml-2 font-medium">
+                          {Math.round(((survey.responseCount || 0) / survey.targetResponses) * 100)}%
+                        </span>
+                      </div>
+                    )}
+                    {survey.endDate && (
+                      <div>
+                        <span className="text-gray-600">終了まで:</span>
+                        <span className="ml-2 font-medium">
+                          {Math.ceil((new Date(survey.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}日
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 保存ボタン */}
+              <div className="flex justify-end pt-6 border-t border-gray-200">
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={isSaving}
+                  className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? '保存中...' : '設定を保存'}
+                </button>
+              </div>
             </div>
           </div>
         )}

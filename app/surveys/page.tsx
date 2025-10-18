@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 
+function formatToTokyoTime(dateString: string): string {
+  const date = new Date(dateString)
+  const tokyoTime = new Date(date.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
+  return tokyoTime.toISOString().replace('T', ' ').slice(0, 16)
+}
+
 interface Survey {
   id: string
   title: string
@@ -12,6 +18,9 @@ interface Survey {
   shareUrl: string | null
   createdAt: string
   responseCount: number
+  maxResponses: number | null
+  endDate: string | null
+  targetResponses: number | null
   owner: {
     id: string
     name: string | null
@@ -33,12 +42,28 @@ export default function SurveysPage() {
     setBaseUrl(window.location.origin)
   }, [session])
 
+  // ページがフォーカスされた時にデータを再取得
+  useEffect(() => {
+    const handleFocus = () => {
+      if (session) {
+        fetchSurveys()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [session])
+
   const fetchSurveys = async () => {
     try {
+      console.log('Fetching surveys...')
       const response = await fetch('/api/surveys')
       if (response.ok) {
         const data = await response.json()
+        console.log('Fetched surveys:', data)
         setSurveys(data)
+      } else {
+        console.error('Failed to fetch surveys, status:', response.status)
       }
     } catch (error) {
       console.error('Failed to fetch surveys:', error)
@@ -153,7 +178,7 @@ export default function SurveysPage() {
               <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider z-10">
+                  <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider z-10" style={{ width: '300px', maxWidth: '300px' }}>
                     アンケート名
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -172,6 +197,15 @@ export default function SurveysPage() {
                     回答数
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    期限
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    目標/上限
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    達成率
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     作成日
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -182,16 +216,16 @@ export default function SurveysPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {surveys.map((survey) => (
                   <tr key={survey.id} className="hover:bg-gray-50">
-                    <td className="sticky left-0 bg-white px-6 py-4 whitespace-nowrap z-10">
+                    <td className="sticky left-0 bg-white px-6 py-4 z-10" style={{ width: '300px', maxWidth: '300px' }}>
                       <div className="flex items-center">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 truncate" title={survey.title}>
                             {survey.title}
                           </div>
                           {survey.description && (
-                            <div className="text-sm text-gray-500">
-                              {survey.description.length > 50 
-                                ? `${survey.description.substring(0, 50)}...` 
+                            <div className="text-sm text-gray-500 truncate" title={survey.description}>
+                              {survey.description.length > 40 
+                                ? `${survey.description.substring(0, 40)}...` 
                                 : survey.description}
                             </div>
                           )}
@@ -243,7 +277,61 @@ export default function SurveysPage() {
                       {survey.responseCount}件
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(survey.createdAt).toLocaleDateString('ja-JP')}
+                      {survey.endDate ? (
+                        <div>
+                          <div>{formatToTokyoTime(survey.endDate).split(' ')[0]}</div>
+                          <div className="text-xs text-gray-400">
+                            {formatToTokyoTime(survey.endDate).split(' ')[1]}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {survey.maxResponses ? (
+                        <div>
+                          <div className="font-medium">上限: {survey.maxResponses}件</div>
+                        </div>
+                      ) : survey.targetResponses ? (
+                        <div>
+                          <div className="font-medium">目標: {survey.targetResponses}件</div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {survey.maxResponses ? (
+                        <div className="flex items-center">
+                          <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full" 
+                              style={{ width: `${Math.min(100, (survey.responseCount / survey.maxResponses) * 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs">
+                            {Math.round((survey.responseCount / survey.maxResponses) * 100)}%
+                          </span>
+                        </div>
+                      ) : survey.targetResponses ? (
+                        <div className="flex items-center">
+                          <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                            <div 
+                              className="bg-green-600 h-2 rounded-full" 
+                              style={{ width: `${Math.min(100, (survey.responseCount / survey.targetResponses) * 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs">
+                            {Math.round((survey.responseCount / survey.targetResponses) * 100)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatToTokyoTime(survey.createdAt).split(' ')[0]}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                       {(survey.userPermission === 'OWNER' || survey.userPermission === 'ADMIN' || survey.userPermission === 'EDIT') && (

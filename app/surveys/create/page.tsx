@@ -34,6 +34,9 @@ export default function CreateSurvey() {
   const [survey, setSurvey] = useState({
     title: '',
     description: '',
+    maxResponses: null as number | null,
+    endDate: null as string | null,
+    targetResponses: null as number | null,
   })
   const [questions, setQuestions] = useState<Question[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -158,9 +161,9 @@ export default function CreateSurvey() {
       description: template.description,
       required: template.required,
       order: questions.length,
-      options: template.options ? JSON.parse(template.options) : undefined,
-      settings: template.settings ? JSON.parse(template.settings) : undefined,
-      conditions: template.conditions ? JSON.parse(template.conditions) : undefined
+      options: Array.isArray(template.options) ? template.options : template.options ?? undefined,
+      settings: typeof template.settings === 'object' ? template.settings : template.settings ?? undefined,
+      conditions: typeof template.conditions === 'object' ? template.conditions : template.conditions ?? undefined
     }
     
     setQuestions([...questions, newQuestion])
@@ -186,9 +189,9 @@ export default function CreateSurvey() {
           description: template.description,
           required: template.required,
           order: insertIndex !== undefined ? insertIndex : questions.length,
-          options: template.options ? JSON.parse(template.options) : undefined,
-          settings: template.settings ? JSON.parse(template.settings) : undefined,
-          conditions: template.conditions ? JSON.parse(template.conditions) : undefined
+          options: Array.isArray(template.options) ? template.options : template.options ?? undefined,
+          settings: typeof template.settings === 'object' ? template.settings : template.settings ?? undefined,
+          conditions: typeof template.conditions === 'object' ? template.conditions : template.conditions ?? undefined
         }
         
         if (insertIndex !== undefined) {
@@ -266,32 +269,31 @@ export default function CreateSurvey() {
       {/* メインコンテンツ */}
       <div className={`flex-1 overflow-y-auto transition-all duration-300 ${showSidebar ? 'mr-80' : ''}`}>
         <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">
-              新しいアンケートを作成
-            </h1>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setShowSidebar(!showSidebar)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
-              >
-                {showSidebar ? 'テンプレートを隠す' : 'テンプレートを表示'}
-              </button>
-              <Link
-                href="/surveys"
-                className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
-              >
-                一覧に戻る
-              </Link>
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">
+                新しいアンケートを作成
+              </h1>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setShowSidebar(!showSidebar)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  {showSidebar ? 'テンプレートを隠す' : 'テンプレートを表示'}
+                </button>
+                <Link
+                  href="/surveys"
+                  className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
+                >
+                  一覧に戻る
+                </Link>
+              </div>
             </div>
-          </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-6">
-              {/* アンケート基本情報 */}
-              <div className="space-y-4">
-                <div>
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-6">
+                {/* アンケート基本情報 */}
+                <div className="space-y-4">
                   <label htmlFor="title" className="block text-sm font-medium text-gray-700">
                     アンケートタイトル *
                   </label>
@@ -317,6 +319,94 @@ export default function CreateSurvey() {
                     className="mt-1"
                   />
                 </div>
+
+                {/* 回答設定 */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">回答設定</h3>
+                  
+                  <div className="space-y-6">
+                    {/* 回答数上限設定 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        回答数上限
+                      </label>
+                      <div className="flex items-center space-x-4">
+                        <input
+                          type="number"
+                          min="1"
+                          value={survey.maxResponses || ''}
+                          onChange={(e) => setSurvey({
+                            ...survey,
+                            maxResponses: e.target.value ? parseInt(e.target.value) : null
+                          })}
+                          className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                          placeholder="制限なし"
+                        />
+                        <span className="text-sm text-gray-500">
+                          件（空白で制限なし）
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        設定した件数に達すると、自動的に回答受付を終了します
+                      </p>
+                    </div>
+
+                    {/* 回答終了日時設定 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        回答終了日時
+                      </label>
+                      <div className="flex items-center space-x-4">
+                        <input
+                          type="datetime-local"
+                          value={survey.endDate ? new Date(survey.endDate).toISOString().slice(0, 16) : ''}
+                          onChange={(e) => setSurvey({
+                            ...survey,
+                            endDate: e.target.value ? new Date(e.target.value).toISOString() : null
+                          })}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        />
+                        <button
+                          onClick={() => setSurvey({ ...survey, endDate: null })}
+                          className="text-sm text-gray-500 hover:text-gray-700"
+                        >
+                          クリア
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        設定した日時に自動的に回答受付を終了します
+                      </p>
+                    </div>
+
+                    {/* 回答数目標値設定 */}
+                    {!survey.maxResponses && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          回答数目標値
+                        </label>
+                        <div className="flex items-center space-x-4">
+                          <input
+                            type="number"
+                            min="1"
+                            value={survey.targetResponses || ''}
+                            onChange={(e) => setSurvey({
+                              ...survey,
+                              targetResponses: e.target.value ? parseInt(e.target.value) : null
+                            })}
+                            className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                            placeholder="目標なし"
+                          />
+                          <span className="text-sm text-gray-500">
+                            件（回答率計算用）
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          回答率の計算に使用されます。回答数上限を設定している場合は不要です
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* 質問一覧 */}
@@ -332,44 +422,39 @@ export default function CreateSurvey() {
                   </button>
                 </div>
 
-                <div 
-                  className="space-y-6"
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e)}
-                >
+                <div className="space-y-6">
                   {questions.map((question, index) => (
-                    <div 
-                      key={question.id}
-                      onClick={() => setSelectedQuestion(question)}
-                      className={`cursor-pointer ${selectedQuestion?.id === question.id ? 'ring-2 ring-blue-500' : ''}`}
-                    >
-                      {/* 質問間の追加ボタン */}
-                      {index === 0 && (
-                        <div 
-                          className="relative group mb-6"
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, index)}
-                        >
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                addQuestion(index)
-                              }}
-                              className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors"
-                              title="ここに質問を追加"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                              </svg>
-                            </button>
-                          </div>
-                          <div className="h-8 border-l-2 border-dashed border-gray-300 ml-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div key={question.id}>
+                      {/* 質問前のドロップゾーン */}
+                      <div 
+                        className="relative group mb-6"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, index)}
+                      >
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              addQuestion(index)
+                            }}
+                            className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors"
+                            title="ここに質問を追加"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </button>
                         </div>
-                      )}
+                        <div className="h-8 border-l-2 border-dashed border-gray-300 ml-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      </div>
 
-                      <div className="border border-gray-300 rounded-lg p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+                      {/* 質問本体 */}
+                      <div 
+                        onClick={() => setSelectedQuestion(question)}
+                        className={`cursor-pointer ${selectedQuestion?.id === question.id ? 'ring-2 ring-blue-500' : ''}`}
+                      >
+                        <div className="border border-gray-300 rounded-lg p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex justify-between items-start mb-4">
                           <span className="text-sm font-semibold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
                             質問 {index + 1}
@@ -616,35 +701,34 @@ export default function CreateSurvey() {
                           />
                         </div>
                       </div>
-
-                      {/* 質問間の追加ボタン（最後の質問以外） */}
-                      {index < questions.length - 1 && (
-                        <div 
-                          className="relative group mt-6"
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, index + 1)}
-                        >
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                addQuestion(index + 1)
-                              }}
-                              className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors"
-                              title="ここに質問を追加"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                              </svg>
-                            </button>
-                          </div>
-                          <div className="h-8 border-l-2 border-dashed border-gray-300 ml-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        </div>
-                      )}
+                    </div>
                     </div>
                     </div>
                   ))}
+
+                  {/* 最後の質問の後のドロップゾーン */}
+                  <div 
+                    className="relative group mt-6"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, questions.length)}
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          addQuestion()
+                        }}
+                        className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors"
+                        title="ここに質問を追加"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="h-8 border-l-2 border-dashed border-gray-300 ml-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  </div>
 
                   {/* 最後に質問を追加するボタン */}
                   <div className="flex justify-center pt-6">
@@ -682,11 +766,10 @@ export default function CreateSurvey() {
                   {isLoading ? '作成中...' : 'アンケートを作成'}
                 </button>
               </div>
+              </form>
             </div>
-          </form>
+          </div>
         </div>
-      </div>
-
       {/* テンプレートサイドバー */}
       {showSidebar && (
         <div className="fixed right-0 top-16 h-[calc(100vh-4rem)] w-80 z-40">
@@ -701,7 +784,6 @@ export default function CreateSurvey() {
           />
         </div>
       )}
-    </div>
     </div>
   )
 }

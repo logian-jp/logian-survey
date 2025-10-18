@@ -4,6 +4,14 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import NotificationPanel from '@/components/NotificationPanel'
+import SurveyAlertPanel from '@/components/SurveyAlertPanel'
+
+function formatToTokyoTime(dateString: string): string {
+  const date = new Date(dateString)
+  const tokyoTime = new Date(date.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
+  return tokyoTime.toISOString().replace('T', ' ').slice(0, 16)
+}
 
 interface Survey {
   id: string
@@ -12,6 +20,9 @@ interface Survey {
   status: 'DRAFT' | 'ACTIVE' | 'CLOSED'
   createdAt: string
   responseCount: number
+  maxResponses: number | null
+  endDate: string | null
+  targetResponses: number | null
   owner: {
     id: string
     name: string | null
@@ -38,15 +49,31 @@ export default function Dashboard() {
     }
   }, [session])
 
+  // ページがフォーカスされた時にデータを再取得
+  useEffect(() => {
+    const handleFocus = () => {
+      if (session) {
+        fetchSurveys()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [session])
+
   const fetchSurveys = async () => {
     try {
+      console.log('Dashboard: Fetching surveys...')
       const response = await fetch('/api/surveys')
       if (response.ok) {
         const data = await response.json()
+        console.log('Dashboard: Fetched surveys:', data)
         setSurveys(data)
+      } else {
+        console.error('Dashboard: Failed to fetch surveys, status:', response.status)
       }
     } catch (error) {
-      console.error('Failed to fetch surveys:', error)
+      console.error('Dashboard: Failed to fetch surveys:', error)
     } finally {
       setIsLoading(false)
     }
@@ -76,6 +103,12 @@ export default function Dashboard() {
             新しいアンケートを作成
           </Link>
         </div>
+
+          {/* 通知パネルとアラートパネル */}
+          <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <NotificationPanel />
+            <SurveyAlertPanel />
+          </div>
         {surveys.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-400 text-6xl mb-4">📊</div>
@@ -118,9 +151,34 @@ export default function Dashboard() {
                   </p>
                 )}
                 
-                <div className="text-sm text-gray-500 mb-4">
+                <div className="text-sm text-gray-500 mb-4 space-y-1">
                   <p>回答数: {survey.responseCount}件</p>
-                  <p>作成日: {new Date(survey.createdAt).toLocaleDateString('ja-JP')}</p>
+                  {survey.endDate && (
+                    <p>期限: {formatToTokyoTime(survey.endDate)}</p>
+                  )}
+                  {survey.maxResponses && (
+                    <p>上限: {survey.maxResponses}件</p>
+                  )}
+                  {survey.targetResponses && !survey.maxResponses && (
+                    <p>目標: {survey.targetResponses}件</p>
+                  )}
+                  {(survey.maxResponses || survey.targetResponses) && (
+                    <div className="flex items-center">
+                      <span className="mr-2">達成率:</span>
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full ${survey.maxResponses ? 'bg-blue-600' : 'bg-green-600'}`}
+                          style={{ 
+                            width: `${Math.min(100, ((survey.maxResponses || survey.targetResponses) ? (survey.responseCount / (survey.maxResponses || survey.targetResponses!)) * 100 : 0))}%` 
+                          }}
+                        ></div>
+                      </div>
+                      <span className="ml-2 text-xs">
+                        {Math.round(((survey.maxResponses || survey.targetResponses) ? (survey.responseCount / (survey.maxResponses || survey.targetResponses!)) * 100 : 0))}%
+                      </span>
+                    </div>
+                  )}
+                  <p>作成日: {formatToTokyoTime(survey.createdAt).split(' ')[0]}</p>
                   <p>所有者: {survey.owner.name || survey.owner.email}</p>
                   <p>あなたの権限: {
                     survey.userPermission === 'OWNER' ? '所有者' :

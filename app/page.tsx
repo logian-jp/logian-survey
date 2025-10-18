@@ -1,13 +1,20 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Logian Survey
-          </h1>
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/images/logo.svg"
+              alt="Logian Survey"
+              width={300}
+              height={80}
+              className="h-20 w-auto"
+            />
+          </div>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             分析に特化したアンケートツール。Googleフォームのような使いやすさで、
             データ分析に最適化された結果を出力します。
@@ -66,6 +73,45 @@ export default function Home() {
               通常のCSV、正規化・標準化されたCSVなど、
               用途に応じたデータ出力が可能です。
             </p>
+          </div>
+        </div>
+
+        {/* 運営会社情報 */}
+        <div className="mt-20 pt-8 border-t border-gray-200">
+          <div className="text-center">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">運営会社</h2>
+            <div className="bg-white p-6 rounded-lg shadow-sm max-w-md mx-auto">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-semibold text-gray-900">Logian株式会社</h3>
+                  <p className="text-sm text-gray-600">データ分析・AI技術の専門企業</p>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm text-gray-600">
+                <p>
+                  <span className="font-medium">ウェブサイト:</span>{' '}
+                  <a 
+                    href="https://logian.jp" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline"
+                  >
+                    https://logian.jp
+                  </a>
+                </p>
+                <p>
+                  <span className="font-medium">事業内容:</span> データ分析、AI技術開発、コンサルティング
+                </p>
+                <p>
+                  <span className="font-medium">サービス:</span> 分析に特化したアンケートツールの提供
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

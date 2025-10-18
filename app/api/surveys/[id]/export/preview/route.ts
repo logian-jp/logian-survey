@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { PREFECTURE_REGIONS, convertAgeGroupToNumber } from '@/lib/survey-parts'
 
 export async function GET(
   request: NextRequest,
@@ -17,7 +16,7 @@ export async function GET(
 
     const surveyId = params.id
     const { searchParams } = new URL(request.url)
-    const format = searchParams.get('format') || 'raw' // raw, normalized, standardized
+    const format = searchParams.get('format') || 'raw'
     const includePersonalData = searchParams.get('includePersonalData') === 'true'
 
     // アンケートの所有者を確認
@@ -36,6 +35,7 @@ export async function GET(
           include: {
             answers: true,
           },
+          take: 5, // プレビュー用に5件のみ取得
         },
       },
     })
@@ -47,21 +47,16 @@ export async function GET(
       )
     }
 
-    // CSVデータを生成
+    // CSVデータを生成（プレビュー用）
     const csvData = generateCSVData(survey, format, includePersonalData)
 
-    // CSVファイル名を生成
-    const timestamp = new Date().toISOString().split('T')[0]
-    const filename = `${survey.title}_${format}_${timestamp}.csv`
-
-    return new NextResponse(csvData, {
-      headers: {
-        'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
+    return NextResponse.json({
+      preview: csvData,
+      totalResponses: survey.responses.length,
+      previewCount: Math.min(5, survey.responses.length)
     })
   } catch (error) {
-    console.error('Failed to export survey:', error)
+    console.error('Failed to generate CSV preview:', error)
     return NextResponse.json(
       { message: 'Internal server error' },
       { status: 500 }
@@ -193,37 +188,29 @@ function getQuestionOptions(question: any): string[] {
   }
   
   if (question.type === 'AGE_GROUP') {
-    return ['10代以下', '20代', '30代', '40代', '50代', '60代', '70代以上']
+    return ['10代', '20代', '30代', '40代', '50代', '60代', '70代以上']
   }
   
   return []
 }
 
 function convertToNumeric(question: any, answer: string): number {
-  if (question.type === 'AGE_GROUP') {
-    return convertAgeGroupToNumber(answer)
-  }
-  
   if (question.type === 'PREFECTURE') {
-    // 都道府県の場合は地方に変換
-    const region = PREFECTURE_REGIONS[answer as keyof typeof PREFECTURE_REGIONS]
-    const regionMap: { [key: string]: number } = {
-      '北海道': 1,
-      '東北': 2,
-      '関東': 3,
-      '中部': 4,
-      '関西': 5,
-      '中国': 6,
-      '四国': 7,
-      '九州': 8,
-      '沖縄': 9,
-    }
-    return regionMap[region] || 0
+    const prefectures = getQuestionOptions(question)
+    return prefectures.indexOf(answer) + 1
   }
   
-  // その他の場合は選択肢のインデックスを返す
-  const options = getQuestionOptions(question)
-  return options.indexOf(answer) + 1
+  if (question.type === 'AGE_GROUP') {
+    const ageGroups = getQuestionOptions(question)
+    return ageGroups.indexOf(answer) + 1
+  }
+  
+  if (question.type === 'RADIO' || question.type === 'SELECT') {
+    const options = getQuestionOptions(question)
+    return options.indexOf(answer) + 1
+  }
+  
+  return 0
 }
 
 function formatToTokyoTime(dateString: string): string {
