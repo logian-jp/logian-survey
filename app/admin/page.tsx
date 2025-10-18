@@ -62,10 +62,52 @@ interface AdminStats {
   }>
 }
 
+interface AnalyticsData {
+  // 基本統計
+  totalUsers: number
+  totalSurveys: number
+  totalResponses: number
+  newUsersThisMonth: number
+  newUsersLastMonth: number
+  userGrowthRate: number
+  
+  // 売上情報
+  monthlyRevenue: number
+  revenueBreakdown: { [key: string]: number }
+  predictedNextMonthRevenue: number
+  revenueGrowthRate: number
+  
+  // 分析データ
+  userGrowthData: Array<{
+    month: string
+    newUsers: number
+    totalUsers: number
+  }>
+  inactiveUsers: number
+  churnRiskUsers: Array<{
+    id: string
+    email: string
+    name: string | null
+    lastLoginAt: string | null
+    planType: string
+  }>
+  
+  // プラン別統計
+  planUserBreakdown: Array<{
+    planType: string
+    planName: string
+    userCount: number
+  }>
+  
+  // 計算日時
+  calculatedAt: string
+}
+
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [stats, setStats] = useState<AdminStats | null>(null)
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
   const [selectedFormat, setSelectedFormat] = useState<'raw' | 'normalized' | 'standardized'>('raw')
@@ -84,18 +126,26 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/admin/stats')
-      if (response.ok) {
-        const data = await response.json()
-        setStats(data)
-      } else if (response.status === 403) {
+      const [statsResponse, analyticsResponse] = await Promise.all([
+        fetch('/api/admin/stats'),
+        fetch('/api/admin/analytics')
+      ])
+      
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setStats(statsData)
+      } else if (statsResponse.status === 403) {
         alert('管理者権限が必要です')
         router.push('/dashboard')
-      } else {
-        console.error('Failed to fetch admin stats')
+        return
+      }
+      
+      if (analyticsResponse.ok) {
+        const analyticsData = await analyticsResponse.json()
+        setAnalytics(analyticsData.data)
       }
     } catch (error) {
-      console.error('Failed to fetch admin stats:', error)
+      console.error('Failed to fetch admin data:', error)
     } finally {
       setIsLoading(false)
     }
@@ -198,76 +248,90 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 概要統計 */}
+        {/* 経営KPI */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">システム概要</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">経営KPI</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                      <span className="text-white text-sm font-medium">👥</span>
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">総ユーザー数</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.totalUsers}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
+            {/* 今月売上 */}
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                      <span className="text-white text-sm font-medium">📊</span>
+                      <span className="text-white text-sm font-medium">💰</span>
                     </div>
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">総アンケート数</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.totalSurveys}</dd>
+                      <dt className="text-sm font-medium text-gray-500 truncate">今月売上</dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        ¥{analytics?.monthlyRevenue.toLocaleString() || 0}
+                      </dd>
                     </dl>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* 来月売上予測 */}
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">📈</span>
+                    </div>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">来月売上予測</dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        ¥{analytics?.predictedNextMonthRevenue.toLocaleString() || 0}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ユーザー成長率 */}
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                      <span className="text-white text-sm font-medium">💬</span>
+                      <span className="text-white text-sm font-medium">👥</span>
                     </div>
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">総回答数</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.totalResponses}</dd>
+                      <dt className="text-sm font-medium text-gray-500 truncate">ユーザー成長率</dt>
+                      <dd className={`text-lg font-medium ${
+                        (analytics?.userGrowthRate || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {analytics?.userGrowthRate.toFixed(1) || 0}%
+                      </dd>
                     </dl>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* 解約リスクユーザー */}
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
-                      <span className="text-white text-sm font-medium">⚡</span>
+                    <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">⚠️</span>
                     </div>
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">アクティブユーザー</dt>
-                      <dd className="text-lg font-medium text-gray-900">{stats.overview.activeUsers}</dd>
+                      <dt className="text-sm font-medium text-gray-500 truncate">解約リスク</dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {analytics?.churnRiskUsers.length || 0}人
+                      </dd>
                     </dl>
                   </div>
                 </div>
@@ -275,6 +339,107 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+
+        {/* 売上分析 */}
+        {analytics && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">売上分析</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 売上内訳 */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">今月売上内訳</h3>
+                <div className="space-y-3">
+                  {Object.entries(analytics.revenueBreakdown).map(([planName, revenue]) => (
+                    <div key={planName} className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">{planName}</span>
+                      <span className="text-sm font-medium text-gray-900">¥{revenue.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* プラン別ユーザー数 */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">プラン別ユーザー数</h3>
+                <div className="space-y-3">
+                  {analytics.planUserBreakdown.map((plan) => (
+                    <div key={plan.planType} className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">{plan.planName}</span>
+                      <span className="text-sm font-medium text-gray-900">{plan.userCount}人</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ユーザー成長推移 */}
+        {analytics && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">ユーザー成長推移</h2>
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left text-sm font-medium text-gray-500 py-2">月</th>
+                      <th className="text-left text-sm font-medium text-gray-500 py-2">新規ユーザー</th>
+                      <th className="text-left text-sm font-medium text-gray-500 py-2">累計ユーザー</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.userGrowthData.map((data, index) => (
+                      <tr key={index} className="border-b border-gray-100">
+                        <td className="py-2 text-sm text-gray-900">{data.month}</td>
+                        <td className="py-2 text-sm text-gray-900">{data.newUsers}人</td>
+                        <td className="py-2 text-sm text-gray-900">{data.totalUsers}人</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 解約リスクユーザー */}
+        {analytics && analytics.churnRiskUsers.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">解約リスクユーザー</h2>
+            <div className="bg-white shadow rounded-lg">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ユーザー</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">プラン</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最終ログイン</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {analytics.churnRiskUsers.map((user) => (
+                      <tr key={user.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div>
+                            <div className="font-medium">{user.name || '未設定'}</div>
+                            <div className="text-gray-500">{user.email}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.planType}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.lastLoginAt ? formatToTokyoTime(user.lastLoginAt) : '未ログイン'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* データダウンロード */}
         <div className="mb-8 bg-white shadow-sm rounded-lg">
