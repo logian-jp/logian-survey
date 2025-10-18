@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -16,15 +13,14 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -38,25 +34,25 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  role          UserRole  @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  accounts         Account[]
-  sessions         Session[]
-  surveys          Survey[]
-  surveyUsers      SurveyUser[]
-  invitedSurveys   SurveyUser[] @relation("SurveyInviter")
-  questionTemplates QuestionTemplate[]
-  userPlan         UserPlan?
-  createdDiscountLinks DiscountLink[] @relation("DiscountLinkCreator")
-  usedDiscountLinks    DiscountLink[] @relation("DiscountLinkUsers")
+  id                     String                 @id @default(cuid())
+  name                   String?
+  email                  String                 @unique
+  emailVerified          DateTime?
+  image                  String?
+  password               String?
+  role                   UserRole               @default(USER)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  accounts               Account[]
+  announcementDeliveries AnnouncementDelivery[]
+  createdDiscountLinks   DiscountLink[]         @relation("DiscountLinkCreator")
+  questionTemplates      QuestionTemplate[]
+  sessions               Session[]
+  surveys                Survey[]
+  invitedSurveys         SurveyUser[]           @relation("SurveyInviter")
+  surveyUsers            SurveyUser[]
+  userPlan               UserPlan?
+  usedDiscountLinks      DiscountLink[]         @relation("DiscountLinkUsers")
 }
 
 model VerificationToken {
@@ -67,30 +63,196 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model Survey {
+  id              String       @id @default(cuid())
+  title           String
+  description     String?
+  status          SurveyStatus @default(DRAFT)
+  shareUrl        String?      @unique
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  maxResponses    Int?
+  endDate         DateTime?
+  targetResponses Int?
+  userId          String
+  questions       Question[]
+  responses       Response[]
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  surveyUsers     SurveyUser[]
+}
+
+model SurveyUser {
+  id         String           @id @default(cuid())
+  userId     String
+  surveyId   String
+  permission SurveyPermission @default(VIEW)
+  invitedBy  String
+  invitedAt  DateTime         @default(now())
+  acceptedAt DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  inviter    User             @relation("SurveyInviter", fields: [invitedBy], references: [id], onDelete: Cascade)
+  survey     Survey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, surveyId])
+}
+
+model Question {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  type        QuestionType
+  required    Boolean      @default(false)
+  order       Int
+  options     Json?
+  settings    Json?
+  conditions  Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  surveyId    String
+  answers     Answer[]
+  survey      Survey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+}
+
+model Response {
+  id        String   @id @default(cuid())
+  surveyId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  answers   Answer[]
+  survey    Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+}
+
+model Answer {
+  id         String       @id @default(cuid())
+  questionId String
+  responseId String
+  value      String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  question   Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  response   Response     @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  files      FileUpload[]
+
+  @@unique([questionId, responseId])
+}
+
+model FileUpload {
+  id           String   @id @default(cuid())
+  answerId     String
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  answer       Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+}
+
+model QuestionTemplate {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  type        QuestionType
+  required    Boolean      @default(false)
+  options     Json?
+  settings    Json?
+  conditions  Json?
+  isPublic    Boolean      @default(false)
+  usageCount  Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserPlan {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  planType  PlanType   @default(FREE)
+  status    PlanStatus @default(ACTIVE)
+  startDate DateTime   @default(now())
+  endDate   DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DiscountLink {
+  id                         String       @id @default(cuid())
+  code                       String       @unique
+  name                       String
+  description                String?
+  discountType               DiscountType @default(PERCENTAGE)
+  discountValue              Float
+  targetPlanType             PlanType
+  originalPrice              Float
+  discountedPrice            Float
+  maxUses                    Int?
+  currentUses                Int          @default(0)
+  isActive                   Boolean      @default(true)
+  validFrom                  DateTime
+  validUntil                 DateTime
+  subscriptionDiscountMonths Int?
+  totalSavings               Float?
+  createdBy                  String
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+  creator                    User         @relation("DiscountLinkCreator", fields: [createdBy], references: [id])
+  users                      User[]       @relation("DiscountLinkUsers")
+}
+
+model PlanConfig {
+  id          String   @id @default(cuid())
+  planType    String   @unique
+  name        String
+  description String?
+  price       Float
+  features    Json
+  limits      Json
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Announcement {
+  id          String                 @id @default(cuid())
+  title       String
+  content     String
+  type        AnnouncementType       @default(MANUAL)
+  status      AnnouncementStatus     @default(DRAFT)
+  priority    Int                    @default(0)
+  scheduledAt DateTime?
+  conditions  Json?
+  targetPlans Json?
+  targetUsers Json?
+  totalSent   Int                    @default(0)
+  totalRead   Int                    @default(0)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  deliveries  AnnouncementDelivery[]
+}
+
+model AnnouncementDelivery {
+  id             String         @id @default(cuid())
+  announcementId String
+  userId         String
+  status         DeliveryStatus @default(PENDING)
+  readAt         DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  announcement   Announcement   @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+}
+
 enum UserRole {
   USER
   ADMIN
-}
-
-model Survey {
-  id          String      @id @default(cuid())
-  title       String
-  description String?
-  status      SurveyStatus @default(DRAFT)
-  shareUrl    String?     @unique
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  // 回答設定
-  maxResponses    Int?      // 回答数上限（null = 制限なし）
-  endDate         DateTime? // 回答終了日時（null = 制限なし）
-  targetResponses Int?      // 回答数目標値（null = 目標なし）
-
-  userId      String
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  questions   Question[]
-  responses   Response[]
-  surveyUsers SurveyUser[]
 }
 
 enum SurveyStatus {
@@ -103,42 +265,6 @@ enum SurveyPermission {
   EDIT
   VIEW
   ADMIN
-}
-
-model SurveyUser {
-  id           String           @id @default(cuid())
-  userId       String
-  surveyId     String
-  permission   SurveyPermission @default(VIEW)
-  invitedBy    String
-  invitedAt    DateTime         @default(now())
-  acceptedAt   DateTime?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  survey   Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  inviter  User   @relation("SurveyInviter", fields: [invitedBy], references: [id], onDelete: Cascade)
-
-  @@unique([userId, surveyId])
-}
-
-model Question {
-  id          String       @id @default(cuid())
-  title       String
-  description String?
-  type        QuestionType
-  required    Boolean      @default(false)
-  order       Int
-  options     Json?        // For multiple choice, checkbox, etc.
-  settings    Json?        // For additional settings like ordinal structure
-  conditions  Json?        // For conditional logic
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  surveyId  String
-  survey    Survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  answers   Answer[]
 }
 
 enum QuestionType {
@@ -161,75 +287,6 @@ enum QuestionType {
   PAGE_BREAK
 }
 
-model Response {
-  id        String   @id @default(cuid())
-  surveyId  String
-  survey    Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  answers   Answer[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Answer {
-  id         String @id @default(cuid())
-  questionId String
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  responseId String
-  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
-  value      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // ファイルアップロード用
-  files      FileUpload[]
-
-  @@unique([questionId, responseId])
-}
-
-model FileUpload {
-  id        String   @id @default(cuid())
-  answerId  String
-  answer    Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
-  filename  String
-  originalName String
-  mimeType  String
-  size      Int
-  url       String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model QuestionTemplate {
-  id          String       @id @default(cuid())
-  title       String
-  description String?
-  type        QuestionType
-  required    Boolean      @default(false)
-  options     Json?        // For multiple choice, checkbox, etc.
-  settings    Json?        // For additional settings like ordinal structure
-  conditions  Json?        // For conditional logic
-  isPublic    Boolean      @default(false) // 公開テンプレートかどうか
-  usageCount  Int          @default(0)     // 使用回数
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  userId      String
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model UserPlan {
-  id        String     @id @default(cuid())
-  userId    String     @unique
-  planType  PlanType   @default(FREE)
-  status    PlanStatus @default(ACTIVE)
-  startDate DateTime   @default(now())
-  endDate   DateTime?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
 enum PlanType {
   FREE
   STANDARD
@@ -244,58 +301,28 @@ enum PlanStatus {
   EXPIRED
 }
 
-model DiscountLink {
-  id          String   @id @default(cuid())
-  code        String   @unique // 割引リンクのコード
-  name        String   // 割引リンクの名前
-  description String?  // 説明
-  
-  // 割引設定
-  discountType     DiscountType @default(PERCENTAGE) // PERCENTAGE or FIXED_AMOUNT
-  discountValue    Float        // 割引率(%) または 固定金額
-  targetPlanType   PlanType      // 対象プラン
-  originalPrice    Float        // 元の価格
-  discountedPrice  Float        // 割引後価格
-  
-  // 制限設定
-  maxUses          Int?         // 最大利用回数 (null = 無制限)
-  currentUses      Int          @default(0) // 現在の利用回数
-  isActive         Boolean      @default(true) // 有効/無効
-  
-  // 期間設定
-  validFrom        DateTime     // 有効開始日時
-  validUntil       DateTime     // 有効終了日時
-  
-  // サブスクリプション割引設定
-  subscriptionDiscountMonths Int?     // 割引適用期間（月数）
-  totalSavings              Float?   // 合計節約額
-  
-  // 作成者
-  createdBy        String       // 作成者ID
-  creator          User         @relation("DiscountLinkCreator", fields: [createdBy], references: [id])
-  
-  // 利用者
-  users            User[]       @relation("DiscountLinkUsers")
-  
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-}
-
 enum DiscountType {
-  PERCENTAGE     // パーセンテージ割引
-  FIXED_AMOUNT   // 固定金額割引
+  PERCENTAGE
+  FIXED_AMOUNT
 }
 
-model PlanConfig {
-  id          String   @id @default(cuid())
-  planType    String   @unique // プランタイプ（FREE, STANDARD, etc.）
-  name        String   // プラン名
-  description String?  // プラン説明
-  price       Float    // 価格（円）
-  features    Json     // 機能リスト
-  limits      Json     // 制限設定
-  isActive    Boolean  @default(true) // 有効/無効
-  sortOrder   Int      @default(0) // 表示順序
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+enum AnnouncementType {
+  MANUAL
+  SCHEDULED
+  CONDITIONAL
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  PAUSED
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  READ
+  HIDDEN
 }

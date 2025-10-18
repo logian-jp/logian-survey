@@ -270,6 +270,12 @@ export default function AdminDashboard() {
                   割引リンク管理
                 </Link>
                 <Link
+                  href="/admin/announcements"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
+                >
+                  お知らせ管理
+                </Link>
+                <Link
                   href="/dashboard"
                   className="text-sm text-gray-600 hover:text-gray-900"
                 >
