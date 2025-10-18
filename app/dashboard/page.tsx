@@ -72,11 +72,19 @@ export default function Dashboard() {
 
   const fetchUserPlan = async (retryCount = 0) => {
     try {
+      console.log(`=== Fetching user plan (attempt ${retryCount + 1}) ===`)
       // キャッシュバスターを追加して常に最新の情報を取得
-      const response = await fetch(`/api/user/plan?t=${Date.now()}`)
+      const url = `/api/user/plan?t=${Date.now()}`
+      console.log('Fetching from URL:', url)
+      const response = await fetch(url)
+      console.log('Response status:', response.status)
+      console.log('Response ok:', response.ok)
+      
       if (response.ok) {
         const data = await response.json()
         console.log('Fetched user plan:', data)
+        console.log('Plan type:', data.planType)
+        console.log('Plan status:', data.status)
         setUserPlan(data)
       } else {
         // APIエラーの場合はリトライまたは無料プランを設定
