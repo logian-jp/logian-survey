@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
 
 interface AdminStats {
   overview: {
@@ -340,6 +341,63 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* 売上予測 */}
+        {analytics && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">売上予測</h2>
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">月別売上推移</h3>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-600">今月売上</span>
+                      <span className="text-lg font-semibold text-gray-900">
+                        ¥{analytics.monthlyRevenue.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                      <span className="text-sm text-gray-600">来月予測</span>
+                      <span className="text-lg font-semibold text-blue-600">
+                        ¥{analytics.predictedNextMonthRevenue.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                      <span className="text-sm text-gray-600">成長率</span>
+                      <span className={`text-lg font-semibold ${
+                        analytics.revenueGrowthRate >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {analytics.revenueGrowthRate.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">売上予測グラフ</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={[
+                      { month: '今月', revenue: analytics.monthlyRevenue },
+                      { month: '来月予測', revenue: analytics.predictedNextMonthRevenue }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => [`¥${value.toLocaleString()}`, '売上']} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#3B82F6" 
+                        strokeWidth={3}
+                        dot={{ fill: '#3B82F6', strokeWidth: 2, r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 売上分析 */}
         {analytics && (
           <div className="mb-8">
@@ -348,27 +406,39 @@ export default function AdminDashboard() {
               {/* 売上内訳 */}
               <div className="bg-white shadow rounded-lg p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">今月売上内訳</h3>
-                <div className="space-y-3">
-                  {Object.entries(analytics.revenueBreakdown).map(([planName, revenue]) => (
-                    <div key={planName} className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">{planName}</span>
-                      <span className="text-sm font-medium text-gray-900">¥{revenue.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(analytics.revenueBreakdown).map(([name, value]) => ({ name, value }))}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {Object.entries(analytics.revenueBreakdown).map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={`hsl(${index * 60}, 70%, 50%)`} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`¥${value.toLocaleString()}`, '売上']} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
 
               {/* プラン別ユーザー数 */}
               <div className="bg-white shadow rounded-lg p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">プラン別ユーザー数</h3>
-                <div className="space-y-3">
-                  {analytics.planUserBreakdown.map((plan) => (
-                    <div key={plan.planType} className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">{plan.planName}</span>
-                      <span className="text-sm font-medium text-gray-900">{plan.userCount}人</span>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={analytics.planUserBreakdown}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="planName" angle={-45} textAnchor="end" height={80} />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`${value}人`, 'ユーザー数']} />
+                    <Bar dataKey="userCount" fill="#3B82F6" />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
@@ -379,26 +449,34 @@ export default function AdminDashboard() {
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">ユーザー成長推移</h2>
             <div className="bg-white shadow rounded-lg p-6">
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left text-sm font-medium text-gray-500 py-2">月</th>
-                      <th className="text-left text-sm font-medium text-gray-500 py-2">新規ユーザー</th>
-                      <th className="text-left text-sm font-medium text-gray-500 py-2">累計ユーザー</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analytics.userGrowthData.map((data, index) => (
-                      <tr key={index} className="border-b border-gray-100">
-                        <td className="py-2 text-sm text-gray-900">{data.month}</td>
-                        <td className="py-2 text-sm text-gray-900">{data.newUsers}人</td>
-                        <td className="py-2 text-sm text-gray-900">{data.totalUsers}人</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analytics.userGrowthData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value, name) => [
+                      `${value}人`, 
+                      name === 'newUsers' ? '新規ユーザー' : '累計ユーザー'
+                    ]}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="newUsers" 
+                    stroke="#3B82F6" 
+                    strokeWidth={2}
+                    name="新規ユーザー"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="totalUsers" 
+                    stroke="#10B981" 
+                    strokeWidth={2}
+                    name="累計ユーザー"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
         )}
