@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 
+// 動的レンダリングを強制
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     return NextResponse.json({

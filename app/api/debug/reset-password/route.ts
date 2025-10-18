@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
+// 動的レンダリングを強制
+export const dynamic = 'force-dynamic'
+
 export async function POST() {
   try {
     console.log('Resetting password for noutomi0729@gmail.com...')
