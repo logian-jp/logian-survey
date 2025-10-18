@@ -176,7 +176,7 @@ export default function UpgradePage() {
         
         // プラン情報を再取得して確認
         try {
-          const planResponse = await fetch('/api/user/plan')
+          const planResponse = await fetch(`/api/user/plan?t=${Date.now()}`)
           if (planResponse.ok) {
             const planData = await planResponse.json()
             console.log('Updated plan data:', planData)
@@ -185,10 +185,21 @@ export default function UpgradePage() {
           console.error('Failed to verify plan update:', error)
         }
         
-        // 3秒後にダッシュボードにリダイレクト
+        // セッションを更新してからリダイレクト
+        try {
+          // セッション情報を更新
+          await fetch('/api/auth/session?update=true')
+          console.log('Session refreshed')
+        } catch (error) {
+          console.error('Failed to refresh session:', error)
+        }
+        
+        // 2秒後にダッシュボードにリダイレクト（キャッシュバスター付き）
         setTimeout(() => {
-          router.push('/dashboard?refresh=' + Date.now()) // キャッシュを回避
-        }, 3000)
+          const refreshToken = Date.now()
+          console.log(`Redirecting to dashboard with refresh token: ${refreshToken}`)
+          router.push(`/dashboard?refresh=${refreshToken}&plan_updated=true`)
+        }, 2000)
       } else {
         const errorData = await response.json()
         console.error('Upgrade failed:', errorData)
