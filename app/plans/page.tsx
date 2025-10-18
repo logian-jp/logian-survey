@@ -13,15 +13,27 @@ interface UserPlan {
   endDate?: string
 }
 
+interface PlanConfig {
+  id: string
+  planType: string
+  name: string
+  price: number
+  features: string[]
+  limits: any
+  isActive: boolean
+}
+
 export default function PlansPage() {
   const { data: session } = useSession()
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null)
+  const [planConfigs, setPlanConfigs] = useState<PlanConfig[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchUserPlan()
     }
+    fetchPlanConfigs()
   }, [session])
 
   const fetchUserPlan = async () => {
@@ -33,96 +45,37 @@ export default function PlansPage() {
       }
     } catch (error) {
       console.error('Failed to fetch user plan:', error)
+    }
+  }
+
+  const fetchPlanConfigs = async () => {
+    try {
+      const response = await fetch('/api/plans')
+      if (response.ok) {
+        const data = await response.json()
+        setPlanConfigs(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch plan configs:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const plans = [
-    {
-      id: 'FREE',
-      name: '基本プラン',
-      price: 0,
-      description: '個人利用に最適',
-      features: [
-        'アンケート作成: 3個まで',
-        '回答数: 100件/アンケート',
-        '基本質問タイプ',
-        'CSV出力（通常・正規化データ）',
-        'セクション・改ページ機能'
-      ],
-      limits: PLAN_LIMITS.FREE,
-      popular: false
-    },
-    {
-      id: 'ONETIME_UNLIMITED',
-      name: '単発無制限プラン',
-      price: 10000,
-      description: '1回限り・全機能開放',
-      features: [
-        'アンケート作成: 1個のみ',
-        '回答数: 無制限',
-        '全質問タイプ・全機能',
-        '条件分岐・ファイルアップロード',
-        '位置情報取得・リッチテキスト',
-        'カスタムブランディング',
-        'API連携・優先サポート',
-        '全データ形式エクスポート'
-      ],
-      limits: PLAN_LIMITS.ONETIME_UNLIMITED,
-      popular: true
-    },
-    {
-      id: 'STANDARD',
-      name: 'スタンダードプラン',
-      price: 2980,
-      description: '中小企業に最適',
-      features: [
-        'アンケート作成: 無制限',
-        '回答数: 1,000件/アンケート',
-        '全質問タイプ',
-        '高度な分析機能',
-        '条件分岐ロジック',
-        '質問テンプレート',
-        'チーム機能'
-      ],
-      limits: PLAN_LIMITS.STANDARD,
-      popular: true
-    },
-    {
-      id: 'PROFESSIONAL',
-      name: 'プロフェッショナルプラン',
-      price: 9800,
-      description: '本格的な分析が必要な場合',
-      features: [
-        'スタンダードの全機能',
-        '回答数: 10,000件/アンケート',
-        '高度な統計分析',
-        'カスタムブランディング',
-        'API連携',
-        '優先サポート'
-      ],
-      limits: PLAN_LIMITS.PROFESSIONAL,
-      popular: false
-    },
-    {
-      id: 'ENTERPRISE',
-      name: 'エンタープライズプラン',
-      price: 29800,
-      description: '大企業・組織向け',
-      features: [
-        'プロフェッショナルの全機能',
-        '回答数: 無制限',
-        '無制限チームメンバー',
-        'SSO連携',
-        'カスタムドメイン',
-        'SLA保証',
-        '専任サポート'
-      ],
-      limits: PLAN_LIMITS.ENTERPRISE,
-      popular: false
-    }
-  ]
+  // データベースから取得したプラン設定を使用
+  const plans = planConfigs.map(config => ({
+    id: config.planType,
+    name: config.name,
+    price: config.price,
+    description: config.planType === 'FREE' ? '個人利用に最適' :
+                 config.planType === 'ONETIME_UNLIMITED' ? '1回限り・全機能開放' :
+                 config.planType === 'STANDARD' ? '中小企業に最適' :
+                 config.planType === 'PROFESSIONAL' ? '本格的な分析が必要な場合' :
+                 '大企業・組織向け',
+    features: config.features,
+    limits: config.limits,
+    popular: config.planType === 'ONETIME_UNLIMITED'
+  }))
 
   if (isLoading) {
     return (

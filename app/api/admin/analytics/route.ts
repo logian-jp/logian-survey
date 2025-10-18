@@ -53,12 +53,22 @@ export async function GET() {
       : 0
 
     // 今月の売上（ユーザープランから計算）
+    // 今月作成されたプランと、今月更新されたプランの両方を含める
     const userPlans = await prisma.userPlan.findMany({
       where: {
         status: 'ACTIVE',
-        createdAt: {
-          gte: startOfMonth
-        }
+        OR: [
+          {
+            createdAt: {
+              gte: startOfMonth
+            }
+          },
+          {
+            updatedAt: {
+              gte: startOfMonth
+            }
+          }
+        ]
       },
       include: {
         user: {

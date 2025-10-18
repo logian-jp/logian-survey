@@ -20,6 +20,9 @@ export default function UpgradePage() {
   const [isValidatingDiscount, setIsValidatingDiscount] = useState(false)
   const [currentUserPlan, setCurrentUserPlan] = useState<any>(null)
 
+  const [planConfig, setPlanConfig] = useState<any>(null)
+  const [isLoadingPlan, setIsLoadingPlan] = useState(true)
+
   const plan = planId ? {
     id: planId,
     ...PLAN_LIMITS[planId as keyof typeof PLAN_LIMITS]
@@ -43,6 +46,30 @@ export default function UpgradePage() {
       fetchCurrentPlan()
     }
   }, [session?.user?.id])
+
+  // プラン設定を取得
+  useEffect(() => {
+    const fetchPlanConfig = async () => {
+      if (!planId) return
+      
+      try {
+        const response = await fetch('/api/plans')
+        if (response.ok) {
+          const data = await response.json()
+          const config = data.find((p: any) => p.planType === planId)
+          if (config) {
+            setPlanConfig(config)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch plan config:', error)
+      } finally {
+        setIsLoadingPlan(false)
+      }
+    }
+
+    fetchPlanConfig()
+  }, [planId])
 
   const planNames: Record<string, string> = {
     FREE: '基本プラン',
@@ -153,7 +180,7 @@ export default function UpgradePage() {
     
     // 擬似的な決済処理（実際のStripe連携は後で実装）
     try {
-      const finalPrice = discountInfo ? discountInfo.discountedPrice : plan.price
+      const finalPrice = discountInfo ? discountInfo.discountedPrice : (planConfig?.price || plan.price)
       console.log(`Processing upgrade: ${plan.id} - ¥${finalPrice}`)
       
       const response = await fetch('/api/user/upgrade-plan', {
@@ -284,7 +311,7 @@ export default function UpgradePage() {
                 {discountInfo ? (
                   <div>
                     <div className="text-lg text-gray-400 line-through">
-                      ¥{plan.price.toLocaleString()}
+                      ¥{(planConfig?.price || plan.price).toLocaleString()}
                     </div>
                     <div className="text-2xl font-bold text-green-600">
                       ¥{discountInfo.discountedPrice.toLocaleString()}
@@ -298,7 +325,7 @@ export default function UpgradePage() {
                 ) : (
                   <div>
                     <div className="text-2xl font-bold text-gray-900">
-                      ¥{plan.price.toLocaleString()}
+                      ¥{(planConfig?.price || plan.price).toLocaleString()}
                     </div>
                     <div className="text-sm text-gray-600">/月</div>
                   </div>
