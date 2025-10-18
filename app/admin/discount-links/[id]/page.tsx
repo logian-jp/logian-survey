@@ -21,6 +21,14 @@ interface DiscountLink {
   validFrom: string
   validUntil: string
   createdAt: string
+  createdBy: string
+  creator: {
+    id: string
+    name: string | null
+    email: string
+  } | null
+  subscriptionDiscountMonths?: number | null
+  totalSavings?: number | null
   users: Array<{
     id: string
     name?: string

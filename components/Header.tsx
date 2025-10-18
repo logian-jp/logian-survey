@@ -78,19 +78,11 @@ export default function Header() {
                     className="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none"
                   >
                     <span className="sr-only">ユーザーメニューを開く</span>
-                    {session.user?.image ? (
-                      <img
-                        className="h-8 w-8 rounded-full"
-                        src={session.user.image}
-                        alt="User avatar"
-                      />
-                    ) : (
-                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-gray-500">
-                        <span className="text-sm font-medium leading-none text-white">
-                          {session.user?.name?.[0] || session.user?.email?.[0]}
-                        </span>
+                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-gray-500">
+                      <span className="text-sm font-medium leading-none text-white">
+                        {session.user?.name?.[0] || session.user?.email?.[0]}
                       </span>
-                    )}
+                    </span>
                     <span className="ml-2 hidden lg:block">{session.user?.name || session.user?.email}</span>
                     <svg
                       className="ml-2 h-5 w-5 text-gray-400"

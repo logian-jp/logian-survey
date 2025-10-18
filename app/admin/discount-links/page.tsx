@@ -21,6 +21,14 @@ interface DiscountLink {
   validFrom: string
   validUntil: string
   createdAt: string
+  createdBy: string
+  creator: {
+    id: string
+    name: string | null
+    email: string
+  } | null
+  subscriptionDiscountMonths?: number | null
+  totalSavings?: number | null
   users: Array<{
     id: string
     name?: string
@@ -49,7 +57,7 @@ const planPrices: Record<string, number> = {
 }
 
 export default function DiscountLinksPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [discountLinks, setDiscountLinks] = useState<DiscountLink[]>([])
   const [isLoading, setIsLoading] = useState(true)

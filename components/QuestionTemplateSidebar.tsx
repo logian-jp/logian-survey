@@ -128,7 +128,9 @@ export default function QuestionTemplateSidebar({
       NAME: '名前',
       AGE_GROUP: '年代',
       LOCATION: '位置情報',
-      FILE_UPLOAD: 'ファイルアップロード'
+      FILE_UPLOAD: 'ファイルアップロード',
+      SECTION: 'セクション',
+      PAGE_BREAK: '改ページ'
     }
     return typeLabels[type] || type
   }

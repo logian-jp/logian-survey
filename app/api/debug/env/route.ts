@@ -10,7 +10,7 @@ export async function GET() {
     })
   } catch (error) {
     return NextResponse.json(
-      { message: 'Error getting environment variables', error: error.message },
+      { message: 'Error getting environment variables', error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
