@@ -64,10 +64,13 @@ export default function Dashboard() {
     if (urlParams.get('refresh')) {
       console.log('Refresh parameter detected, forcing plan update')
       fetchUserPlan()
+      // URLからrefreshパラメータを削除
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
     }
   }, [])
 
-  const fetchUserPlan = async () => {
+  const fetchUserPlan = async (retryCount = 0) => {
     try {
       // キャッシュバスターを追加して常に最新の情報を取得
       const response = await fetch(`/api/user/plan?t=${Date.now()}`)
@@ -76,8 +79,28 @@ export default function Dashboard() {
         console.log('Fetched user plan:', data)
         setUserPlan(data)
       } else {
-        // APIエラーの場合は無料プランを設定
-        console.warn('Failed to fetch user plan, using FREE plan as fallback')
+        // APIエラーの場合はリトライまたは無料プランを設定
+        if (retryCount < 2) {
+          console.warn(`Failed to fetch user plan, retrying... (${retryCount + 1}/2)`)
+          setTimeout(() => fetchUserPlan(retryCount + 1), 1000)
+        } else {
+          console.warn('Failed to fetch user plan after retries, using FREE plan as fallback')
+          setUserPlan({
+            id: 'fallback',
+            planType: 'FREE',
+            status: 'ACTIVE',
+            startDate: new Date(),
+            endDate: null
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch user plan:', error)
+      // エラーの場合はリトライまたは無料プランを設定
+      if (retryCount < 2) {
+        console.warn(`Network error, retrying... (${retryCount + 1}/2)`)
+        setTimeout(() => fetchUserPlan(retryCount + 1), 1000)
+      } else {
         setUserPlan({
           id: 'fallback',
           planType: 'FREE',
@@ -86,16 +109,6 @@ export default function Dashboard() {
           endDate: null
         })
       }
-    } catch (error) {
-      console.error('Failed to fetch user plan:', error)
-      // エラーの場合は無料プランを設定
-      setUserPlan({
-        id: 'fallback',
-        planType: 'FREE',
-        status: 'ACTIVE',
-        startDate: new Date(),
-        endDate: null
-      })
     }
   }
 
