@@ -1,0 +1,129 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/admin-auth'
+
+export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin()
+    
+    const { searchParams } = new URL(request.url)
+    const format = searchParams.get('format') || 'raw' // raw, normalized, standardized
+    const includePersonalData = searchParams.get('includePersonalData') === 'true'
+    
+    // 全アンケートと回答データを取得
+    const surveys = await prisma.survey.findMany({
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        questions: {
+          orderBy: {
+            order: 'asc'
+          }
+        },
+        responses: {
+          include: {
+            answers: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+    
+    // CSVデータを生成
+    const csvData = generateAllSurveysCSV(surveys, format, includePersonalData)
+    
+    // ファイル名を生成
+    const timestamp = new Date().toISOString().split('T')[0]
+    const filename = `all_surveys_${format}_${timestamp}.csv`
+    const encodedFilename = encodeURIComponent(filename)
+    
+    // UTF-8 BOMを追加
+    const csvWithBOM = '\uFEFF' + csvData
+    
+    return new NextResponse(csvWithBOM, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
+      },
+    })
+  } catch (error) {
+    console.error('Failed to export all surveys:', error)
+    return NextResponse.json(
+      { message: 'Failed to export all surveys data' },
+      { status: 500 }
+    )
+  }
+}
+
+function generateAllSurveysCSV(surveys: any[], format: string, includePersonalData: boolean): string {
+  const headers = [
+    'アンケートID',
+    'アンケートタイトル',
+    'アンケート作成者',
+    '作成者メール',
+    'アンケートステータス',
+    'アンケート作成日時',
+    '回答ID',
+    '回答日時',
+    '質問ID',
+    '質問タイトル',
+    '質問タイプ',
+    '回答値'
+  ]
+  
+  const rows: string[] = []
+  rows.push(headers.join(','))
+  
+  surveys.forEach(survey => {
+    survey.responses.forEach((response: any) => {
+      response.answers.forEach((answer: any) => {
+        const question = survey.questions.find((q: any) => q.id === answer.questionId)
+        
+        if (!question) return
+        
+        // 個人情報の除外チェック
+        if (!includePersonalData && ['NAME', 'EMAIL', 'PHONE'].includes(question.type)) {
+          return
+        }
+        
+        const rowData = [
+          escapeCSVValue(survey.id),
+          escapeCSVValue(survey.title),
+          escapeCSVValue(survey.user.name || ''),
+          escapeCSVValue(survey.user.email),
+          escapeCSVValue(survey.status),
+          escapeCSVValue(formatToTokyoTime(survey.createdAt)),
+          escapeCSVValue(response.id),
+          escapeCSVValue(formatToTokyoTime(response.createdAt)),
+          escapeCSVValue(question.id),
+          escapeCSVValue(question.title),
+          escapeCSVValue(question.type),
+          escapeCSVValue(answer.value || '')
+        ]
+        
+        rows.push(rowData.join(','))
+      })
+    })
+  })
+  
+  return rows.join('\n')
+}
+
+function escapeCSVValue(value: string): string {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+function formatToTokyoTime(dateString: string): string {
+  const date = new Date(dateString)
+  const tokyoTime = new Date(date.getTime() + (9 * 60 * 60 * 1000)) // UTC+9
+  return tokyoTime.toISOString().replace('T', ' ').slice(0, 16)
+}

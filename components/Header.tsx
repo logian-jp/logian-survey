@@ -42,6 +42,14 @@ export default function Header() {
             >
               アンケート作成
             </Link>
+            {session?.user?.email && ['admin@logian.jp', 'takashi@logian.jp'].includes(session.user.email) && (
+              <Link
+                href="/admin"
+                className="text-red-700 hover:text-red-900 px-3 py-2 rounded-md text-sm font-medium transition-colors border border-red-300 rounded-md"
+              >
+                管理画面
+              </Link>
+            )}
           </nav>
 
           {/* ユーザーメニュー */}
