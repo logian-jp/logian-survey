@@ -179,12 +179,13 @@ export default async function Home() {
           <div className="grid md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
               <div className="flex items-center mb-4">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3" style={{ backgroundColor: '#2f2f2f' }}>
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <span className="text-xl font-bold" style={{ color: '#2f2f2f' }}>Logian Survey</span>
+                <Image
+                  src="/images/logo.svg"
+                  alt="Logian Survey"
+                  width={120}
+                  height={40}
+                  className="h-10 w-auto mr-3"
+                />
               </div>
               <p className="mb-6 max-w-md" style={{ color: '#666666' }}>
                 分析に特化したアンケートツール。データ分析に最適化された結果を出力し、日本の市場調査を支援します。
