@@ -173,14 +173,26 @@ export default function AdminDashboard() {
               <h1 className="text-2xl font-bold text-gray-900">Logian管理画面</h1>
               <p className="text-sm text-gray-600">システム全体の統計情報とデータ管理</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/dashboard"
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                ユーザーダッシュボードに戻る
-              </Link>
-            </div>
+              <div className="flex items-center space-x-4">
+                <Link
+                  href="/admin/plan-config"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  プラン設定管理
+                </Link>
+                <Link
+                  href="/admin/discount-links"
+                  className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+                >
+                  割引リンク管理
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
+                  ユーザーダッシュボードに戻る
+                </Link>
+              </div>
           </div>
         </div>
       </div>

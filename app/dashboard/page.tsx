@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import NotificationPanel from '@/components/NotificationPanel'
 import SurveyAlertPanel from '@/components/SurveyAlertPanel'
+import { PLAN_LIMITS } from '@/lib/plan-limits'
 
 function formatToTokyoTime(dateString: string): string {
   const date = new Date(dateString)
@@ -42,6 +43,7 @@ export default function Dashboard() {
   const router = useRouter()
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [userPlan, setUserPlan] = useState<any>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -52,8 +54,39 @@ export default function Dashboard() {
   useEffect(() => {
     if (session) {
       fetchSurveys()
+      fetchUserPlan()
     }
   }, [session])
+
+  const fetchUserPlan = async () => {
+    try {
+      const response = await fetch('/api/user/plan')
+      if (response.ok) {
+        const data = await response.json()
+        setUserPlan(data)
+      } else {
+        // APIエラーの場合は無料プランを設定
+        console.warn('Failed to fetch user plan, using FREE plan as fallback')
+        setUserPlan({
+          id: 'fallback',
+          planType: 'FREE',
+          status: 'ACTIVE',
+          startDate: new Date(),
+          endDate: null
+        })
+      }
+    } catch (error) {
+      console.error('Failed to fetch user plan:', error)
+      // エラーの場合は無料プランを設定
+      setUserPlan({
+        id: 'fallback',
+        planType: 'FREE',
+        status: 'ACTIVE',
+        startDate: new Date(),
+        endDate: null
+      })
+    }
+  }
 
   // ページがフォーカスされた時にデータを再取得
   useEffect(() => {
@@ -99,12 +132,12 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">ダッシュボード</h1>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8 gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">ダッシュボード</h1>
           <Link
             href="/surveys/create"
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-center sm:text-left"
           >
             新しいアンケートを作成
           </Link>
@@ -115,6 +148,47 @@ export default function Dashboard() {
             <NotificationPanel />
             <SurveyAlertPanel />
           </div>
+
+          {/* プラン制限の案内 */}
+          {userPlan && (
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-blue-900 mb-2">
+                      現在のプラン: {userPlan.planType === 'FREE' ? '基本プラン' : 
+                                   userPlan.planType === 'STANDARD' ? 'スタンダードプラン' :
+                                   userPlan.planType === 'PROFESSIONAL' ? 'プロフェッショナルプラン' :
+                                   'エンタープライズプラン'}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-blue-700">
+                      <span className="block sm:inline">アンケート作成: {PLAN_LIMITS[userPlan.planType]?.maxSurveys === -1 ? '無制限' : `${PLAN_LIMITS[userPlan.planType]?.maxSurveys}個`}</span>
+                      <span className="hidden sm:inline"> | </span>
+                      <span className="block sm:inline">回答数上限: {PLAN_LIMITS[userPlan.planType]?.maxResponsesPerSurvey === -1 ? '無制限' : `${PLAN_LIMITS[userPlan.planType]?.maxResponsesPerSurvey}件/アンケート`}</span>
+                      <span className="hidden sm:inline"> | </span>
+                      <span className="block sm:inline">エクスポート: {PLAN_LIMITS[userPlan.planType]?.exportFormats.join(', ')}</span>
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    <Link
+                      href="/settings"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      設定
+                    </Link>
+                    {userPlan.planType === 'FREE' && (
+                      <Link
+                        href="/plans"
+                        className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+                      >
+                        プランアップグレード
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         {surveys.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-400 text-6xl mb-4">📊</div>
@@ -132,7 +206,7 @@ export default function Dashboard() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {surveys.map((survey) => (
               <div key={survey.id} className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex justify-between items-start mb-4">

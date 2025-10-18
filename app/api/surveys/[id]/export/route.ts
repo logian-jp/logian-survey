@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { PREFECTURE_REGIONS, convertAgeGroupToNumber } from '@/lib/survey-parts'
+import { checkExportFormat } from '@/lib/plan-check'
 
 export async function GET(
   request: NextRequest,
@@ -19,6 +20,15 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const format = searchParams.get('format') || 'raw' // raw, normalized, standardized
     const includePersonalData = searchParams.get('includePersonalData') === 'true'
+
+    // プラン制限チェック
+    const formatCheck = await checkExportFormat(session.user.id, format)
+    if (!formatCheck.allowed) {
+      return NextResponse.json(
+        { message: formatCheck.message },
+        { status: 403 }
+      )
+    }
 
     // アンケートの所有者を確認
     const survey = await prisma.survey.findFirst({

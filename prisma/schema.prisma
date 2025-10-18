@@ -54,6 +54,9 @@ model User {
   surveyUsers      SurveyUser[]
   invitedSurveys   SurveyUser[] @relation("SurveyInviter")
   questionTemplates QuestionTemplate[]
+  userPlan         UserPlan?
+  createdDiscountLinks DiscountLink[] @relation("DiscountLinkCreator")
+  usedDiscountLinks    DiscountLink[] @relation("DiscountLinkUsers")
 }
 
 model VerificationToken {
@@ -212,4 +215,87 @@ model QuestionTemplate {
 
   userId      String
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserPlan {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  planType  PlanType   @default(FREE)
+  status    PlanStatus @default(ACTIVE)
+  startDate DateTime   @default(now())
+  endDate   DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum PlanType {
+  FREE
+  STANDARD
+  PROFESSIONAL
+  ENTERPRISE
+  ONETIME_UNLIMITED
+}
+
+enum PlanStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+model DiscountLink {
+  id          String   @id @default(cuid())
+  code        String   @unique // 割引リンクのコード
+  name        String   // 割引リンクの名前
+  description String?  // 説明
+  
+  // 割引設定
+  discountType     DiscountType @default(PERCENTAGE) // PERCENTAGE or FIXED_AMOUNT
+  discountValue    Float        // 割引率(%) または 固定金額
+  targetPlanType   PlanType      // 対象プラン
+  originalPrice    Float        // 元の価格
+  discountedPrice  Float        // 割引後価格
+  
+  // 制限設定
+  maxUses          Int?         // 最大利用回数 (null = 無制限)
+  currentUses      Int          @default(0) // 現在の利用回数
+  isActive         Boolean      @default(true) // 有効/無効
+  
+  // 期間設定
+  validFrom        DateTime     // 有効開始日時
+  validUntil       DateTime     // 有効終了日時
+  
+  // サブスクリプション割引設定
+  subscriptionDiscountMonths Int?     // 割引適用期間（月数）
+  totalSavings              Float?   // 合計節約額
+  
+  // 作成者
+  createdBy        String       // 作成者ID
+  creator          User         @relation("DiscountLinkCreator", fields: [createdBy], references: [id])
+  
+  // 利用者
+  users            User[]       @relation("DiscountLinkUsers")
+  
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+enum DiscountType {
+  PERCENTAGE     // パーセンテージ割引
+  FIXED_AMOUNT   // 固定金額割引
+}
+
+model PlanConfig {
+  id          String   @id @default(cuid())
+  planType    String   @unique // プランタイプ（FREE, STANDARD, etc.）
+  name        String   // プラン名
+  description String?  // プラン説明
+  price       Float    // 価格（円）
+  features    Json     // 機能リスト
+  limits      Json     // 制限設定
+  isActive    Boolean  @default(true) // 有効/無効
+  sortOrder   Int      @default(0) // 表示順序
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

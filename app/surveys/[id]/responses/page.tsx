@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { PLAN_LIMITS } from '@/lib/plan-limits'
 
 interface Question {
   id: string
@@ -148,12 +149,27 @@ export default function SurveyResponsesPage() {
   const [includePersonalData, setIncludePersonalData] = useState(false)
   const [csvPreview, setCsvPreview] = useState<string>('')
   const [isLoadingPreview, setIsLoadingPreview] = useState(false)
+  const [userPlan, setUserPlan] = useState<any>(null)
+  const [exportError, setExportError] = useState<string>('')
 
   useEffect(() => {
     if (session && surveyId) {
       fetchSurveyResponses()
+      fetchUserPlan()
     }
   }, [session, surveyId])
+
+  const fetchUserPlan = async () => {
+    try {
+      const response = await fetch('/api/user/plan')
+      if (response.ok) {
+        const data = await response.json()
+        setUserPlan(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch user plan:', error)
+    }
+  }
 
   useEffect(() => {
     if (survey) {
@@ -204,6 +220,15 @@ export default function SurveyResponsesPage() {
 
   const downloadCSV = async () => {
     try {
+      // プラン制限チェック
+      if (userPlan) {
+        const limits = PLAN_LIMITS[userPlan.planType]
+        if (!limits.exportFormats.includes(selectedFormat)) {
+          setExportError(`${selectedFormat}形式のエクスポートは${userPlan.planType}プランでは利用できません。プランをアップグレードしてください。`)
+          return
+        }
+      }
+
       const params = new URLSearchParams({
         format: selectedFormat,
         includePersonalData: includePersonalData.toString(),
@@ -222,12 +247,14 @@ export default function SurveyResponsesPage() {
         link.click()
         document.body.removeChild(link)
         window.URL.revokeObjectURL(downloadUrl)
+        setExportError('') // 成功時はエラーをクリア
       } else {
-        alert('CSVのダウンロードに失敗しました')
+        const errorData = await response.json()
+        setExportError(`CSVのダウンロードに失敗しました: ${errorData.message || response.statusText}`)
       }
     } catch (error) {
       console.error('CSV download error:', error)
-      alert('CSVのダウンロードに失敗しました')
+      setExportError('CSVのダウンロードに失敗しました')
     }
   }
 
@@ -410,6 +437,37 @@ export default function SurveyResponsesPage() {
             </div>
           </div>
         </div>
+
+        {/* エラーメッセージ */}
+        {exportError && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  エクスポートエラー
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{exportError}</p>
+                </div>
+                {exportError.includes('プランをアップグレード') && (
+                  <div className="mt-4">
+                    <Link
+                      href="/plans"
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      プランをアップグレード
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* CSVプレビュー */}
         {survey.responses.length > 0 && (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -8,6 +8,7 @@ import RichTextEditor from '@/components/RichTextEditor'
 import ConditionalLogicEditor from '@/components/ConditionalLogicEditor'
 import QuestionTemplateSidebar from '@/components/QuestionTemplateSidebar'
 import { ConditionalLogic } from '@/types/conditional'
+import { PLAN_LIMITS } from '@/lib/plan-limits'
 
 interface Question {
   id: string
@@ -40,6 +41,74 @@ export default function CreateSurvey() {
   })
   const [questions, setQuestions] = useState<Question[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [userPlan, setUserPlan] = useState<any>(null)
+  const [planLimit, setPlanLimit] = useState<{ allowed: boolean; message?: string }>({ allowed: true })
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      checkPlanLimit()
+    }
+  }, [session])
+
+  const checkPlanLimit = async () => {
+    try {
+      const response = await fetch('/api/user/plan')
+      if (response.ok) {
+        const planData = await response.json()
+        setUserPlan(planData)
+        
+        // アンケート作成数の制限チェック
+        const surveyCountResponse = await fetch('/api/surveys')
+        if (surveyCountResponse.ok) {
+          const surveys = await surveyCountResponse.json()
+          const currentCount = surveys.length
+          const limits = PLAN_LIMITS[planData.planType]
+          
+          if (limits.maxSurveys !== -1 && currentCount >= limits.maxSurveys) {
+            setPlanLimit({
+              allowed: false,
+              message: `アンケート作成数の上限（${limits.maxSurveys}個）に達しています。プランをアップグレードしてください。`
+            })
+          }
+        }
+      } else {
+        // APIエラーの場合は無料プランとして処理
+        console.warn('Failed to fetch user plan, using FREE plan as fallback')
+        setUserPlan({
+          id: 'fallback',
+          planType: 'FREE',
+          status: 'ACTIVE',
+          startDate: new Date(),
+          endDate: null
+        })
+        
+        // 無料プランの制限をチェック
+        const surveyCountResponse = await fetch('/api/surveys')
+        if (surveyCountResponse.ok) {
+          const surveys = await surveyCountResponse.json()
+          const currentCount = surveys.length
+          const limits = PLAN_LIMITS.FREE
+          
+          if (limits.maxSurveys !== -1 && currentCount >= limits.maxSurveys) {
+            setPlanLimit({
+              allowed: false,
+              message: `アンケート作成数の上限（${limits.maxSurveys}個）に達しています。プランをアップグレードしてください。`
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check plan limit:', error)
+      // エラーの場合は無料プランを設定
+      setUserPlan({
+        id: 'fallback',
+        planType: 'FREE',
+        status: 'ACTIVE',
+        startDate: new Date(),
+        endDate: null
+      })
+    }
+  }
 
   const questionTypes = [
     { value: 'TEXT', label: 'テキスト入力' },
@@ -271,6 +340,35 @@ export default function CreateSurvey() {
       {/* メインコンテンツ */}
       <div className={`flex-1 overflow-y-auto transition-all duration-300 ${showSidebar ? 'mr-80' : ''}`}>
         <div className="max-w-4xl mx-auto px-4 py-8">
+          {/* プラン制限の警告 */}
+          {!planLimit.allowed && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    プラン制限に達しています
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{planLimit.message}</p>
+                  </div>
+                  <div className="mt-4">
+                    <Link
+                      href="/plans"
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      プランをアップグレード
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl font-bold text-gray-900">
@@ -805,10 +903,16 @@ export default function CreateSurvey() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isLoading || !survey.title || questions.length === 0}
-                  className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  disabled={isLoading || !survey.title || questions.length === 0 || !planLimit.allowed}
+                  className={`px-6 py-2 rounded-md transition-colors disabled:opacity-50 ${
+                    !planLimit.allowed 
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  }`}
                 >
-                  {isLoading ? '作成中...' : 'アンケートを作成'}
+                  {isLoading ? '作成中...' : 
+                   !planLimit.allowed ? 'プラン制限に達しています' : 
+                   'アンケートを作成'}
                 </button>
               </div>
               </form>

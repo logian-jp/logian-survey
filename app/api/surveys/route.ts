@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { checkSurveyLimit } from '@/lib/plan-check'
 
 export async function GET(request: NextRequest) {
   try {
@@ -91,6 +92,15 @@ export async function POST(request: NextRequest) {
 
     console.log('Creating survey for user:', session.user.id)
     console.log('Session user:', session.user)
+
+    // プラン制限チェック
+    const limitCheck = await checkSurveyLimit(session.user.id)
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { message: limitCheck.message },
+        { status: 403 }
+      )
+    }
 
     // ユーザーの存在確認
     let user = await prisma.user.findUnique({

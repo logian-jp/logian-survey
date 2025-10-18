@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { checkResponseLimit } from '@/lib/plan-check'
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +28,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { message: 'Survey not found or not active' },
         { status: 404 }
+      )
+    }
+
+    // プラン制限チェック
+    const limitCheck = await checkResponseLimit(surveyId)
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { message: limitCheck.message },
+        { status: 403 }
       )
     }
 
