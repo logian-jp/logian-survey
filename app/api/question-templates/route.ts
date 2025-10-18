@@ -15,9 +15,22 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includePublic = searchParams.get('includePublic') === 'true'
 
+    // メールアドレスでユーザーを検索
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! }
+    })
+
+    if (!user) {
+      console.error('User not found in database:', session.user.email)
+      return NextResponse.json({
+        message: 'ユーザーがデータベースに存在しません',
+        email: session.user.email
+      }, { status: 400 })
+    }
+
     const whereClause: any = {
       OR: [
-        { userId: session.user.id }, // 自分のテンプレート
+        { userId: user.id }, // 自分のテンプレート
       ]
     }
 
@@ -68,16 +81,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'タイトルとタイプは必須です' }, { status: 400 })
     }
 
-    // ユーザーが存在するか確認
+    // メールアドレスでユーザーを検索
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
+      where: { email: session.user.email! }
     })
 
     if (!user) {
-      console.error('User not found in database:', session.user.id)
+      console.error('User not found in database:', session.user.email)
       return NextResponse.json({
         message: 'ユーザーがデータベースに存在しません',
-        userId: session.user.id
+        email: session.user.email
       }, { status: 400 })
     }
 
@@ -93,7 +106,7 @@ export async function POST(request: Request) {
         settings: settings !== undefined ? settings : undefined,
         conditions: conditions !== undefined ? conditions : undefined,
         isPublic: isPublic || false,
-        userId: session.user.id
+        userId: user.id
       }
     })
 

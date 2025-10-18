@@ -33,6 +33,7 @@ export default function CreateSurvey() {
   const [showSidebar, setShowSidebar] = useState(true)
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
   const [survey, setSurvey] = useState({
+    id: null as string | null,
     title: '',
     description: '',
     maxResponses: null as number | null,
@@ -302,6 +303,9 @@ export default function CreateSurvey() {
 
       const createdSurvey = await surveyResponse.json()
 
+      // アンケートIDを設定
+      setSurvey(prev => ({ ...prev, id: createdSurvey.id }))
+
       // 質問作成
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i]
@@ -417,8 +421,26 @@ export default function CreateSurvey() {
                     onChange={(value) => setSurvey({ ...survey, description: value })}
                     placeholder="アンケートの目的や内容について説明してください"
                     className="mt-1"
+                    allowVideo={true}
+                    userPlan={userPlan?.planType || 'FREE'}
                   />
                 </div>
+
+                {/* プレビューボタン（アンケート保存後） */}
+                {survey.id && (
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => window.open(`/survey/${survey.id}`, '_blank')}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      📱 プレビュー
+                    </button>
+                    <span className="text-sm text-gray-600 flex items-center">
+                      💡 アンケートを保存するとプレビューできます
+                    </span>
+                  </div>
+                )}
 
                 {/* 回答設定 */}
                 <div className="border-t border-gray-200 pt-6">
@@ -706,6 +728,10 @@ export default function CreateSurvey() {
                                 <label htmlFor={`ordinal-${question.id}`} className="ml-2 block text-sm text-gray-700">
                                   順序構造があるカテゴリ変数（例：満足度、重要度）
                                 </label>
+                                <p className="text-xs text-gray-500 mt-1 ml-6">
+                                  チェック時：1列の数値データ（1,2,3...）<br/>
+                                  未チェック時：One-Hot Encoding（複数列の0/1データ）
+                                </p>
                               </div>
                             )}
 

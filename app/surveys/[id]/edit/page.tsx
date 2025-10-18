@@ -68,6 +68,7 @@ export default function EditSurvey() {
   const [isInviting, setIsInviting] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
+  const [userPlan, setUserPlan] = useState<any>(null)
 
   const questionTypes = [
     { value: 'TEXT', label: 'テキスト入力' },
@@ -106,8 +107,21 @@ export default function EditSurvey() {
     if (session && surveyId) {
       fetchSurvey()
       fetchCollaborators()
+      fetchUserPlan()
     }
   }, [session, surveyId])
+
+  const fetchUserPlan = async () => {
+    try {
+      const response = await fetch('/api/user/plan')
+      if (response.ok) {
+        const data = await response.json()
+        setUserPlan(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch user plan:', error)
+    }
+  }
 
   const fetchSurvey = async () => {
     try {
@@ -620,7 +634,25 @@ export default function EditSurvey() {
                   onChange={(value) => setSurvey({ ...survey, description: value })}
                   placeholder="アンケートの目的や内容について説明してください"
                   className="mt-1"
+                  allowVideo={true}
+                  userPlan={userPlan?.planType || 'FREE'}
                 />
+              </div>
+
+              {/* プレビューボタン */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => window.open(`/survey/${survey.shareUrl || survey.id}`, '_blank')}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  📱 プレビュー
+                </button>
+                {survey.status === 'ACTIVE' && survey.shareUrl && (
+                  <span className="text-sm text-green-600 flex items-center">
+                    ✅ 公開中
+                  </span>
+                )}
               </div>
 
               {survey.status === 'ACTIVE' && survey.shareUrl && (
@@ -847,6 +879,10 @@ export default function EditSurvey() {
                               <label htmlFor={`ordinal-${question.id}`} className="ml-2 block text-sm text-gray-700">
                                 順序構造があるカテゴリ変数（例：満足度、重要度）
                               </label>
+                              <p className="text-xs text-gray-500 mt-1 ml-6">
+                                チェック時：1列の数値データ（1,2,3...）<br/>
+                                未チェック時：One-Hot Encoding（複数列の0/1データ）
+                              </p>
                             </div>
                           )}
 

@@ -93,18 +93,9 @@ export async function POST(request: NextRequest) {
     console.log('Creating survey for user:', session.user.id)
     console.log('Session user:', session.user)
 
-    // プラン制限チェック
-    const limitCheck = await checkSurveyLimit(session.user.id)
-    if (!limitCheck.allowed) {
-      return NextResponse.json(
-        { message: limitCheck.message },
-        { status: 403 }
-      )
-    }
-
-    // ユーザーの存在確認
+    // メールアドレスでユーザーを検索
     let user = await prisma.user.findUnique({
-      where: { id: session.user.id }
+      where: { email: session.user.email! }
     })
 
     if (!user) {
@@ -112,14 +103,23 @@ export async function POST(request: NextRequest) {
       // ユーザーが存在しない場合は作成
       user = await prisma.user.create({
         data: {
-          id: session.user.id,
           name: session.user.name,
           email: session.user.email,
+          role: 'USER'
         }
       })
       console.log('User created:', user)
     } else {
       console.log('User found:', user)
+    }
+
+    // プラン制限チェック（正しいユーザーIDを使用）
+    const limitCheck = await checkSurveyLimit(user.id)
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { message: limitCheck.message },
+        { status: 403 }
+      )
     }
 
     const { title, description, maxResponses, endDate, targetResponses } = await request.json()
@@ -141,17 +141,17 @@ export async function POST(request: NextRequest) {
           maxResponses: maxResponses || null,
           endDate: endDate || null,
           targetResponses: targetResponses || null,
-          userId: session.user.id,
+          userId: user.id,
         },
       })
 
       // 作成者を管理者権限でSurveyUserテーブルに追加
       await tx.surveyUser.create({
         data: {
-          userId: session.user.id,
+          userId: user.id,
           surveyId: survey.id,
           permission: 'ADMIN',
-          invitedBy: session.user.id, // 自分自身を招待者として設定
+          invitedBy: user.id, // 自分自身を招待者として設定
           acceptedAt: new Date(), // 即座に承認済みとして設定
         },
       })

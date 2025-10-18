@@ -91,7 +91,7 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
           headers.push(`${question.title}_numeric`)
         } else if (['RADIO', 'SELECT', 'PREFECTURE'].includes(question.type)) {
           if (parsedSettings.ordinalStructure) {
-            // 順序構造がある場合、数値変換
+            // 順序構造がある場合、数値変換（1列）
             headers.push(`${question.title}_numeric`)
           } else {
             // 順序構造がない場合、One-Hot Encoding
@@ -101,10 +101,16 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
             })
           }
         } else if (question.type === 'CHECKBOX') {
-          const options = getQuestionOptions(question)
-          options.forEach(option => {
-            headers.push(`${question.title}_${option}`)
-          })
+          if (parsedSettings.ordinalStructure) {
+            // 順序構造がある複数選択の場合、数値変換（1列）
+            headers.push(`${question.title}_numeric`)
+          } else {
+            // 順序構造がない複数選択の場合、One-Hot Encoding
+            const options = getQuestionOptions(question)
+            options.forEach(option => {
+              headers.push(`${question.title}_${option}`)
+            })
+          }
         } else {
           headers.push(question.title)
         }
@@ -145,12 +151,16 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
         if (question.type === 'AGE_GROUP') {
           // 年齢グループは順序構造があるカテゴリ変数として1列で表示
           const numericValue = convertToNumeric(question, answer)
-          rowData.push(escapeCSVValue(String(numericValue)))
+          const processedValue = processNumericValue(numericValue, format, question, responses)
+          const displayValue = (numericValue === 0 || isNaN(processedValue)) ? 'NA' : String(processedValue)
+          rowData.push(escapeCSVValue(displayValue))
         } else if (['RADIO', 'SELECT', 'PREFECTURE'].includes(question.type)) {
           if (parsedSettings.ordinalStructure) {
             // 順序構造がある場合、数値変換
             const numericValue = convertToNumeric(question, answer)
-            rowData.push(escapeCSVValue(String(numericValue)))
+            const processedValue = processNumericValue(numericValue, format, question, responses)
+            const displayValue = (numericValue === 0 || isNaN(processedValue)) ? 'NA' : String(processedValue)
+            rowData.push(escapeCSVValue(displayValue))
           } else {
             // 順序構造がない場合、One-Hot Encoding
             const options = getQuestionOptions(question)
@@ -160,21 +170,29 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
             })
           }
         } else if (question.type === 'CHECKBOX') {
-          // 複数選択の場合、One-Hot Encoding
-          const options = getQuestionOptions(question)
-          const selectedOptions = answer ? answer.split(',') : []
-          console.log('CHECKBOX processing (preview):', {
-            questionId: question.id,
-            questionTitle: question.title,
-            answer: answer,
-            selectedOptions: selectedOptions,
-            options: options
-          })
-          options.forEach(option => {
-            const isSelected = selectedOptions.includes(option) ? '1' : '0'
-            console.log(`Option "${option}": isSelected=${isSelected}`)
-            rowData.push(escapeCSVValue(isSelected))
-          })
+          if (parsedSettings.ordinalStructure) {
+            // 順序構造がある複数選択の場合、数値変換（1列）
+            const numericValue = convertToNumeric(question, answer)
+            const processedValue = processNumericValue(numericValue, format, question, responses)
+            const displayValue = (numericValue === 0 || isNaN(processedValue)) ? 'NA' : String(processedValue)
+            rowData.push(escapeCSVValue(displayValue))
+          } else {
+            // 順序構造がない複数選択の場合、One-Hot Encoding
+            const options = getQuestionOptions(question)
+            const selectedOptions = answer ? answer.split(',') : []
+            console.log('CHECKBOX processing (preview):', {
+              questionId: question.id,
+              questionTitle: question.title,
+              answer: answer,
+              selectedOptions: selectedOptions,
+              options: options
+            })
+            options.forEach(option => {
+              const isSelected = selectedOptions.includes(option) ? '1' : '0'
+              console.log(`Option "${option}": isSelected=${isSelected}`)
+              rowData.push(escapeCSVValue(isSelected))
+            })
+          }
         } else {
           // その他の場合、そのまま
           rowData.push(escapeCSVValue(answer))
@@ -213,6 +231,12 @@ function getQuestionOptions(question: any): string[] {
 function convertToNumeric(question: any, answer: string): number {
   console.log(`Converting to numeric (preview): ${question.type} - "${answer}"`)
   
+  // 空の回答や無効な回答の場合は0を返す（NAとして扱う）
+  if (!answer || answer.trim() === '' || answer === 'null' || answer === 'undefined') {
+    console.log(`Empty or invalid answer (preview): "${answer}" -> 0 (NA)`)
+    return 0
+  }
+  
   if (question.type === 'AGE_GROUP') {
     const numericValue = convertAgeGroupToNumber(answer)
     console.log(`Age group conversion (preview): "${answer}" -> ${numericValue}`)
@@ -238,6 +262,25 @@ function convertToNumeric(question: any, answer: string): number {
     return numericValue
   }
   
+  if (question.type === 'CHECKBOX') {
+    // 複数選択の場合、選択された項目の合計値または最大値を返す
+    const selectedOptions = answer ? answer.split(',') : []
+    const options = getQuestionOptions(question)
+    
+    if (selectedOptions.length === 0) {
+      return 0
+    }
+    
+    // 選択された項目のインデックスの合計を返す（順序尺度の場合）
+    const totalValue = selectedOptions.reduce((sum, option) => {
+      const index = options.indexOf(option) + 1
+      return sum + index
+    }, 0)
+    
+    console.log(`CHECKBOX ordinal conversion (preview): "${answer}" -> selected: [${selectedOptions.join(', ')}] -> total: ${totalValue}`)
+    return totalValue
+  }
+  
   if (question.type === 'RADIO' || question.type === 'SELECT') {
     const options = getQuestionOptions(question)
     const numericValue = options.indexOf(answer) + 1
@@ -246,6 +289,50 @@ function convertToNumeric(question: any, answer: string): number {
   }
   
   return 0
+}
+
+function processNumericValue(value: number, format: string, question: any, responses: any[]): number {
+  // NAの値（0またはNaN）の場合はそのまま返す
+  if (value === 0 || isNaN(value)) {
+    return value
+  }
+  
+  if (format === 'raw' || format === 'normalized' || format === 'standardized') {
+    // 数値データの統計を計算（NAでない値のみ）
+    const numericValues: number[] = []
+    
+    responses.forEach(response => {
+      const answer = response.answers.find((a: any) => a.questionId === question.id)
+      if (answer && answer.value) {
+        const numericValue = convertToNumeric(question, answer.value)
+        if (!isNaN(numericValue) && numericValue !== 0) {
+          numericValues.push(numericValue)
+        }
+      }
+    })
+    
+    if (numericValues.length === 0) {
+      return value
+    }
+    
+    const mean = numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length
+    const variance = numericValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / numericValues.length
+    const stdDev = Math.sqrt(variance)
+    
+    if (format === 'normalized') {
+      // 正規化: (x - min) / (max - min)
+      const min = Math.min(...numericValues)
+      const max = Math.max(...numericValues)
+      if (max === min) return 0
+      return (value - min) / (max - min)
+    } else if (format === 'standardized') {
+      // 標準化: (x - mean) / std
+      if (stdDev === 0) return 0
+      return (value - mean) / stdDev
+    }
+  }
+  
+  return value
 }
 
 function formatToTokyoTime(dateString: string): string {

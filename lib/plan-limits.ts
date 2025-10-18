@@ -47,7 +47,8 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
       'team_collaboration',
       'custom_branding',
       'api_integration',
-      'priority_support'
+      'priority_support',
+      'video_embedding'
     ],
     price: 9800
   },
@@ -67,7 +68,8 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
       'priority_support',
       'sso_integration',
       'custom_domain',
-      'sla_guarantee'
+      'sla_guarantee',
+      'video_embedding'
     ],
     price: 29800
   },
@@ -86,7 +88,8 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
       'rich_text_editor',
       'custom_branding',
       'api_integration',
-      'priority_support'
+      'priority_support',
+      'video_embedding'
     ],
     price: 10000 // 1回限り10,000円
   }
@@ -94,6 +97,11 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
 
 export function getPlanLimits(planType: string): PlanLimits {
   return PLAN_LIMITS[planType] || PLAN_LIMITS.FREE
+}
+
+export function canUseVideoEmbedding(planType: string): boolean {
+  const limits = getPlanLimits(planType)
+  return limits.features.includes('video_embedding')
 }
 
 export function checkPlanFeature(planType: string, feature: string): boolean {

@@ -197,12 +197,6 @@ export default function Dashboard() {
                                    userPlan.planType === 'ONETIME_UNLIMITED' ? '単発無制限プラン' :
                                    '不明なプラン'}
                     </h3>
-                    {/* デバッグ情報（開発時のみ表示） */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <div className="text-xs text-gray-500 mb-2">
-                        デバッグ: {JSON.stringify(userPlan, null, 2)}
-                      </div>
-                    )}
                     <p className="text-xs sm:text-sm text-blue-700">
                       <span className="block sm:inline">アンケート作成: {PLAN_LIMITS[userPlan.planType]?.maxSurveys === -1 ? '無制限' : `${PLAN_LIMITS[userPlan.planType]?.maxSurveys}個`}</span>
                       <span className="hidden sm:inline"> | </span>

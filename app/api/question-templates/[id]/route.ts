@@ -15,11 +15,24 @@ export async function GET(
       return NextResponse.json({ message: '認証が必要です' }, { status: 401 })
     }
 
+    // メールアドレスでユーザーを検索
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! }
+    })
+
+    if (!user) {
+      console.error('User not found in database:', session.user.email)
+      return NextResponse.json({
+        message: 'ユーザーがデータベースに存在しません',
+        email: session.user.email
+      }, { status: 400 })
+    }
+
     const template = await prisma.questionTemplate.findFirst({
       where: {
         id: params.id,
         OR: [
-          { userId: session.user.id },
+          { userId: user.id },
           { isPublic: true }
         ]
       },
@@ -62,11 +75,24 @@ export async function PUT(
 
     const { title, description, type, required, options, settings, conditions, isPublic } = await request.json()
 
+    // メールアドレスでユーザーを検索
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! }
+    })
+
+    if (!user) {
+      console.error('User not found in database:', session.user.email)
+      return NextResponse.json({
+        message: 'ユーザーがデータベースに存在しません',
+        email: session.user.email
+      }, { status: 400 })
+    }
+
     // テンプレートの所有者かチェック
     const existingTemplate = await prisma.questionTemplate.findFirst({
       where: {
         id: params.id,
-        userId: session.user.id
+        userId: user.id
       }
     })
 
@@ -110,11 +136,24 @@ export async function DELETE(
       return NextResponse.json({ message: '認証が必要です' }, { status: 401 })
     }
 
+    // メールアドレスでユーザーを検索
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! }
+    })
+
+    if (!user) {
+      console.error('User not found in database:', session.user.email)
+      return NextResponse.json({
+        message: 'ユーザーがデータベースに存在しません',
+        email: session.user.email
+      }, { status: 400 })
+    }
+
     // テンプレートの所有者かチェック
     const existingTemplate = await prisma.questionTemplate.findFirst({
       where: {
         id: params.id,
-        userId: session.user.id
+        userId: user.id
       }
     })
 

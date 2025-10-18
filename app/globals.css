@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 動画埋め込み用のスタイル */
+.video-embed {
+  margin: 1rem 0;
+  text-align: center;
+  width: 100%;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.video-embed iframe {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 640px) {
+  .video-embed {
+    max-width: 100%;
+  }
+  
+  .video-embed iframe {
+    width: 100%;
+    aspect-ratio: 16/9;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
