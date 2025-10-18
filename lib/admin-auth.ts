@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 const ADMIN_EMAILS = [
   'admin@logian.jp',
   'takashi@logian.jp',
+  'noutomi0729@gmail.com',
   // 必要に応じて追加
 ]
 
