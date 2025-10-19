@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import Head from 'next/head'
 
 interface Question {
   id: string
@@ -56,34 +55,10 @@ export default function SurveyPage() {
     // エンタープライズプランの場合の特別な処理があればここに追加
   }, [survey?.headerImageUrl])
 
-  // SEO用のメタデータを設定
+  // ページタイトルのみ設定（メタデータはサーバーサイドで生成）
   useEffect(() => {
-    if (survey) {
-      // ページタイトルを設定
+    if (survey && typeof window !== 'undefined') {
       document.title = survey.useCustomLogo ? survey.title : survey.title + ' - LogianSurvey'
-      
-      // Open Graphメタタグを設定
-      const ogTitle = document.querySelector('meta[property="og:title"]')
-      const ogDescription = document.querySelector('meta[property="og:description"]')
-      const ogImage = document.querySelector('meta[property="og:image"]')
-      const ogUrl = document.querySelector('meta[property="og:url"]')
-      
-      if (ogTitle) {
-        ogTitle.setAttribute('content', survey.title)
-      }
-      if (ogDescription) {
-        const description = survey.description ? 
-          survey.description.replace(/<[^>]*>/g, '').substring(0, 160) : 
-          survey.title
-        ogDescription.setAttribute('content', description)
-      }
-      if (ogImage) {
-        const imageUrl = survey.ogImageUrl || survey.headerImageUrl || '/images/logo.svg'
-        ogImage.setAttribute('content', imageUrl.startsWith('http') ? imageUrl : `${window.location.origin}${imageUrl}`)
-      }
-      if (ogUrl) {
-        ogUrl.setAttribute('content', window.location.href)
-      }
     }
   }, [survey])
 
@@ -385,16 +360,9 @@ export default function SurveyPage() {
 
   return (
     <>
-      <Head>
-        <title>{survey ? (survey.useCustomLogo ? survey.title : survey.title + ' - LogianSurvey') : 'LogianSurvey'}</title>
-        <meta property="og:title" content={survey?.title || 'LogianSurvey'} />
-        <meta property="og:description" content={survey?.description ? survey.description.replace(/<[^>]*>/g, '').substring(0, 160) : survey?.title || ''} />
-        <meta property="og:image" content={survey?.ogImageUrl || survey?.headerImageUrl || '/images/logo.svg'} />
-        <meta property="og:url" content={typeof window !== 'undefined' ? window.location.href : ''} />
-        <style jsx global>{`
-          /* エンタープライズプランの場合のみスタイル適用 */
-        `}</style>
-      </Head>
+      <style jsx global>{`
+        /* エンタープライズプランの場合のみスタイル適用 */
+      `}</style>
       <div className="min-h-screen bg-gray-50">
       {/* エンタープライズプランのオリジナルロゴを固定ヘッダーとして表示 */}
       {survey?.useCustomLogo && survey?.customLogoUrl && (
