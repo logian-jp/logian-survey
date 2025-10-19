@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
-import { existsSync } from 'fs'
 import { getUserPlan } from '@/lib/plan-limits'
 
 export const dynamic = 'force-dynamic'
@@ -43,24 +40,21 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer())
     const filename = `${Date.now()}-${file.name.replace(/\s/g, '_')}`
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'logos')
     
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
+    // Vercel環境では一時的にメモリに保存し、データベースにBase64で保存
+    const base64Data = buffer.toString('base64')
+    const mimeType = file.type
     
-    const filePath = join(uploadDir, filename)
-    await writeFile(filePath, buffer)
+    // データベースにBase64データとして保存
+    const logoData = `data:${mimeType};base64,${base64Data}`
 
-    const logoUrl = `/uploads/logos/${filename}`
-
-    // データベースを更新
+    // データベースを更新（Base64データを直接保存）
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { customLogoUrl: logoUrl },
+      data: { customLogoUrl: logoData },
     })
 
-    return NextResponse.json({ success: true, logoUrl })
+    return NextResponse.json({ success: true, logoUrl: logoData })
   } catch (error) {
     console.error('Logo upload error:', error)
     return NextResponse.json(

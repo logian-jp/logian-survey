@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { unlink } from 'fs/promises'
-import { join } from 'path'
 import { getUserPlan } from '@/lib/plan-limits'
 
 export const dynamic = 'force-dynamic'
@@ -22,30 +20,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Enterprise plan required' }, { status: 403 })
     }
 
-    // ユーザーのカスタムロゴURLを取得
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { customLogoUrl: true }
-    })
-
-    // ファイルを削除
-    if (user?.customLogoUrl) {
-      try {
-        const imagePath = user.customLogoUrl.replace('/uploads/', '')
-        const fullPath = join(process.cwd(), 'public', imagePath)
-        await unlink(fullPath)
-      } catch (fileError: any) {
-        if (fileError.code === 'ENOENT') {
-          console.warn(`File not found, but proceeding with DB update: ${user.customLogoUrl}`)
-        } else {
-          console.error('Failed to delete file from filesystem:', fileError)
-          return NextResponse.json(
-            { message: 'Failed to delete logo file' },
-            { status: 500 }
-          )
-        }
-      }
-    }
+    // Base64データの場合はファイルシステムから削除する必要がない
+    // データベースから直接削除するだけ
 
     // データベースを更新
     await prisma.user.update({

@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { unlink } from 'fs/promises'
-import { join } from 'path'
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -47,24 +45,8 @@ export async function POST(
       return NextResponse.json({ message: 'Enterprise plan required' }, { status: 403 })
     }
 
-    // ファイルパスを取得
-    let imagePath: string | null = null
-    if (type === 'header' && (survey as any).headerImageUrl) {
-      imagePath = (survey as any).headerImageUrl.replace('/uploads/', '')
-    } else if (type === 'og' && (survey as any).ogImageUrl) {
-      imagePath = (survey as any).ogImageUrl.replace('/uploads/', '')
-    }
-
-    // ファイルを削除
-    if (imagePath) {
-      try {
-        const fullPath = join(process.cwd(), 'public', imagePath)
-        await unlink(fullPath)
-      } catch (error) {
-        console.error('File deletion error:', error)
-        // ファイルが存在しない場合はエラーを無視
-      }
-    }
+    // Base64データの場合はファイルシステムから削除する必要がない
+    // データベースから直接削除するだけ
 
     // データベースを更新
     const updateData: any = {}
