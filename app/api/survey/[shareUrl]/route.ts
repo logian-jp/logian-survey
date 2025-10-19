@@ -40,6 +40,8 @@ export async function GET(
       id: survey.id,
       title: survey.title,
       description: survey.description,
+      headerImageUrl: (survey as any).headerImageUrl,
+      ogImageUrl: (survey as any).ogImageUrl,
       questions: questionsWithParsedOptions,
     })
   } catch (error) {

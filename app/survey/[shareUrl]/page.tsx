@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Head from 'next/head'
 
 interface Question {
   id: string
@@ -17,6 +18,8 @@ interface Survey {
   id: string
   title: string
   description?: string
+  headerImageUrl?: string | null
+  ogImageUrl?: string | null
   questions: Question[]
 }
 
@@ -43,6 +46,37 @@ export default function SurveyPage() {
       fetchSurvey()
     }
   }, [shareUrl])
+
+  // SEO用のメタデータを設定
+  useEffect(() => {
+    if (survey) {
+      // ページタイトルを設定
+      document.title = survey.title + ' - LogianSurvey'
+      
+      // Open Graphメタタグを設定
+      const ogTitle = document.querySelector('meta[property="og:title"]')
+      const ogDescription = document.querySelector('meta[property="og:description"]')
+      const ogImage = document.querySelector('meta[property="og:image"]')
+      const ogUrl = document.querySelector('meta[property="og:url"]')
+      
+      if (ogTitle) {
+        ogTitle.setAttribute('content', survey.title)
+      }
+      if (ogDescription) {
+        const description = survey.description ? 
+          survey.description.replace(/<[^>]*>/g, '').substring(0, 160) : 
+          survey.title
+        ogDescription.setAttribute('content', description)
+      }
+      if (ogImage) {
+        const imageUrl = survey.ogImageUrl || survey.headerImageUrl || '/images/logo.svg'
+        ogImage.setAttribute('content', imageUrl.startsWith('http') ? imageUrl : `${window.location.origin}${imageUrl}`)
+      }
+      if (ogUrl) {
+        ogUrl.setAttribute('content', window.location.href)
+      }
+    }
+  }, [survey])
 
   // ページ分割ロジック
   useEffect(() => {
@@ -345,6 +379,16 @@ export default function SurveyPage() {
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="mb-8">
+            {/* エンタープライズプラン用のオリジナルヘッダー画像 */}
+            {survey?.headerImageUrl && (
+              <div className="mb-6">
+                <img
+                  src={survey.headerImageUrl}
+                  alt="ヘッダー画像"
+                  className="w-full h-32 object-cover rounded-lg"
+                />
+              </div>
+            )}
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               {survey?.title}
             </h1>

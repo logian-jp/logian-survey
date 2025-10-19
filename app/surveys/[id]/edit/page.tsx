@@ -37,6 +37,8 @@ interface Survey {
   endDate?: string | null
   targetResponses?: number | null
   responseCount?: number
+  headerImageUrl?: string | null
+  ogImageUrl?: string | null
   questions: Question[]
 }
 
@@ -121,6 +123,100 @@ export default function EditSurvey() {
       }
     } catch (error) {
       console.error('Failed to fetch user plan:', error)
+    }
+  }
+
+  const handleHeaderImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', 'header')
+
+      const response = await fetch(`/api/surveys/${surveyId}/upload-image`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSurvey(prev => prev ? { ...prev, headerImageUrl: data.imageUrl } : null)
+      } else {
+        alert('ヘッダー画像のアップロードに失敗しました')
+      }
+    } catch (error) {
+      console.error('Header image upload error:', error)
+      alert('ヘッダー画像のアップロードに失敗しました')
+    }
+  }
+
+  const handleOgImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', 'og')
+
+      const response = await fetch(`/api/surveys/${surveyId}/upload-image`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSurvey(prev => prev ? { ...prev, ogImageUrl: data.imageUrl } : null)
+      } else {
+        alert('アイキャッチ画像のアップロードに失敗しました')
+      }
+    } catch (error) {
+      console.error('OG image upload error:', error)
+      alert('アイキャッチ画像のアップロードに失敗しました')
+    }
+  }
+
+  const removeHeaderImage = async () => {
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/remove-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type: 'header' }),
+      })
+
+      if (response.ok) {
+        setSurvey(prev => prev ? { ...prev, headerImageUrl: null } : null)
+      } else {
+        alert('ヘッダー画像の削除に失敗しました')
+      }
+    } catch (error) {
+      console.error('Remove header image error:', error)
+      alert('ヘッダー画像の削除に失敗しました')
+    }
+  }
+
+  const removeOgImage = async () => {
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/remove-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type: 'og' }),
+      })
+
+      if (response.ok) {
+        setSurvey(prev => prev ? { ...prev, ogImageUrl: null } : null)
+      } else {
+        alert('アイキャッチ画像の削除に失敗しました')
+      }
+    } catch (error) {
+      console.error('Remove OG image error:', error)
+      alert('アイキャッチ画像の削除に失敗しました')
     }
   }
 
@@ -639,6 +735,83 @@ export default function EditSurvey() {
                   userPlan={userPlan?.planType || 'FREE'}
                 />
               </div>
+
+              {/* エンタープライズプラン用のヘッダー画像設定 */}
+              {userPlan?.planType === 'ENTERPRISE' && (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="headerImage" className="block text-sm font-medium text-gray-700 mb-2">
+                      オリジナルヘッダー画像（エンタープライズプラン）
+                    </label>
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="file"
+                        id="headerImage"
+                        accept="image/*"
+                        onChange={handleHeaderImageUpload}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {survey.headerImageUrl && (
+                        <button
+                          type="button"
+                          onClick={removeHeaderImage}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
+                    {survey.headerImageUrl && (
+                      <div className="mt-2">
+                        <img
+                          src={survey.headerImageUrl}
+                          alt="ヘッダー画像"
+                          className="h-20 w-auto object-cover rounded border"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          公開URLでのヘッダー画像として表示されます
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="ogImage" className="block text-sm font-medium text-gray-700 mb-2">
+                      アイキャッチ画像（SNSシェア用）
+                    </label>
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="file"
+                        id="ogImage"
+                        accept="image/*"
+                        onChange={handleOgImageUpload}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {survey.ogImageUrl && (
+                        <button
+                          type="button"
+                          onClick={removeOgImage}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
+                    {survey.ogImageUrl && (
+                      <div className="mt-2">
+                        <img
+                          src={survey.ogImageUrl}
+                          alt="アイキャッチ画像"
+                          className="h-20 w-auto object-cover rounded border"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          SNSでシェアされた際に表示されます（推奨サイズ: 1200x630px）
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* プレビューボタン */}
               <div className="flex gap-3">

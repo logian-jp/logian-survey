@@ -75,6 +75,11 @@ model Survey {
   endDate         DateTime?
   targetResponses Int?
   userId          String
+  
+  // エンタープライズプラン用のカスタマイズ機能
+  headerImageUrl  String?      // オリジナルヘッダー画像
+  ogImageUrl      String?      // Open Graph用アイキャッチ画像
+  
   questions       Question[]
   responses       Response[]
   user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
