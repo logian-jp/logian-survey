@@ -41,6 +41,7 @@ model User {
   image                  String?
   password               String?
   role                   UserRole               @default(USER)
+  customLogoUrl          String?                // エンタープライズプラン用のカスタムロゴ
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   accounts               Account[]
@@ -79,6 +80,7 @@ model Survey {
   // エンタープライズプラン用のカスタマイズ機能
   headerImageUrl  String?      // オリジナルヘッダー画像
   ogImageUrl      String?      // Open Graph用アイキャッチ画像
+  useCustomLogo   Boolean?     // オリジナルロゴを使用するかどうか
   
   questions       Question[]
   responses       Response[]

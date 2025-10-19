@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Head from 'next/head'
 
 interface Question {
@@ -20,12 +21,15 @@ interface Survey {
   description?: string
   headerImageUrl?: string | null
   ogImageUrl?: string | null
+  useCustomLogo?: boolean
+  customLogoUrl?: string | null
   questions: Question[]
 }
 
 export default function SurveyPage() {
   const params = useParams()
   const router = useRouter()
+  const { data: session } = useSession()
   const shareUrl = params.shareUrl as string
   
   const [survey, setSurvey] = useState<Survey | null>(null)
@@ -47,11 +51,16 @@ export default function SurveyPage() {
     }
   }, [shareUrl])
 
+  // エンタープライズプランの場合の処理
+  useEffect(() => {
+    // エンタープライズプランの場合の特別な処理があればここに追加
+  }, [survey?.headerImageUrl])
+
   // SEO用のメタデータを設定
   useEffect(() => {
     if (survey) {
       // ページタイトルを設定
-      document.title = survey.title + ' - LogianSurvey'
+      document.title = survey.useCustomLogo ? survey.title : survey.title + ' - LogianSurvey'
       
       // Open Graphメタタグを設定
       const ogTitle = document.querySelector('meta[property="og:title"]')
@@ -375,20 +384,36 @@ export default function SurveyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      <Head>
+        <title>{survey ? (survey.useCustomLogo ? survey.title : survey.title + ' - LogianSurvey') : 'LogianSurvey'}</title>
+        <meta property="og:title" content={survey?.title || 'LogianSurvey'} />
+        <meta property="og:description" content={survey?.description ? survey.description.replace(/<[^>]*>/g, '').substring(0, 160) : survey?.title || ''} />
+        <meta property="og:image" content={survey?.ogImageUrl || survey?.headerImageUrl || '/images/logo.svg'} />
+        <meta property="og:url" content={typeof window !== 'undefined' ? window.location.href : ''} />
+        <style jsx global>{`
+          /* エンタープライズプランの場合のみスタイル適用 */
+        `}</style>
+      </Head>
+      <div className="min-h-screen bg-gray-50">
+      {/* エンタープライズプランのオリジナルロゴを固定ヘッダーとして表示 */}
+      {survey?.useCustomLogo && survey?.customLogoUrl && (
+        <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-4xl mx-auto px-4 py-4">
+            <div className="flex justify-center">
+              <img
+                src={survey.customLogoUrl}
+                alt="カスタムロゴ"
+                className="h-8 w-auto object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="mb-8">
-            {/* エンタープライズプラン用のオリジナルヘッダー画像 */}
-            {survey?.headerImageUrl && (
-              <div className="mb-6">
-                <img
-                  src={survey.headerImageUrl}
-                  alt="ヘッダー画像"
-                  className="w-full h-32 object-cover rounded-lg"
-                />
-              </div>
-            )}
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               {survey?.title}
             </h1>
@@ -837,6 +862,18 @@ export default function SurveyPage() {
           </form>
         </div>
       </div>
-    </div>
+
+      {/* フッター - カスタムロゴを使用していない場合のみ表示 */}
+      {!(survey?.useCustomLogo && survey?.customLogoUrl) && (
+        <footer className="bg-white border-t border-gray-200 mt-12">
+          <div className="max-w-4xl mx-auto px-4 py-6">
+            <div className="text-center text-sm text-gray-500">
+              <p>Powered by LogianSurvey</p>
+            </div>
+          </div>
+        </footer>
+      )}
+      </div>
+    </>
   )
 }

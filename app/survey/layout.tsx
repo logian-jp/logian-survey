@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import './globals.css'
-import { Providers } from './providers'
+import '../globals.css'
+import { Providers } from '../providers'
 import Header from '@/components/Header'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: '分析に特化したアンケートツール',
 }
 
-export default function RootLayout({
+export default function SurveyLayout({
   children,
 }: {
   children: React.ReactNode
@@ -20,7 +20,6 @@ export default function RootLayout({
     <html lang="ja">
       <body className={inter.className}>
         <Providers>
-          <Header />
           {children}
         </Providers>
       </body>

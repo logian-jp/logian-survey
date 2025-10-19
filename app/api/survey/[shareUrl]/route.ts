@@ -19,6 +19,11 @@ export async function GET(
             order: 'asc',
           },
         },
+        user: {
+          select: {
+            customLogoUrl: true
+          }
+        }
       },
     })
 
@@ -42,6 +47,8 @@ export async function GET(
       description: survey.description,
       headerImageUrl: (survey as any).headerImageUrl,
       ogImageUrl: (survey as any).ogImageUrl,
+      useCustomLogo: (survey as any).useCustomLogo,
+      customLogoUrl: survey.user.customLogoUrl,
       questions: questionsWithParsedOptions,
     })
   } catch (error) {

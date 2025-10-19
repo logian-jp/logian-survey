@@ -83,6 +83,9 @@ export async function GET(
       maxResponses: survey.maxResponses,
       endDate: survey.endDate,
       targetResponses: survey.targetResponses,
+      headerImageUrl: (survey as any).headerImageUrl,
+      ogImageUrl: (survey as any).ogImageUrl,
+      useCustomLogo: (survey as any).useCustomLogo,
       createdAt: survey.createdAt,
       updatedAt: survey.updatedAt,
       responseCount: survey._count.responses,
@@ -109,7 +112,7 @@ export async function PUT(
     }
 
     const surveyId = params.id
-    const { title, description, status, maxResponses, endDate, targetResponses } = await request.json()
+    const { title, description, status, maxResponses, endDate, targetResponses, headerImageUrl, ogImageUrl, useCustomLogo } = await request.json()
 
     // 権限チェック
     const hasEditPermission = await canEditSurvey(session.user.id, surveyId)
@@ -142,6 +145,9 @@ export async function PUT(
         maxResponses: maxResponses !== undefined ? maxResponses : null,
         endDate: endDate !== undefined ? endDate : null,
         targetResponses: targetResponses !== undefined ? targetResponses : null,
+        headerImageUrl: headerImageUrl !== undefined ? headerImageUrl : null,
+        ogImageUrl: ogImageUrl !== undefined ? ogImageUrl : null,
+        useCustomLogo: useCustomLogo !== undefined ? useCustomLogo : null,
       },
     })
 
