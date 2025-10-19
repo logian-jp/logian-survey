@@ -37,8 +37,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // 画像URLを決定
     let imageUrl = (survey as any).ogImageUrl || survey.user.customLogoUrl || '/images/logo.svg'
     
+    // Base64データの場合は画像APIエンドポイントを使用
+    if (imageUrl.startsWith('data:')) {
+      imageUrl = `${process.env.NEXTAUTH_URL || 'https://logian-survey.vercel.app'}/api/image/${survey.id}?type=og`
+    }
     // 相対URLの場合は絶対URLに変換
-    if (!imageUrl.startsWith('http')) {
+    else if (!imageUrl.startsWith('http')) {
       imageUrl = `${process.env.NEXTAUTH_URL || 'https://logian-survey.vercel.app'}${imageUrl}`
     }
 
