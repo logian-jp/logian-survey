@@ -58,10 +58,7 @@ export async function DELETE(request: NextRequest) {
       // 6. ディスカウントリンクを削除
       await tx.discountLink.deleteMany({
         where: {
-          OR: [
-            { createdBy: userId },
-            { usedBy: { some: { userId: userId } } }
-          ]
+          createdBy: userId
         }
       })
 

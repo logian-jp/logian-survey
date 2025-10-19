@@ -123,3 +123,40 @@ export function checkPlanLimit(planType: string, limitType: 'maxSurveys' | 'maxR
   if (limit === -1) return true // 無制限
   return currentCount < limit
 }
+
+// ユーザーのプラン情報を取得する関数
+export async function getUserPlan(userId: string) {
+  const { PrismaClient } = await import('@prisma/client')
+  const prisma = new PrismaClient()
+  
+  try {
+    const userPlan = await prisma.userPlan.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        planType: true,
+        status: true,
+      }
+    })
+    
+    if (!userPlan) {
+      return null
+    }
+    
+    // プラン制限情報を追加
+    const planLimits = getPlanLimits(userPlan.planType)
+    
+    return {
+      ...userPlan,
+      maxSurveys: planLimits.maxSurveys,
+      maxResponses: planLimits.maxResponsesPerSurvey,
+      canUseVideoEmbedding: planLimits.features.includes('video_embedding'),
+      canUseLocationTracking: planLimits.features.includes('location_tracking'),
+    }
+  } catch (error) {
+    console.error('Failed to fetch user plan:', error)
+    return null
+  } finally {
+    await prisma.$disconnect()
+  }
+}
