@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkResponseLimit } from '@/lib/plan-check'
+import { recordDataUsage } from '@/lib/plan-limits'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,6 +29,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { message: 'Survey not found or not active' },
         { status: 404 }
+      )
+    }
+
+    // 期限切れチェック
+    if (survey.endDate && new Date() > new Date(survey.endDate)) {
+      return NextResponse.json(
+        { message: 'This survey is closed for new responses' },
+        { status: 403 }
       )
     }
 
@@ -96,6 +105,10 @@ export async function POST(request: NextRequest) {
     
     // すべての回答を並行して作成
     await Promise.all(answerPromises)
+
+    // データ使用量を記録（回答送信時）
+    const responseDataSize = JSON.stringify(answers).length
+    await recordDataUsage(survey.userId, surveyId, 'survey_data', responseDataSize, `アンケート「${survey.title}」への回答`)
 
     return NextResponse.json({ message: 'Response submitted successfully' })
   } catch (error) {

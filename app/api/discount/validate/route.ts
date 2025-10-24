@@ -11,11 +11,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const { discountCode, planType } = await request.json()
+    const { discountCode, ticketType } = await request.json()
 
-    if (!discountCode || !planType) {
+    if (!discountCode || !ticketType) {
       return NextResponse.json(
-        { message: 'Discount code and plan type are required' },
+        { message: 'Discount code and ticket type are required' },
         { status: 400 }
       )
     }
@@ -51,10 +51,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 対象プランかチェック
-    if (discountLink.targetPlanType !== planType) {
+    // 対象チケットタイプかチェック
+    if (discountLink.targetTicketType !== ticketType) {
       return NextResponse.json(
-        { message: 'This discount code is not valid for the selected plan' },
+        { message: 'This discount code is not valid for the selected ticket type' },
         { status: 400 }
       )
     }

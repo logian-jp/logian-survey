@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getPlanLimits } from '@/lib/plan-limits'
 
 // APIキー認証のヘルパー関数
 async function authenticateApiKey(request: NextRequest) {
@@ -59,14 +60,39 @@ export async function GET(
             order: 'asc',
           },
         },
+        user: { include: { userPlan: true } },
       },
     })
+    // プランのAPI連携可否チェック（PROFESSIONAL/ENTERPRISE）
+    const planType = (survey as any).user.userPlan?.planType || 'FREE'
+    const limits = getPlanLimits(planType)
+    if (!limits.features.includes('api_integration')) {
+      return NextResponse.json(
+        { message: 'API access is available for Professional or Enterprise plans only' },
+        { status: 403 }
+      )
+    }
 
     if (!survey) {
       return NextResponse.json(
         { message: 'Survey not found' },
         { status: 404 }
       )
+    }
+
+    // 保存期間チェック（アンケートのendDate + retentionを過ぎていれば取得不可）
+    if ((survey as any).endDate) {
+      const userPlanType = (survey as any).user.userPlan?.planType || 'FREE'
+      const limitsForRetention = getPlanLimits(userPlanType)
+      if (limitsForRetention.dataRetentionDays) {
+        const retentionDeadline = new Date(new Date((survey as any).endDate).getTime() + limitsForRetention.dataRetentionDays * 24 * 60 * 60 * 1000)
+        if (new Date() > retentionDeadline) {
+          return NextResponse.json(
+            { message: 'Data retention period has expired for this survey' },
+            { status: 403 }
+          )
+        }
+      }
     }
 
     // 回答を取得
@@ -153,12 +179,30 @@ export async function POST(
         id: surveyId,
         status: 'ACTIVE',
       },
+      include: { user: { include: { userPlan: true } } }
     })
+    // プランのAPI連携可否チェック（PROFESSIONAL/ENTERPRISE）
+    const planType = (survey as any).user.userPlan?.planType || 'FREE'
+    const limits = getPlanLimits(planType)
+    if (!limits.features.includes('api_integration')) {
+      return NextResponse.json(
+        { message: 'API access is available for Professional or Enterprise plans only' },
+        { status: 403 }
+      )
+    }
 
     if (!survey) {
       return NextResponse.json(
         { message: 'Survey not found or not active' },
         { status: 404 }
+      )
+    }
+
+    // 期限切れチェック（募集期間）
+    if ((survey as any).endDate && new Date() > new Date((survey as any).endDate)) {
+      return NextResponse.json(
+        { message: 'This survey is closed for new responses' },
+        { status: 403 }
       )
     }
 

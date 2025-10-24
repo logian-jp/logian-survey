@@ -212,9 +212,9 @@ async function seedTestData() {
         await prisma.question.create({
           data: {
             type: questionData.type,
-            text: questionData.text,
+            title: questionData.text,
             options: questionData.options,
-            isRequired: questionData.isRequired,
+            required: questionData.isRequired,
             order: questionData.order,
             surveyId: survey.id
           }

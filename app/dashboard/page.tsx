@@ -44,6 +44,7 @@ export default function Dashboard() {
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [userPlan, setUserPlan] = useState<any>(null)
+  const [planSlots, setPlanSlots] = useState<any[]>([])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -55,6 +56,7 @@ export default function Dashboard() {
     if (session) {
       fetchSurveys()
       fetchUserPlan()
+      fetchPlanSlots()
     }
   }, [session])
 
@@ -69,6 +71,18 @@ export default function Dashboard() {
       window.history.replaceState({}, '', newUrl)
     }
   }, [])
+
+  const fetchPlanSlots = async () => {
+    try {
+      const response = await fetch('/api/user/plan-slots')
+      if (response.ok) {
+        const data = await response.json()
+        setPlanSlots(data.planSlots || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch plan slots:', error)
+    }
+  }
 
   const fetchUserPlan = async (retryCount = 0) => {
     try {
@@ -183,57 +197,88 @@ export default function Dashboard() {
             <SurveyAlertPanel />
           </div>
 
-          {/* プラン制限の案内 */}
-          {userPlan && (
+          {/* チケット情報の案内 */}
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <h3 className="text-base sm:text-lg font-semibold text-blue-900 mb-2">
+                    チケットシステム
+                  </h3>
+                  <p className="text-xs sm:text-sm text-blue-700">
+                    <span className="block sm:inline">無料チケット: 3枚</span>
+                    <span className="hidden sm:inline"> | </span>
+                    <span className="block sm:inline">アンケート作成時にチケットを選択</span>
+                    <span className="hidden sm:inline"> | </span>
+                    <span className="block sm:inline">チケット購入で追加可能</span>
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Link
+                    href="/settings"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    設定
+                  </Link>
+                  <Link
+                    href="/tickets"
+                    className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
+                  >
+                    チケット購入
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* プラン枠数表示 */}
+          {planSlots.length > 0 && (
             <div className="mb-8">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div>
-                    <h3 className="text-base sm:text-lg font-semibold text-blue-900 mb-2">
-                      現在のプラン: {userPlan.planType === 'FREE' ? '基本プラン' : 
-                                   userPlan.planType === 'STANDARD' ? 'スタンダードプラン' :
-                                   userPlan.planType === 'PROFESSIONAL' ? 'プロフェッショナルプラン' :
-                                   userPlan.planType === 'ENTERPRISE' ? 'エンタープライズプラン' :
-                                   userPlan.planType === 'ONETIME_UNLIMITED' ? '単発無制限プラン' :
-                                   '不明なプラン'}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-blue-700">
-                      <span className="block sm:inline">アンケート作成: {PLAN_LIMITS[userPlan.planType]?.maxSurveys === -1 ? '無制限' : `${PLAN_LIMITS[userPlan.planType]?.maxSurveys}個`}</span>
-                      <span className="hidden sm:inline"> | </span>
-                      <span className="block sm:inline">回答数上限: {PLAN_LIMITS[userPlan.planType]?.maxResponsesPerSurvey === -1 ? '無制限' : `${PLAN_LIMITS[userPlan.planType]?.maxResponsesPerSurvey}件/アンケート`}</span>
-                      <span className="hidden sm:inline"> | </span>
-                      <span className="block sm:inline">エクスポート: {PLAN_LIMITS[userPlan.planType]?.exportFormats.join(', ')}</span>
-                    </p>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    <button
-                      onClick={() => {
-                        console.log('Manual plan refresh triggered')
-                        fetchUserPlan()
-                      }}
-                      className="px-3 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      🔄 更新
-                    </button>
-                    <Link
-                      href="/settings"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                    >
-                      設定
-                    </Link>
-                    {userPlan.planType === 'FREE' && (
-                      <Link
-                        href="/plans"
-                        className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
-                      >
-                        プランアップグレード
-                      </Link>
-                    )}
-                  </div>
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-green-900 mb-4">
+                  プラン枠数
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {planSlots.map((slot) => (
+                    <div key={slot.id} className="bg-white rounded-lg p-4 border border-green-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                          {slot.planType === 'FREE' ? '基本プラン' :
+                           slot.planType === 'STANDARD' ? 'スタンダードプラン' :
+                           slot.planType === 'PROFESSIONAL' ? 'プロフェッショナルプラン' :
+                           slot.planType === 'ENTERPRISE' ? 'エンタープライズプラン' :
+                           slot.planType}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(slot.purchasedAt).toLocaleDateString('ja-JP')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl font-bold text-green-600">
+                          {slot.remainingSlots}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          残り枠数
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        使用済み: {slot.usedSlots} / {slot.totalSlots}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 text-center">
+                  <Link
+                    href="/plans"
+                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                  >
+                    追加プランを購入
+                  </Link>
                 </div>
               </div>
             </div>
           )}
+
         {surveys.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-400 text-6xl mb-4">📊</div>

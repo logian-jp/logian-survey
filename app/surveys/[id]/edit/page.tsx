@@ -40,6 +40,7 @@ interface Survey {
   headerImageUrl?: string | null
   ogImageUrl?: string | null
   useCustomLogo?: boolean
+  planType?: string
   questions: Question[]
 }
 
@@ -720,9 +721,9 @@ export default function EditSurvey() {
                   value={survey.description || ''}
                   onChange={(value) => setSurvey({ ...survey, description: value })}
                   placeholder="アンケートの目的や内容について説明してください"
+                  ticketType={survey.planType || 'FREE'}
                   className="mt-1"
                   allowVideo={true}
-                  userPlan={userPlan?.planType || 'FREE'}
                 />
               </div>
 
@@ -928,6 +929,7 @@ export default function EditSurvey() {
                             value={question.description || ''}
                             onChange={(value) => updateQuestion(question.id, { description: value })}
                             placeholder="追加の説明があれば入力してください（改行可能）"
+                            ticketType={survey.planType || 'FREE'}
                             className="min-h-[100px]"
                           />
                         </div>
@@ -1180,6 +1182,23 @@ export default function EditSurvey() {
 
         {activeTab === 'settings' && (
           <div className="space-y-6">
+            {/* チケット情報表示 */}
+            {survey.planType && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-blue-800 mb-2">チケット情報</h3>
+                <div className="text-sm text-blue-700">
+                  <p>
+                    このアンケートは <strong>{
+                      survey.planType === 'FREE' && '無料チケット'
+                      || survey.planType === 'STANDARD' && 'スタンダードチケット'
+                      || survey.planType === 'PROFESSIONAL' && 'プロフェッショナルチケット'
+                      || survey.planType === 'ENTERPRISE' && 'エンタープライズチケット'
+                    }</strong> で作成されています。
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">回答設定</h3>
               
@@ -1313,8 +1332,8 @@ export default function EditSurvey() {
               </div>
             </div>
 
-            {/* エンタープライズプラン用の画像設定 */}
-            {userPlan?.planType === 'ENTERPRISE' && (
+            {/* エンタープライズチケット用の画像設定 */}
+            {survey.planType === 'ENTERPRISE' && (
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">ブランディング設定</h3>
                 

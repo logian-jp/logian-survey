@@ -94,6 +94,81 @@ export async function checkSurveyLimit(userId: string): Promise<{ allowed: boole
   }
 }
 
+// プラン枠数のチェック
+export async function checkPlanSlotLimit(userId: string, planType: string): Promise<{ allowed: boolean; message?: string; remainingSlots?: number }> {
+  try {
+    // ユーザーの該当プランの枠数を取得
+    const planSlot = await prisma.userPlanSlot.findFirst({
+      where: {
+        userId,
+        planType: planType as any,
+        remainingSlots: { gt: 0 }
+      },
+      orderBy: {
+        purchasedAt: 'desc'
+      }
+    })
+
+    if (!planSlot) {
+      return {
+        allowed: false,
+        message: `${planType}プランの枠がありません。プランを購入してください。`
+      }
+    }
+
+    return {
+      allowed: true,
+      remainingSlots: planSlot.remainingSlots
+    }
+  } catch (error) {
+    console.error('Error checking plan slot limit:', error)
+    return {
+      allowed: false,
+      message: '枠数の確認中にエラーが発生しました'
+    }
+  }
+}
+
+// プラン枠の消費
+export async function consumePlanSlot(userId: string, planType: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const planSlot = await prisma.userPlanSlot.findFirst({
+      where: {
+        userId,
+        planType: planType as any,
+        remainingSlots: { gt: 0 }
+      },
+      orderBy: {
+        purchasedAt: 'desc'
+      }
+    })
+
+    if (!planSlot) {
+      return {
+        success: false,
+        message: `${planType}プランの枠がありません`
+      }
+    }
+
+    // 枠数を1つ消費
+    await prisma.userPlanSlot.update({
+      where: { id: planSlot.id },
+      data: {
+        usedSlots: { increment: 1 },
+        remainingSlots: { decrement: 1 }
+      }
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error consuming plan slot:', error)
+    return {
+      success: false,
+      message: '枠数の消費中にエラーが発生しました'
+    }
+  }
+}
+
 export async function checkResponseLimit(surveyId: string): Promise<{ allowed: boolean; message?: string }> {
   const survey = await prisma.survey.findUnique({
     where: { id: surveyId },
@@ -110,14 +185,49 @@ export async function checkResponseLimit(surveyId: string): Promise<{ allowed: b
     return { allowed: true }
   }
 
-  const responseCount = await prisma.response.count({
-    where: { surveyId }
-  })
+  // 追加回答数アドオン（スタンダード以上）を合算
+  let additionalResponses = 0
+  try {
+    const addons = await (prisma as any).userDataAddon.findMany({
+      where: {
+        userId: survey.userId,
+        status: 'ACTIVE',
+        surveyId: surveyId, // このアンケートに紐づいたアドオン
+        addon: {
+          type: 'responses',
+          isActive: true
+        },
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } }
+        ]
+      },
+      include: { addon: true }
+    })
+    additionalResponses = addons.reduce((total: number, a: { addon: { amount: number } }) => total + (a.addon.amount || 0), 0)
+  } catch (e) {
+    // 取得失敗時は追加0として続行
+  }
 
-  if (responseCount >= limits.maxResponsesPerSurvey) {
+  // 有効上限を計算（プラン上限 + アドオン）。アンケートごとの個別上限が設定されていれば下限に合わせる
+  const baseLimit = limits.maxResponsesPerSurvey
+  const effectivePlanLimit = baseLimit === -1 ? -1 : baseLimit + additionalResponses
+  const perSurveyLimit = survey.maxResponses ?? null
+  const effectiveLimit = effectivePlanLimit === -1
+    ? (perSurveyLimit ?? -1)
+    : (perSurveyLimit ? Math.min(effectivePlanLimit, perSurveyLimit) : effectivePlanLimit)
+
+  // 無制限（-1）の場合は許可
+  if (effectiveLimit === -1) {
+    return { allowed: true }
+  }
+
+  const responseCount = await prisma.response.count({ where: { surveyId } })
+
+  if (responseCount >= effectiveLimit) {
     return {
       allowed: false,
-      message: `回答数の上限（${limits.maxResponsesPerSurvey}件）に達しています。プランをアップグレードしてください。`
+      message: `回答数の上限（${effectiveLimit}件）に達しています。アドオンを追加購入するか、プランを見直してください。`
     }
   }
 

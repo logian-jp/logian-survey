@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { PREFECTURE_REGIONS, convertAgeGroupToNumber } from '@/lib/survey-parts'
 import { checkExportFormat } from '@/lib/plan-check'
+import { translateVariableName } from '@/lib/variable-translation'
+import { getPlanLimits } from '@/lib/plan-limits'
 
 export async function GET(
   request: NextRequest,
@@ -20,6 +22,29 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const format = searchParams.get('format') || 'raw' // raw, normalized, standardized
     const includePersonalData = searchParams.get('includePersonalData') === 'true'
+    const convertToEnglish = searchParams.get('convertToEnglish') === 'true'
+    
+    let customHeaders = { responseId: '回答ID', responseDate: '回答日時' }
+    let variableNames = {}
+    
+    try {
+      if (searchParams.get('customHeaders')) {
+        customHeaders = JSON.parse(searchParams.get('customHeaders')!)
+      }
+      if (searchParams.get('variableNames')) {
+        variableNames = JSON.parse(searchParams.get('variableNames')!)
+      }
+    } catch (error) {
+      console.error('Error parsing custom parameters:', error)
+    }
+    
+    console.log('Export API parameters:', {
+      format,
+      includePersonalData,
+      convertToEnglish,
+      customHeaders,
+      variableNames
+    })
 
     // プラン制限チェック
     const formatCheck = await checkExportFormat(session.user.id, format)
@@ -57,8 +82,22 @@ export async function GET(
       )
     }
 
+    // 保存期間チェック（回答募集終了後、プランの保存期間を超えている場合はブロック）
+    const userPlan = await prisma.userPlan.findUnique({ where: { userId: session.user.id } })
+    const planType = userPlan?.planType || 'FREE'
+    const limits = getPlanLimits(planType)
+    if ((survey as any).endDate && limits.dataRetentionDays) {
+      const retentionDeadline = new Date(new Date((survey as any).endDate).getTime() + limits.dataRetentionDays * 24 * 60 * 60 * 1000)
+      if (new Date() > retentionDeadline) {
+        return NextResponse.json(
+          { message: 'Data retention period has expired for this survey' },
+          { status: 403 }
+        )
+      }
+    }
+
     // CSVデータを生成
-    const csvData = generateCSVData(survey, format, includePersonalData)
+    const csvData = generateCSVData(survey, format, includePersonalData, convertToEnglish, customHeaders, variableNames)
 
     // CSVファイル名を生成（URLエンコードして安全にする）
     const timestamp = new Date().toISOString().split('T')[0]
@@ -83,12 +122,17 @@ export async function GET(
   }
 }
 
-function generateCSVData(survey: any, format: string, includePersonalData: boolean) {
+function generateCSVData(survey: any, format: string, includePersonalData: boolean, convertToEnglish: boolean = false, customHeaders: any = null, variableNames: any = {}) {
+  console.log('generateCSVData called with:', { format, includePersonalData, convertToEnglish })
+  
   const questions = survey.questions
   const responses = survey.responses
 
   // ヘッダー行を生成
-  const headers: string[] = ['回答ID', '回答日時']
+  const responseIdHeader = customHeaders?.responseId || (convertToEnglish ? 'response_id' : '回答ID')
+  const responseDateHeader = customHeaders?.responseDate || (convertToEnglish ? 'response_date' : '回答日時')
+  const headers: string[] = [responseIdHeader, responseDateHeader]
+  console.log('Headers:', headers)
   const questionMap: { [key: string]: any } = {}
 
     questions.forEach((question: any) => {
@@ -99,38 +143,49 @@ function generateCSVData(survey: any, format: string, includePersonalData: boole
         return
       }
 
+      const getHeaderName = (baseName: string, suffix: string = '', questionId: string = '') => {
+        // カスタム変数名がある場合はそれを使用
+        if (questionId && variableNames[questionId]) {
+          const customName = variableNames[questionId]
+          return suffix ? `${customName}_${suffix}` : customName
+        }
+        
+        const fullName = suffix ? `${baseName}_${suffix}` : baseName
+        return convertToEnglish ? translateVariableName(fullName) : fullName
+      }
+
       if (format === 'raw') {
-        headers.push(question.title)
+        headers.push(getHeaderName(question.title, '', question.id))
         questionMap[question.id] = { question, settings: parsedSettings }
       } else {
         // 分析用の列を生成
         if (question.type === 'AGE_GROUP') {
           // 年齢グループは順序構造があるカテゴリ変数として1列で表示
-          headers.push(`${question.title}_numeric`)
+          headers.push(getHeaderName(question.title, 'numeric', question.id))
         } else if (['RADIO', 'SELECT', 'PREFECTURE'].includes(question.type)) {
           if (parsedSettings.ordinalStructure) {
             // 順序構造がある場合、数値変換（1列）
-            headers.push(`${question.title}_numeric`)
+            headers.push(getHeaderName(question.title, 'numeric', question.id))
           } else {
             // 順序構造がない場合、One-Hot Encoding
             const options = getQuestionOptions(question)
             options.forEach(option => {
-              headers.push(`${question.title}_${option}`)
+              headers.push(getHeaderName(question.title, option, question.id))
             })
           }
         } else if (question.type === 'CHECKBOX') {
           if (parsedSettings.ordinalStructure) {
             // 順序構造がある複数選択の場合、数値変換（1列）
-            headers.push(`${question.title}_numeric`)
+            headers.push(getHeaderName(question.title, 'numeric', question.id))
           } else {
             // 順序構造がない複数選択の場合、One-Hot Encoding
             const options = getQuestionOptions(question)
             options.forEach(option => {
-              headers.push(`${question.title}_${option}`)
+              headers.push(getHeaderName(question.title, option, question.id))
             })
           }
         } else {
-          headers.push(question.title)
+          headers.push(getHeaderName(question.title, '', question.id))
         }
         questionMap[question.id] = { question, settings: parsedSettings }
       }

@@ -44,71 +44,59 @@ export default function CreateSurvey() {
   const [isLoading, setIsLoading] = useState(false)
   const [userPlan, setUserPlan] = useState<any>(null)
   const [planLimit, setPlanLimit] = useState<{ allowed: boolean; message?: string }>({ allowed: true })
+  const [planSlots, setPlanSlots] = useState<any[]>([])
+  const [selectedPlanType, setSelectedPlanType] = useState<string | null>(null)
+  const [showPlanSelection, setShowPlanSelection] = useState(true)
+  const [activeTab, setActiveTab] = useState<'questions' | 'settings' | 'sharing'>('questions')
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   useEffect(() => {
     if (session?.user?.id) {
       checkPlanLimit()
+      fetchPlanSlots()
     }
   }, [session])
 
   const checkPlanLimit = async () => {
+    // チケットシステムに移行したため、プラン制限チェックは不要
+    setUserPlan({ planType: 'FREE' })
+    setPlanLimit({ allowed: true })
+  }
+
+  const fetchPlanSlots = async () => {
     try {
-      const response = await fetch('/api/user/plan')
+      const response = await fetch('/api/user/tickets')
       if (response.ok) {
-        const planData = await response.json()
-        setUserPlan(planData)
-        
-        // アンケート作成数の制限チェック
-        const surveyCountResponse = await fetch('/api/surveys')
-        if (surveyCountResponse.ok) {
-          const surveys = await surveyCountResponse.json()
-          const currentCount = surveys.length
-          const limits = PLAN_LIMITS[planData.planType]
-          
-          if (limits.maxSurveys !== -1 && currentCount >= limits.maxSurveys) {
-            setPlanLimit({
-              allowed: false,
-              message: `アンケート作成数の上限（${limits.maxSurveys}個）に達しています。プランをアップグレードしてください。`
-            })
-          }
-        }
-      } else {
-        // APIエラーの場合は無料プランとして処理
-        console.warn('Failed to fetch user plan, using FREE plan as fallback')
-        setUserPlan({
-          id: 'fallback',
-          planType: 'FREE',
-          status: 'ACTIVE',
-          startDate: new Date(),
-          endDate: null
-        })
-        
-        // 無料プランの制限をチェック
-        const surveyCountResponse = await fetch('/api/surveys')
-        if (surveyCountResponse.ok) {
-          const surveys = await surveyCountResponse.json()
-          const currentCount = surveys.length
-          const limits = PLAN_LIMITS.FREE
-          
-          if (limits.maxSurveys !== -1 && currentCount >= limits.maxSurveys) {
-            setPlanLimit({
-              allowed: false,
-              message: `アンケート作成数の上限（${limits.maxSurveys}個）に達しています。プランをアップグレードしてください。`
-            })
-          }
-        }
+        const data = await response.json()
+        setPlanSlots(data.tickets || [])
       }
     } catch (error) {
-      console.error('Failed to check plan limit:', error)
-      // エラーの場合は無料プランを設定
-      setUserPlan({
-        id: 'fallback',
-        planType: 'FREE',
-        status: 'ACTIVE',
-        startDate: new Date(),
-        endDate: null
-      })
+      console.error('Failed to fetch tickets:', error)
     }
+  }
+
+  const handlePlanSelection = (planType: string) => {
+    setSelectedPlanType(planType)
+    setShowPlanSelection(false)
+  }
+
+  const handleBackToTicketSelection = () => {
+    // 変更があるかチェック
+    const hasChanges = survey.title || survey.description || questions.length > 0
+    if (hasChanges) {
+      setShowBackConfirm(true)
+    } else {
+      setShowPlanSelection(true)
+    }
+  }
+
+  const handleBackConfirm = (save: boolean) => {
+    if (save) {
+      // 一時保存の処理（必要に応じて実装）
+      console.log('一時保存')
+    }
+    setShowBackConfirm(false)
+    setShowPlanSelection(true)
   }
 
   const questionTypes = [
@@ -294,7 +282,10 @@ export default function CreateSurvey() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(survey),
+        body: JSON.stringify({
+          ...survey,
+          ticketType: selectedPlanType || 'FREE'
+        }),
       })
 
       if (!surveyResponse.ok) {
@@ -339,11 +330,164 @@ export default function CreateSurvey() {
     )
   }
 
+  // プラン選択画面
+  if (showPlanSelection) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-lg shadow-sm border p-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">アンケート作成 - チケット選択</h1>
+            <p className="text-gray-600 mb-8">どのチケットでアンケートを作成しますか？</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* FREEチケットを常に表示 */}
+              <div key="FREE" className="border rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-gray-900 mb-2">
+                    無料チケット
+                  </div>
+                  <div className="text-3xl font-bold text-blue-600 mb-2">
+                    3
+                  </div>
+                  <div className="text-sm text-gray-500 mb-4">
+                    残りチケット数 / 3枚
+                  </div>
+                  <button
+                    onClick={() => handlePlanSelection('FREE')}
+                    className="w-full px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    このチケットで作成
+                  </button>
+                </div>
+              </div>
+              
+              {/* 有料チケット */}
+              {planSlots.filter(slot => slot.ticketType !== 'FREE').map((slot) => (
+                <div key={slot.ticketType} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-gray-900 mb-2">
+                      {slot.ticketType === 'STANDARD' && 'スタンダードチケット'}
+                      {slot.ticketType === 'PROFESSIONAL' && 'プロフェッショナルチケット'}
+                      {slot.ticketType === 'ENTERPRISE' && 'エンタープライズチケット'}
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 mb-2">
+                      {slot.remainingTickets}
+                    </div>
+                    <div className="text-sm text-gray-500 mb-4">
+                      残りチケット数 / {slot.totalTickets}枚
+                    </div>
+                    <button
+                      onClick={() => handlePlanSelection(slot.ticketType)}
+                      disabled={slot.remainingTickets <= 0}
+                      className={`w-full px-4 py-2 rounded-md font-medium transition-colors ${
+                        slot.remainingTickets > 0
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      {slot.remainingTickets > 0 ? 'このチケットで作成' : 'チケット不足'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {planSlots.length === 0 && (
+                <div className="col-span-full text-center text-gray-500 py-8">
+                  <p className="text-lg mb-4">チケットがありません</p>
+                  <a
+                    href="/tickets"
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    チケットを購入する
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* メインコンテンツ */}
       <div className={`flex-1 overflow-y-auto transition-all duration-300 ${showSidebar ? 'mr-80' : ''}`}>
         <div className="max-w-4xl mx-auto px-4 py-8">
+          {/* ヘッダー */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleBackToTicketSelection}
+                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                チケット選択に戻る
+              </button>
+            </div>
+            
+            {/* タブ */}
+            <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab('questions')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'questions'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                質問
+              </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'settings'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                設定
+              </button>
+              <button
+                onClick={() => setActiveTab('sharing')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'sharing'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                共有
+              </button>
+            </div>
+          </div>
+
+          {/* 選択されたプラン表示 */}
+          {selectedPlanType && (
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-blue-800">
+                    選択されたチケット: {
+                      selectedPlanType === 'FREE' && '無料チケット'
+                      || selectedPlanType === 'STANDARD' && 'スタンダードチケット'
+                      || selectedPlanType === 'PROFESSIONAL' && 'プロフェッショナルチケット'
+                      || selectedPlanType === 'ENTERPRISE' && 'エンタープライズチケット'
+                    }
+                  </h3>
+                  <div className="mt-2 text-sm text-blue-700">
+                    <p>このチケットでアンケートを作成しています。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* プラン制限の警告 */}
           {!planLimit.allowed && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
@@ -373,28 +517,30 @@ export default function CreateSurvey() {
             </div>
           )}
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-900">
-                新しいアンケートを作成
-              </h1>
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => setShowSidebar(!showSidebar)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
-                >
-                  {showSidebar ? 'テンプレートを隠す' : 'テンプレートを表示'}
-                </button>
-                <Link
-                  href="/surveys"
-                  className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
-                >
-                  一覧に戻る
-                </Link>
+          {/* タブコンテンツ */}
+          {activeTab === 'questions' && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  新しいアンケートを作成
+                </h1>
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={() => setShowSidebar(!showSidebar)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    {showSidebar ? 'テンプレートを隠す' : 'テンプレートを表示'}
+                  </button>
+                  <Link
+                    href="/surveys"
+                    className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
+                  >
+                    一覧に戻る
+                  </Link>
+                </div>
               </div>
-            </div>
 
-            <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 {/* アンケート基本情報 */}
                 <div className="space-y-4">
@@ -420,9 +566,9 @@ export default function CreateSurvey() {
                     value={survey.description || ''}
                     onChange={(value) => setSurvey({ ...survey, description: value })}
                     placeholder="アンケートの目的や内容について説明してください"
+                    ticketType={selectedPlanType || 'FREE'}
                     className="mt-1"
                     allowVideo={true}
-                    userPlan={userPlan?.planType || 'FREE'}
                   />
                 </div>
 
@@ -690,6 +836,7 @@ export default function CreateSurvey() {
                                 value={question.description || ''}
                                 onChange={(value) => updateQuestion(question.id, { description: value })}
                                 placeholder="追加の説明があれば入力してください（改行可能）"
+                                ticketType={selectedPlanType || 'FREE'}
                                 className="min-h-[100px]"
                               />
                             </div>
@@ -847,7 +994,7 @@ export default function CreateSurvey() {
                                   {question.settings.allowedFileTypes.map(fileType => {
                                     const option = fileTypeOptions.find(opt => opt.value === fileType)
                                     return option?.extensions.map(ext => (
-                                      <span key={ext} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                      <span key={`${fileType}-${ext}`} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
                                         {ext}
                                       </span>
                                     ))
@@ -943,7 +1090,99 @@ export default function CreateSurvey() {
               </div>
               </form>
             </div>
-          </div>
+          )}
+
+          {/* 設定タブ */}
+          {activeTab === 'settings' && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">アンケート設定</h2>
+              
+              <div className="space-y-6">
+                {/* 回答数制限 */}
+                <div>
+                  <label htmlFor="maxResponses" className="block text-sm font-medium text-gray-700 mb-2">
+                    最大回答数
+                  </label>
+                  <input
+                    type="number"
+                    id="maxResponses"
+                    value={survey.maxResponses || ''}
+                    onChange={(e) => setSurvey({ ...survey, maxResponses: e.target.value ? parseInt(e.target.value) : null })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="制限なし"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    回答数の上限を設定できます。空欄の場合は制限なしです。
+                  </p>
+                </div>
+
+                {/* 募集期間 */}
+                <div>
+                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
+                    募集終了日
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="endDate"
+                    value={survey.endDate || ''}
+                    onChange={(e) => setSurvey({ ...survey, endDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    アンケートの募集を終了する日時を設定できます。
+                  </p>
+                </div>
+
+                {/* 目標回答数 */}
+                <div>
+                  <label htmlFor="targetResponses" className="block text-sm font-medium text-gray-700 mb-2">
+                    目標回答数
+                  </label>
+                  <input
+                    type="number"
+                    id="targetResponses"
+                    value={survey.targetResponses || ''}
+                    onChange={(e) => setSurvey({ ...survey, targetResponses: e.target.value ? parseInt(e.target.value) : null })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="目標なし"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    目標とする回答数を設定できます。進捗管理に使用されます。
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 共有タブ */}
+          {activeTab === 'sharing' && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">共有設定</h2>
+              
+              <div className="space-y-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-blue-900 mb-2">共有URL</h3>
+                  <p className="text-sm text-blue-700 mb-3">
+                    アンケートを作成すると、共有用のURLが生成されます。
+                  </p>
+                  <div className="bg-white border border-blue-200 rounded-md p-3">
+                    <code className="text-sm text-gray-600">
+                      {survey.id ? `https://your-domain.com/survey/${survey.id}` : 'アンケート作成後に表示されます'}
+                    </code>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-yellow-900 mb-2">注意事項</h3>
+                  <ul className="text-sm text-yellow-700 space-y-1">
+                    <li>• アンケートを作成してから共有URLが有効になります</li>
+                    <li>• • 共有URLは誰でもアクセス可能です</li>
+                    <li>• 回答データは設定した保存期間中保持されます</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       {/* テンプレートサイドバー */}
       {showSidebar && (
@@ -959,6 +1198,42 @@ export default function CreateSurvey() {
           />
         </div>
       )}
+
+      {/* 戻る確認ポップアップ */}
+      {showBackConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              変更を保存しますか？
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              現在の変更内容を保存してからチケット選択に戻りますか？
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => handleBackConfirm(true)}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                保存して戻る
+              </button>
+              <button
+                onClick={() => handleBackConfirm(false)}
+                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
+              >
+                保存せずに戻る
+              </button>
+              <button
+                onClick={() => setShowBackConfirm(false)}
+                className="flex-1 bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
+    </div> 
   )
 }

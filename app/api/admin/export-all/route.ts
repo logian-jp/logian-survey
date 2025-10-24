@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/admin-auth'
+import { recordDataUsage } from '@/lib/plan-limits'
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -40,6 +41,10 @@ export async function GET(request: NextRequest) {
     
     // CSVデータを生成
     const csvData = generateAllSurveysCSV(surveys, format, includePersonalData)
+    
+    // データ使用量を記録（エクスポート時）
+    const exportDataSize = csvData.length
+    await recordDataUsage('admin', null, 'export_data', exportDataSize, `全データエクスポート（${format}形式）`)
     
     // ファイル名を生成
     const timestamp = new Date().toISOString().split('T')[0]

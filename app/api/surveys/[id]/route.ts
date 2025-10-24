@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { canViewSurvey, canEditSurvey } from '@/lib/survey-permissions'
+import { getPlanLimits } from '@/lib/plan-limits'
 
 export async function GET(
   request: NextRequest,
@@ -135,12 +136,25 @@ export async function PUT(
       )
     }
 
+    // 無料チケットのYouTube埋め込み禁止（iframe除去）
+    let sanitizedDescription = description
+    try {
+      const surveyTicketType = existingSurvey.ticketType || 'FREE'
+      const { canUseVideoEmbedding } = await import('@/lib/ticket-check')
+      const canEmbed = canUseVideoEmbedding(surveyTicketType)
+      if (!canEmbed && typeof sanitizedDescription === 'string' && sanitizedDescription.includes('<iframe')) {
+        sanitizedDescription = sanitizedDescription.replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+      }
+    } catch (e) {
+      // 失敗時はそのまま
+    }
+
     // アンケートを更新
     const updatedSurvey = await prisma.survey.update({
       where: { id: surveyId },
       data: {
         ...(title && { title }),
-        ...(description !== undefined && { description }),
+        ...(description !== undefined && { description: sanitizedDescription }),
         ...(status && { status }),
         maxResponses: maxResponses !== undefined ? maxResponses : null,
         endDate: endDate !== undefined ? endDate : null,

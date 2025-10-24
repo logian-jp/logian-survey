@@ -109,11 +109,11 @@ export default function Header() {
                         設定
                       </Link>
                       <Link
-                        href="/plans"
+                        href="/tickets"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         role="menuitem"
                       >
-                        プラン
+                        チケット
                       </Link>
                       <button
                         onClick={() => signOut()}

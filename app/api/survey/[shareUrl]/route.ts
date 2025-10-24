@@ -34,6 +34,14 @@ export async function GET(
       )
     }
 
+    // 募集期間の期限切れチェック（公開ページでもブロック）
+    if ((survey as any).endDate && new Date() > new Date((survey as any).endDate)) {
+      return NextResponse.json(
+        { message: 'This survey is closed for new responses' },
+        { status: 403 }
+      )
+    }
+
     // 質問のオプションをパース
     const questionsWithParsedOptions = survey.questions.map(question => ({
       ...question,

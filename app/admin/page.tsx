@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
+import UserCountChart from '@/components/UserCountChart'
+import AdminDataUsageChart from '@/components/AdminDataUsageChart'
 
 interface AdminStats {
   overview: {
@@ -104,11 +106,38 @@ interface AnalyticsData {
   calculatedAt: string
 }
 
+interface TicketStats {
+  ticketStats: Array<{
+    ticketType: string
+    ticketName: string
+    purchased: number
+    total: number
+    used: number
+    remaining: number
+    usageRate: number
+    revenue: number
+  }>
+  monthlyRevenue: Array<{
+    date: string
+    revenue: number
+  }>
+  totalRevenue: number
+  totalTickets: number
+  totalUsedTickets: number
+  overallUsageRate: number
+  period: {
+    days: number
+    startDate: string
+    endDate: string
+  }
+}
+
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [ticketStats, setTicketStats] = useState<TicketStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
   const [selectedFormat, setSelectedFormat] = useState<'raw' | 'normalized' | 'standardized'>('raw')
@@ -128,9 +157,9 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const [statsResponse, analyticsResponse] = await Promise.all([
+      const [statsResponse, ticketStatsResponse] = await Promise.all([
         fetch('/api/admin/stats'),
-        fetch('/api/admin/analytics')
+        fetch('/api/admin/ticket-stats')
       ])
       
       if (statsResponse.ok) {
@@ -142,9 +171,19 @@ export default function AdminDashboard() {
         return
       }
       
-      if (analyticsResponse.ok) {
-        const analyticsData = await analyticsResponse.json()
-        setAnalytics(analyticsData.data)
+      // analyticsResponse を一時的に無効化
+      // if (analyticsResponse.ok) {
+      //   const analyticsData = await analyticsResponse.json()
+      //   setAnalytics(analyticsData.data)
+      // }
+
+      if (ticketStatsResponse.ok) {
+        const ticketStatsData = await ticketStatsResponse.json()
+        console.log('Ticket stats data received:', ticketStatsData)
+        setTicketStats(ticketStatsData)
+      } else {
+        const errorData = await ticketStatsResponse.json().catch(() => ({}))
+        console.error('Failed to fetch ticket stats:', ticketStatsResponse.status, ticketStatsResponse.statusText, errorData)
       }
     } catch (error) {
       console.error('Failed to fetch admin data:', error)
@@ -276,6 +315,18 @@ export default function AdminDashboard() {
                   お知らせ管理
                 </Link>
                 <Link
+                  href="/admin/data-addons"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors text-sm"
+                >
+                  データアドオン管理
+                </Link>
+                <Link
+                  href="/admin/purchases"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-sm"
+                >
+                  購入履歴管理
+                </Link>
+                <Link
                   href="/dashboard"
                   className="text-sm text-gray-600 hover:text-gray-900"
                 >
@@ -287,6 +338,107 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* チケット統計 */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">チケット統計</h2>
+          {ticketStats ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* チケット使用率 */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">チケット使用率</h3>
+                <div className="space-y-4">
+                  {ticketStats.ticketStats.map((ticket) => (
+                    <div key={ticket.ticketType} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium text-gray-900">{ticket.ticketName}</span>
+                        <span className="text-sm text-gray-500">
+                          {ticket.usageRate.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(ticket.usageRate, 100)}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex justify-between text-sm text-gray-600 mt-2">
+                        <span>使用済み: {ticket.used}枚</span>
+                        <span>残り: {ticket.remaining}枚</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-gray-600 mt-1">
+                        <span>発行枚数: {ticket.total}枚</span>
+                        <span>購入: {ticket.purchased}回</span>
+                      </div>
+                      {ticket.revenue > 0 && (
+                        <div className="text-sm text-green-600 mt-1">
+                          売上: ¥{ticket.revenue.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-gray-900">全体使用率</span>
+                    <span className="text-lg font-semibold text-blue-600">
+                      {ticketStats.overallUsageRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    総発行枚数: {ticketStats.totalTickets}枚 / 使用済み: {ticketStats.totalUsedTickets}枚
+                  </div>
+                </div>
+              </div>
+
+              {/* チケット売上推移 */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">チケット売上推移</h3>
+                <div className="mb-4">
+                  <div className="text-2xl font-bold text-gray-900">
+                    ¥{ticketStats.totalRevenue.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    過去{ticketStats.period.days}日間の売上
+                  </div>
+                  {ticketStats.totalRevenue === 0 && (
+                    <div className="text-sm text-orange-600 mt-2">
+                      ※ まだチケットの購入がありません
+                    </div>
+                  )}
+                </div>
+                <ResponsiveContainer width="100%" height={200} minWidth={300} minHeight={200}>
+                  <LineChart data={ticketStats.monthlyRevenue}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(value) => new Date(value).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
+                    />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value) => [`¥${(value ?? 0).toLocaleString()}`, '売上']}
+                      labelFormatter={(value) => new Date(value).toLocaleDateString('ja-JP')}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="revenue" 
+                      stroke="#10B981" 
+                      strokeWidth={2}
+                      dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="text-center text-gray-500">
+                <p>チケット統計データを読み込み中...</p>
+                <p className="text-sm mt-2">データが表示されない場合は、ブラウザのコンソールでエラーを確認してください。</p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 経営KPI */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">経営KPI</h2>
@@ -482,42 +634,10 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ユーザー成長推移 */}
-        {analytics && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">ユーザー成長推移</h2>
-            <div className="bg-white shadow rounded-lg p-6">
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={analytics.userGrowthData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      `${value}人`, 
-                      name === 'newUsers' ? '新規ユーザー' : '累計ユーザー'
-                    ]}
-                  />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="newUsers" 
-                    stroke="#3B82F6" 
-                    strokeWidth={2}
-                    name="新規ユーザー"
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="totalUsers" 
-                    stroke="#10B981" 
-                    strokeWidth={2}
-                    name="累計ユーザー"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
+        {/* ユーザー数推移 */}
+        <div className="mb-8">
+          <UserCountChart />
+        </div>
 
         {/* 解約リスクユーザー */}
         {analytics && analytics.churnRiskUsers.length > 0 && (
@@ -605,6 +725,12 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+
+        {/* データ使用量 */}
+        <div className="mb-8">
+          <AdminDataUsageChart />
+        </div>
+
 
         {/* 最近のユーザー */}
         <div className="mb-8 bg-white shadow-sm rounded-lg">

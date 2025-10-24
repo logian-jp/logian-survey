@@ -18,27 +18,20 @@ export default function SignIn() {
     setError('')
 
     try {
-      console.log('Attempting login with:', { email, password: '***' })
       const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
       })
-
-      console.log('SignIn result:', result)
       
       if (result?.error) {
         console.error('Login error:', result.error)
         setError('ログインに失敗しました: ' + result.error)
       } else if (result?.ok) {
         console.log('Login successful, redirecting to dashboard')
-        // セッションを確認してからリダイレクト
-        const session = await getSession()
-        console.log('Current session:', session)
         router.push('/dashboard')
-        router.refresh() // ページを強制リフレッシュ
+        router.refresh()
       } else {
-        console.log('Login result was neither error nor ok:', result)
         setError('ログインに失敗しました')
       }
     } catch (error) {
@@ -51,7 +44,14 @@ export default function SignIn() {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true)
-    await signIn('google', { callbackUrl: '/dashboard' })
+    try {
+      await signIn('google', { callbackUrl: '/dashboard' })
+    } catch (error) {
+      console.error('Google sign in error:', error)
+      setError('Googleログインに失敗しました')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

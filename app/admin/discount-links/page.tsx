@@ -12,7 +12,7 @@ interface DiscountLink {
   description?: string
   discountType: 'PERCENTAGE' | 'FIXED_AMOUNT'
   discountValue: number
-  targetPlanType: string
+  targetTicketType: string
   originalPrice: number
   discountedPrice: number
   maxUses?: number
@@ -40,20 +40,18 @@ interface DiscountLink {
   }>
 }
 
-const planNames: Record<string, string> = {
-  FREE: '基本プラン',
-  ONETIME_UNLIMITED: '単発無制限プラン',
-  STANDARD: 'スタンダードプラン',
-  PROFESSIONAL: 'プロフェッショナルプラン',
-  ENTERPRISE: 'エンタープライズプラン'
+const ticketNames: Record<string, string> = {
+  FREE: '無料チケット',
+  STANDARD: 'スタンダードチケット',
+  PROFESSIONAL: 'プロフェッショナルチケット',
+  ENTERPRISE: 'エンタープライズチケット'
 }
 
-const planPrices: Record<string, number> = {
+const ticketPrices: Record<string, number> = {
   FREE: 0,
-  ONETIME_UNLIMITED: 10000,
   STANDARD: 2980,
-  PROFESSIONAL: 9800,
-  ENTERPRISE: 29800
+  PROFESSIONAL: 10000,
+  ENTERPRISE: 50000
 }
 
 export default function DiscountLinksPage() {
@@ -68,7 +66,7 @@ export default function DiscountLinksPage() {
     description: '',
     discountType: 'PERCENTAGE' as 'PERCENTAGE' | 'FIXED_AMOUNT',
     discountValue: 0,
-    targetPlanType: 'STANDARD' as string,
+    targetTicketType: 'STANDARD' as string,
     maxUses: null as number | null,
     validFrom: '',
     validUntil: '',
@@ -123,11 +121,11 @@ export default function DiscountLinksPage() {
 
   // サブスクリプション割引の計算
   const calculateSubscriptionDiscount = () => {
-    if (!newLink.subscriptionDiscountMonths || newLink.targetPlanType === 'FREE' || newLink.targetPlanType === 'ONETIME_UNLIMITED') {
+    if (!newLink.subscriptionDiscountMonths || newLink.targetTicketType === 'FREE') {
       return null
     }
     
-    const monthlyPrice = planPrices[newLink.targetPlanType]
+    const monthlyPrice = ticketPrices[newLink.targetTicketType]
     const totalMonths = newLink.subscriptionDiscountMonths
     const originalTotal = monthlyPrice * totalMonths
     
@@ -169,7 +167,7 @@ export default function DiscountLinksPage() {
           description: '',
           discountType: 'PERCENTAGE',
           discountValue: 0,
-          targetPlanType: 'STANDARD',
+          targetTicketType: 'STANDARD',
           maxUses: null,
           validFrom: '',
           validUntil: '',
@@ -341,16 +339,16 @@ export default function DiscountLinksPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    対象プラン
+                    対象チケット
                   </label>
                   <select
-                    value={newLink.targetPlanType}
-                    onChange={(e) => setNewLink({ ...newLink, targetPlanType: e.target.value })}
+                    value={newLink.targetTicketType}
+                    onChange={(e) => setNewLink({ ...newLink, targetTicketType: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                   >
-                    {Object.entries(planNames).map(([key, name]) => (
+                    {Object.entries(ticketNames).map(([key, name]) => (
                       <option key={key} value={key}>
-                        {name} (¥{planPrices[key].toLocaleString()})
+                        {name} (¥{ticketPrices[key].toLocaleString()})
                       </option>
                     ))}
                   </select>
@@ -453,7 +451,7 @@ export default function DiscountLinksPage() {
               </div>
               
               {/* 割引計算プレビュー */}
-              {newLink.targetPlanType !== 'FREE' && newLink.targetPlanType !== 'ONETIME_UNLIMITED' && newLink.subscriptionDiscountMonths && (
+              {newLink.targetTicketType !== 'FREE' && newLink.subscriptionDiscountMonths && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                   <h4 className="text-sm font-medium text-blue-900 mb-2">割引計算プレビュー</h4>
                   {(() => {
@@ -467,7 +465,7 @@ export default function DiscountLinksPage() {
                             <span className="font-medium">期間:</span> {newLink.subscriptionDiscountMonths}ヶ月
                           </div>
                           <div>
-                            <span className="font-medium">月額料金:</span> ¥{planPrices[newLink.targetPlanType].toLocaleString()}
+                            <span className="font-medium">月額料金:</span> ¥{ticketPrices[newLink.targetTicketType].toLocaleString()}
                           </div>
                           <div>
                             <span className="font-medium">通常料金合計:</span> ¥{discount.originalTotal.toLocaleString()}
@@ -580,7 +578,7 @@ export default function DiscountLinksPage() {
                       </code>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {planNames[link.targetPlanType]}
+                      {ticketNames[link.targetTicketType]}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div>

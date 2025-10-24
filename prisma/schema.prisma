@@ -52,8 +52,12 @@ model User {
   surveys                Survey[]
   invitedSurveys         SurveyUser[]           @relation("SurveyInviter")
   surveyUsers            SurveyUser[]
-  userPlan               UserPlan?
   usedDiscountLinks      DiscountLink[]         @relation("DiscountLinkUsers")
+  dataUsage              DataUsage[]
+  dataAddons             UserDataAddon[]
+  notifications          Notification[]
+  ticketPurchases        TicketPurchase[]
+  tickets                UserTicket[]
 }
 
 model VerificationToken {
@@ -73,19 +77,26 @@ model Survey {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   maxResponses    Int?
-  endDate         DateTime?
+  endDate         DateTime?    // 回答募集の期限
   targetResponses Int?
   userId          String
+  
+  // アンケート単位のチケット設定
+  ticketType      TicketType   @default(FREE)  // このアンケートのチケット
+  surveyEndDate   DateTime?    // アンケート終了日（回答募集終了後）
+  dataRetentionDays Int?       // データ保存期間（日数）
   
   // エンタープライズプラン用のカスタマイズ機能
   headerImageUrl  String?      // オリジナルヘッダー画像
   ogImageUrl      String?      // Open Graph用アイキャッチ画像
   useCustomLogo   Boolean?     // オリジナルロゴを使用するかどうか
+  customDomain    String?      // カスタムドメイン
   
   questions       Question[]
   responses       Response[]
   user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   surveyUsers     SurveyUser[]
+  ticketPurchases TicketPurchase[]
 }
 
 model SurveyUser {
@@ -175,17 +186,6 @@ model QuestionTemplate {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model UserPlan {
-  id        String     @id @default(cuid())
-  userId    String     @unique
-  planType  PlanType   @default(FREE)
-  status    PlanStatus @default(ACTIVE)
-  startDate DateTime   @default(now())
-  endDate   DateTime?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
 
 model DiscountLink {
   id                         String       @id @default(cuid())
@@ -194,7 +194,7 @@ model DiscountLink {
   description                String?
   discountType               DiscountType @default(PERCENTAGE)
   discountValue              Float
-  targetPlanType             PlanType
+  targetTicketType           TicketType
   originalPrice              Float
   discountedPrice            Float
   maxUses                    Int?
@@ -212,17 +212,19 @@ model DiscountLink {
 }
 
 model PlanConfig {
-  id          String   @id @default(cuid())
-  planType    String   @unique
-  name        String
-  description String?
-  price       Float
-  features    Json
-  limits      Json
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  planType        String   @unique
+  name            String
+  description     String?
+  price           Float
+  features        Json
+  limits          Json
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  stripeProductId String?
+  stripePriceId   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Announcement {
@@ -255,6 +257,57 @@ model AnnouncementDelivery {
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([announcementId, userId])
+}
+
+model DataUsage {
+  id          String   @id @default(cuid())
+  userId      String
+  surveyId   String?
+  dataType    String   // 'survey_data', 'file_upload', 'export_data'
+  sizeBytes   Int      // データサイズ（バイト）
+  description String?  // データの説明
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DataStorageAddon {
+  id                String   @id @default(cuid())
+  name              String   // 例: "100MB容量追加"
+  description       String?  // 説明
+  type              String   // 'storage' または 'retention'
+  amount            Int      // 容量の場合: MB数、保存期間の場合: 日数
+  price             Int      // 価格（円）
+  stripeProductId   String?  // Stripe商品ID
+  stripePriceId     String?  // Stripe価格ID
+  isActive          Boolean  @default(true)
+  isMonthly         Boolean  @default(false) // 月額かどうか（保存期間延長は買い切り）
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  userPurchases     UserDataAddon[]
+}
+
+model UserDataAddon {
+  id                String           @id @default(cuid())
+  userId            String
+  addonId           String
+  status            AddonStatus      @default(ACTIVE)
+  purchasedAt       DateTime         @default(now())
+  expiresAt         DateTime?        // 月額の場合のみ設定
+  stripeSubscriptionId String?       // 月額の場合のStripeサブスクリプションID
+  stripePaymentIntentId String?      // 買い切りの場合のStripe支払いID
+  surveyId          String?          // 保存期間延長の場合の対象アンケートID
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addon             DataStorageAddon @relation(fields: [addonId], references: [id], onDelete: Cascade)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([userId, addonId, status])
+}
+
+enum AddonStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
 }
 
 enum UserRole {
@@ -294,7 +347,7 @@ enum QuestionType {
   PAGE_BREAK
 }
 
-enum PlanType {
+enum TicketType {
   FREE
   STANDARD
   PROFESSIONAL
@@ -302,11 +355,6 @@ enum PlanType {
   ONETIME_UNLIMITED
 }
 
-enum PlanStatus {
-  ACTIVE
-  CANCELLED
-  EXPIRED
-}
 
 enum DiscountType {
   PERCENTAGE
@@ -333,3 +381,71 @@ enum DeliveryStatus {
   READ
   HIDDEN
 }
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      String?  // JSON string for additional data
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationType {
+  SURVEY_RESPONSE
+  ADDON_PURCHASED
+  PLAN_UPDATED
+  SYSTEM_ANNOUNCEMENT
+}
+
+enum PurchaseStatus {
+  ACTIVE
+  CANCELLED
+  REFUNDED
+}
+
+// チケット購入記録（アンケート単位の買い切りチケットの記録）
+model TicketPurchase {
+  id                 String    @id @default(cuid())
+  userId             String
+  surveyId           String?
+  ticketType         TicketType
+  amount             Int?      // 金額（最小単位, JPYなら円）
+  currency           String?   // 例: 'jpy'
+  checkoutSessionId  String?   @unique
+  paymentIntentId    String?   @unique
+  metadata           Json?
+  status             PurchaseStatus @default(ACTIVE)
+  purchasedAt        DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  survey             Survey?   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([surveyId])
+}
+
+// チケット管理（ユーザーが持つチケットの数）
+model UserTicket {
+  id        String     @id @default(cuid())
+  userId    String
+  ticketType TicketType
+  totalTickets Int      // 購入した総チケット数
+  usedTickets  Int      @default(0) // 使用済みチケット数
+  remainingTickets Int  // 残りチケット数（計算フィールド）
+  purchasedAt DateTime @default(now())
+  expiresAt  DateTime? // チケットの有効期限（null = 永続）
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([ticketType])
+}
+

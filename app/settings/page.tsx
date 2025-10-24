@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import StripePortal from '@/components/StripePortal'
+import DataUsageChart from '@/components/DataUsageChart'
+import DataAddonPurchase from '@/components/DataAddonPurchase'
 
 interface UserPlan {
   id: string
@@ -27,6 +30,7 @@ export default function Settings() {
   const router = useRouter()
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [planSlots, setPlanSlots] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [customLogo, setCustomLogo] = useState<string | null>(null)
@@ -39,21 +43,14 @@ export default function Settings() {
       fetchUserPlan()
       fetchCustomLogo()
       fetchUserProfile()
+      fetchPlanSlots()
     }
   }, [session])
 
   const fetchUserPlan = async () => {
-    try {
-      const response = await fetch('/api/user/plan')
-      if (response.ok) {
-        const data = await response.json()
-        setUserPlan(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch user plan:', error)
-    } finally {
-      setIsLoading(false)
-    }
+    // チケットシステムに移行したため、プラン情報は不要
+    setUserPlan({ planType: 'FREE' })
+    setIsLoading(false)
   }
 
   const fetchCustomLogo = async () => {
@@ -77,6 +74,18 @@ export default function Settings() {
       }
     } catch (error) {
       console.error('Failed to fetch user profile:', error)
+    }
+  }
+
+  const fetchPlanSlots = async () => {
+    try {
+      const response = await fetch('/api/user/tickets')
+      if (response.ok) {
+        const data = await response.json()
+        setPlanSlots(data.tickets || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch tickets:', error)
     }
   }
 
@@ -273,6 +282,52 @@ export default function Settings() {
             </form>
           </div>
 
+          {/* チケット数表示 */}
+          <div className="mb-8">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">チケット数</h2>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 無料チケットを常に表示 */}
+                <div className="bg-white rounded-lg p-4 border">
+                  <div className="text-sm font-medium text-gray-600 mb-2">
+                    無料チケット
+                  </div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    3
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    残りチケット数 / 3枚
+                  </div>
+                </div>
+                
+                {/* 有料チケット */}
+                {planSlots.filter(slot => slot.ticketType !== 'FREE').map((slot) => (
+                  <div key={slot.ticketType} className="bg-white rounded-lg p-4 border">
+                    <div className="text-sm font-medium text-gray-600 mb-2">
+                      {slot.ticketType === 'STANDARD' && 'スタンダードチケット'}
+                      {slot.ticketType === 'PROFESSIONAL' && 'プロフェッショナルチケット'}
+                      {slot.ticketType === 'ENTERPRISE' && 'エンタープライズチケット'}
+                    </div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {slot.remainingTickets}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      残りチケット数 / {slot.totalTickets}枚
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 text-center">
+                <a
+                  href="/tickets"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  チケットを購入する
+                </a>
+              </div>
+            </div>
+          </div>
+
           {/* エンタープライズプラン用のロゴ設定 */}
           {userPlan?.planType === 'ENTERPRISE' && (
             <div className="mb-8">
@@ -321,55 +376,59 @@ export default function Settings() {
             </div>
           )}
 
-          {/* プラン情報 */}
-          <div className="border-t pt-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">プラン情報</h2>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">プラン:</span>
-                  <span className="ml-2 font-medium">
-                    {userPlan?.planType === 'FREE' && 'フリープラン'}
-                    {userPlan?.planType === 'BASIC' && 'ベーシックプラン'}
-                    {userPlan?.planType === 'PROFESSIONAL' && 'プロフェッショナルプラン'}
-                    {userPlan?.planType === 'ENTERPRISE' && 'エンタープライズプラン'}
-                    {!userPlan?.planType && 'フリープラン'}
-                  </span>
+
+          {/* データ使用量 */}
+          {session?.user?.id && (
+            <div className="mb-8">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">データ使用量</h2>
+              <DataUsageChart 
+                userId={session.user.id}
+                planType={userPlan?.planType || 'FREE'}
+                maxDataSizeMB={userPlan?.planType === 'FREE' ? 100 : 
+                              userPlan?.planType === 'BASIC' ? 500 :
+                              userPlan?.planType === 'STANDARD' ? 2000 : -1}
+              />
+            </div>
+          )}
+
+          {/* データアドオン */}
+          {session?.user?.id && (
+            <div className="mb-8">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">データアドオン</h2>
+              <div className="bg-white rounded-lg shadow p-6">
+                <p className="text-gray-600 mb-4">容量追加や保存期間延長のアドオンを購入できます。</p>
+                <div className="space-y-4">
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">容量追加</h3>
+                    <p className="text-sm text-gray-600 mb-3">データ保存容量を追加します</p>
+                    <div className="text-2xl font-bold text-gray-900 mb-3">月額120円〜</div>
+                    <button 
+                      onClick={() => router.push('/data-addons?type=storage')}
+                      className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      容量追加を購入
+                    </button>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">保存期間延長</h3>
+                    <p className="text-sm text-gray-600 mb-3">データの保存期間を延長します</p>
+                    <div className="text-2xl font-bold text-gray-900 mb-3">500円〜</div>
+                    <button 
+                      onClick={() => router.push('/data-addons?type=retention')}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      保存期間延長を購入
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-600">最大アンケート数:</span>
-                  <span className="ml-2 font-medium">{userPlan?.maxSurveys || '無制限'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">最大回答数:</span>
-                  <span className="ml-2 font-medium">{userPlan?.maxResponses || '無制限'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">動画埋め込み:</span>
-                  <span className="ml-2 font-medium">{userPlan?.canUseVideoEmbedding ? '利用可能' : '利用不可'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">位置情報取得:</span>
-                  <span className="ml-2 font-medium">{userPlan?.canUseLocationTracking ? '利用可能' : '利用不可'}</span>
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    💡 容量追加や保存期間延長の詳細な商品一覧と価格は、購入ボタンをクリックしてご確認ください。
+                  </p>
                 </div>
               </div>
             </div>
-            
-            {userPlan?.planType === 'FREE' && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="text-sm font-medium text-blue-900 mb-2">プランアップグレード</h3>
-                <p className="text-sm text-blue-700 mb-3">
-                  より多くの機能をご利用いただくには、プランのアップグレードをお勧めします。
-                </p>
-                <button
-                  onClick={() => router.push('/plans')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
-                >
-                  プランを確認する
-                </button>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* アカウント管理 */}
           <div className="border-t pt-6">

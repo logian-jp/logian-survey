@@ -82,6 +82,20 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = user.role
         console.log('JWT: Added role to token:', user.role)
+      } else if (token?.sub) {
+        // 既存のトークンからユーザー情報を取得
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.sub },
+            select: { role: true }
+          })
+          if (dbUser) {
+            token.role = dbUser.role
+            console.log('JWT: Updated role from database:', dbUser.role)
+          }
+        } catch (error) {
+          console.error('JWT: Error fetching user role:', error)
+        }
       }
       return token
     },

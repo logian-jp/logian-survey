@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { PLAN_LIMITS } from '@/lib/plan-limits'
+import StripeCheckout from '@/components/StripeCheckout'
 
 interface UserPlan {
   id: string
@@ -28,10 +29,13 @@ export default function PlansPage() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null)
   const [planConfigs, setPlanConfigs] = useState<PlanConfig[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [surveys, setSurveys] = useState<any[]>([])
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('')
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchUserPlan()
+      fetchUserSurveys()
     }
     fetchPlanConfigs()
   }, [session])
@@ -62,20 +66,85 @@ export default function PlansPage() {
     }
   }
 
-  // データベースから取得したプラン設定を使用
-  const plans = planConfigs.map(config => ({
-    id: config.planType,
-    name: config.name,
-    price: config.price,
-    description: config.planType === 'FREE' ? '個人利用に最適' :
-                 config.planType === 'ONETIME_UNLIMITED' ? '1回限り・全機能開放' :
-                 config.planType === 'STANDARD' ? '中小企業に最適' :
-                 config.planType === 'PROFESSIONAL' ? '本格的な分析が必要な場合' :
-                 '大企業・組織向け',
-    features: config.features,
-    limits: config.limits,
-    popular: config.planType === 'ONETIME_UNLIMITED'
-  }))
+  const fetchUserSurveys = async () => {
+    try {
+      const res = await fetch('/api/surveys')
+      if (res.ok) {
+        const data = await res.json()
+        // 所有アンケートのみを優先して表示（なければ全アクセス可能なもの）
+        const owned = data.filter((s: any) => s.userPermission === 'OWNER')
+        setSurveys(owned.length > 0 ? owned : data)
+        if ((owned.length > 0 ? owned : data).length > 0) {
+          setSelectedSurveyId((owned.length > 0 ? owned : data)[0].id)
+        }
+      }
+    } catch (e) {
+      // 無視（UIのみの補助機能）
+    }
+  }
+
+  // 新しい単発プラン構造
+  const plans = [
+    {
+      id: 'FREE',
+      name: '無料プラン',
+      price: 0,
+      description: '個人利用に最適',
+      features: [
+        'アンケート作成: 3件',
+        '各アンケート回答上限: 100件',
+        '回答募集期間: 最大30日間',
+        'データ保存期間: 90日間',
+        'YouTube埋め込み不可',
+        '正規化・標準化エクスポートなし'
+      ],
+      limits: { maxResponses: 100, surveyDurationDays: 30, dataRetentionDays: 90 },
+      popular: false
+    },
+    {
+      id: 'STANDARD',
+      name: 'スタンダードプラン',
+      price: 2980,
+      description: '小規模〜中規模調査に最適',
+      features: [
+        '1つのアンケート回答上限: 300件',
+        '回答募集期間: 最大90日間',
+        'データ保存期間: 90日間'
+      ],
+      limits: { maxResponses: 300, surveyDurationDays: 90, dataRetentionDays: 90 },
+      popular: true
+    },
+    {
+      id: 'PROFESSIONAL',
+      name: 'プロフェッショナルプラン',
+      price: 10000,
+      description: '本格的な調査に最適',
+      features: [
+        '1つのアンケート回答上限: 1000件',
+        '回答募集期間: 最大180日',
+        'データ保存期間: 180日',
+        'Webhook/API連携可能'
+      ],
+      limits: { maxResponses: 1000, surveyDurationDays: 180, dataRetentionDays: 180 },
+      popular: false
+    },
+    {
+      id: 'ENTERPRISE',
+      name: 'エンタープライズプラン',
+      price: 50000,
+      description: '大規模調査・エンタープライズ向け',
+      features: [
+        '1つのアンケート回答上限: 無制限',
+        '回答募集期間: 最大180日',
+        'データ保存期間: 360日',
+        'Webhook/API連携可能',
+        'PayPayポイント施策の構築（別途セットアップ費）',
+        'API発行・報酬履歴ログ出力'
+      ],
+      limits: { maxResponses: -1, surveyDurationDays: 180, dataRetentionDays: 360 },
+      popular: false
+    }
+  ]
 
   if (isLoading) {
     return (
@@ -154,7 +223,7 @@ export default function PlansPage() {
                   <span className="text-4xl font-bold text-gray-900">
                     ¥{plan.price.toLocaleString()}
                   </span>
-                  <span className="text-gray-600">/月</span>
+                  {plan.price > 0 && <span className="text-gray-600">/回</span>}
                 </div>
 
                 <ul className="space-y-3 mb-8 text-left">
@@ -168,6 +237,22 @@ export default function PlansPage() {
                   ))}
                 </ul>
 
+                {plan.price > 0 && surveys.length > 0 && (
+                  <div className="mb-4 text-left">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">対象アンケート</label>
+                    <select
+                      value={selectedSurveyId}
+                      onChange={(e) => setSelectedSurveyId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                    >
+                      {surveys.map((s) => (
+                        <option key={s.id} value={s.id}>{s.title}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">この購入を適用するアンケートを選択してください。</p>
+                  </div>
+                )}
+
                 {userPlan?.planType === plan.id ? (
                   <button
                     disabled
@@ -175,17 +260,28 @@ export default function PlansPage() {
                   >
                     現在のプラン
                   </button>
-                ) : (
+                ) : plan.price === 0 ? (
                   <Link
                     href={`/plans/upgrade?plan=${plan.id}`}
-                    className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
-                      plan.popular
-                        ? 'bg-primary text-white hover:bg-primary/90'
-                        : 'bg-gray-900 text-white hover:bg-gray-800'
-                    }`}
+                    className="w-full py-3 px-6 rounded-lg font-medium transition-colors bg-gray-900 text-white hover:bg-gray-800"
                   >
-                    {plan.price === 0 ? '無料で開始' : 'プランを選択'}
+                    無料で開始
                   </Link>
+                ) : (
+                  <StripeCheckout
+                    planType={plan.id}
+                    planName={plan.name}
+                    price={plan.price}
+                    surveyId={selectedSurveyId || undefined}
+                    onSuccess={() => {
+                      // 成功時の処理
+                      fetchUserPlan()
+                    }}
+                    onError={(error) => {
+                      console.error('Payment error:', error)
+                      alert(`決済エラー: ${error}`)
+                    }}
+                  />
                 )}
               </div>
             </div>

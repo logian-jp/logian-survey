@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { PLAN_LIMITS } from '@/lib/plan-limits'
+import { TICKET_LIMITS } from '@/lib/ticket-check'
 
 export async function GET() {
   try {
@@ -25,11 +25,7 @@ export async function GET() {
     try {
       const discountLinks = await prisma.discountLink.findMany({
         include: {
-          users: {
-            include: {
-              userPlan: true
-            }
-          },
+          users: true,
           creator: {
             select: {
               id: true,
@@ -98,7 +94,7 @@ export async function POST(request: NextRequest) {
         description,
         discountType,
         discountValue,
-        targetPlanType,
+        targetTicketType,
         maxUses,
         validFrom,
         validUntil,
@@ -107,17 +103,17 @@ export async function POST(request: NextRequest) {
       } = await request.json()
 
     // バリデーション
-    if (!name || !code || !discountType || !discountValue || !targetPlanType || !validFrom || !validUntil) {
+    if (!name || !code || !discountType || !discountValue || !targetTicketType || !validFrom || !validUntil) {
       return NextResponse.json(
         { message: 'Required fields are missing' },
         { status: 400 }
       )
     }
 
-    // プランが存在するかチェック
-    if (!PLAN_LIMITS[targetPlanType]) {
+    // チケットタイプが存在するかチェック
+    if (!TICKET_LIMITS[targetTicketType as keyof typeof TICKET_LIMITS]) {
       return NextResponse.json(
-        { message: 'Invalid plan type' },
+        { message: 'Invalid ticket type' },
         { status: 400 }
       )
     }
@@ -131,7 +127,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 元の価格を取得
-    const originalPrice = PLAN_LIMITS[targetPlanType].price
+    const originalPrice = TICKET_LIMITS[targetTicketType as keyof typeof TICKET_LIMITS].price
 
     // 割引後価格を計算
     let discountedPrice: number
@@ -168,7 +164,7 @@ export async function POST(request: NextRequest) {
       description,
       discountType,
       discountValue,
-      targetPlanType,
+      targetTicketType,
       originalPrice,
       discountedPrice,
       maxUses,
@@ -185,7 +181,7 @@ export async function POST(request: NextRequest) {
         description,
         discountType,
         discountValue,
-        targetPlanType,
+        targetTicketType,
         originalPrice,
         discountedPrice,
         maxUses: maxUses || null,

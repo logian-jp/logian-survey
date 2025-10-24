@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { canUseVideoEmbedding } from '@/lib/plan-limits'
+import { canUseVideoEmbedding } from '@/lib/ticket-check'
 
 interface RichTextEditorProps {
   value: string
@@ -9,7 +9,7 @@ interface RichTextEditorProps {
   placeholder?: string
   className?: string
   allowVideo?: boolean
-  userPlan?: string
+  ticketType?: string
 }
 
 export default function RichTextEditor({ 
@@ -18,7 +18,7 @@ export default function RichTextEditor({
   placeholder = "説明を入力してください...",
   className = "",
   allowVideo = false,
-  userPlan = 'FREE'
+  ticketType = 'FREE'
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const [isBold, setIsBold] = useState(false)
@@ -395,7 +395,7 @@ export default function RichTextEditor({
 
             {/* 動画埋め込み */}
             <div className="flex items-center gap-1">
-              {canUseVideoEmbedding(userPlan) ? (
+              {canUseVideoEmbedding(ticketType) ? (
                 <ToolbarButton
                   onClick={() => setShowVideoModal(true)}
                   isActive={false}

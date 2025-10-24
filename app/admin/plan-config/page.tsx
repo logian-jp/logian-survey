@@ -19,6 +19,8 @@ interface PlanConfig {
   }
   isActive: boolean
   sortOrder: number
+  stripeProductId?: string
+  stripePriceId?: string
 }
 
 export default function PlanConfigPage() {
@@ -28,6 +30,8 @@ export default function PlanConfigPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingPlan, setEditingPlan] = useState<PlanConfig | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncResults, setSyncResults] = useState<any[]>([])
   const [newPlan, setNewPlan] = useState({
     planType: '',
     name: '',
@@ -181,6 +185,33 @@ export default function PlanConfigPage() {
     }))
   }
 
+  const handleSyncStripe = async () => {
+    setIsSyncing(true)
+    try {
+      const response = await fetch('/api/admin/stripe/sync-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type: 'plans' })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSyncResults(data.results)
+        alert('Stripe商品・価格の同期が完了しました')
+        fetchPlanConfigs() // データを再取得
+      } else {
+        alert('Stripe同期に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error syncing Stripe:', error)
+      alert('Stripe同期中にエラーが発生しました')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -195,6 +226,13 @@ export default function PlanConfigPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">プラン設定管理</h1>
           <div className="flex items-center space-x-4">
+            <button
+              onClick={handleSyncStripe}
+              disabled={isSyncing}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              {isSyncing ? '同期中...' : 'Stripe同期'}
+            </button>
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
               className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
@@ -556,6 +594,47 @@ export default function PlanConfigPage() {
           </div>
         )}
 
+        {/* Stripe同期結果 */}
+        {syncResults.length > 0 && (
+          <div className="bg-white shadow-sm rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Stripe同期結果</h2>
+            <div className="space-y-3">
+              {syncResults.map((result, index) => (
+                <div key={index} className={`p-3 rounded-lg ${
+                  result.status === 'synced' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">{result.name}</div>
+                      <div className="text-sm text-gray-600">{result.planType}</div>
+                    </div>
+                    <div className="text-right">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        result.status === 'synced' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {result.status === 'synced' ? '同期成功' : '同期失敗'}
+                      </span>
+                    </div>
+                  </div>
+                  {result.status === 'synced' && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      <div>商品ID: {result.stripeProductId?.slice(-8)}</div>
+                      <div>価格ID: {result.stripePriceId?.slice(-8)}</div>
+                    </div>
+                  )}
+                  {result.error && (
+                    <div className="mt-2 text-xs text-red-600">
+                      エラー: {result.error}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-white shadow-sm rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -572,6 +651,9 @@ export default function PlanConfigPage() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ステータス
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Stripe連携
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     アクション
@@ -602,6 +684,21 @@ export default function PlanConfigPage() {
                       }`}>
                         {plan.isActive ? '有効' : '無効'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="space-y-1">
+                        {plan.stripeProductId ? (
+                          <>
+                            <div className="text-xs text-green-600">✓ 商品連携済み</div>
+                            <div className="text-xs text-gray-500">ID: {plan.stripeProductId.slice(-8)}</div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-red-600">✗ 未連携</div>
+                        )}
+                        {plan.stripePriceId && (
+                          <div className="text-xs text-gray-500">価格ID: {plan.stripePriceId.slice(-8)}</div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button

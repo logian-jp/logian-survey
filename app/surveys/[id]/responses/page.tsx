@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { PLAN_LIMITS } from '@/lib/plan-limits'
 import LocationMap from '@/components/LocationMap'
+import VariableNameTranslator from '@/components/VariableNameTranslator'
 
 interface Question {
   id: string
@@ -54,7 +55,14 @@ function stripHtmlTags(html: string): string {
   return html.replace(/<[^>]*>/g, '')
 }
 
-function CSVPreviewTable({ csvData }: CSVPreviewTableProps) {
+function CSVPreviewTable({ 
+  csvData, 
+  variableNames, 
+  customHeaders 
+}: CSVPreviewTableProps & { 
+  variableNames: Record<string, string>
+  customHeaders: { responseId: string; responseDate: string }
+}) {
   if (!csvData) {
     return <div className="text-gray-500 text-center py-4">プレビューを生成中...</div>
   }
@@ -95,7 +103,26 @@ function CSVPreviewTable({ csvData }: CSVPreviewTableProps) {
     return result
   }
 
-  const headers = parseCSVLine(lines[0])
+  const originalHeaders = parseCSVLine(lines[0])
+  
+  // カスタムヘッダーを適用（デバッグログ付き）
+  console.log('Original headers:', originalHeaders)
+  console.log('Custom headers:', customHeaders)
+  
+  const headers = originalHeaders.map((header, index) => {
+    if (index === 0) {
+      console.log('Replacing header at index 0:', header, 'with:', customHeaders.responseId)
+      return customHeaders.responseId
+    }
+    if (index === 1) {
+      console.log('Replacing header at index 1:', header, 'with:', customHeaders.responseDate)
+      return customHeaders.responseDate
+    }
+    return header
+  })
+  
+  console.log('Final headers:', headers)
+  
   const dataRows = lines.slice(1).map(line => parseCSVLine(line))
 
   return (
@@ -148,6 +175,7 @@ export default function SurveyResponsesPage() {
   const [error, setError] = useState('')
   const [selectedFormat, setSelectedFormat] = useState<'raw' | 'normalized' | 'standardized'>('raw')
   const [includePersonalData, setIncludePersonalData] = useState(false)
+  const [convertToEnglish, setConvertToEnglish] = useState(false)
   const [csvPreview, setCsvPreview] = useState<string>('')
   const [isLoadingPreview, setIsLoadingPreview] = useState(false)
   const [userPlan, setUserPlan] = useState<any>(null)
@@ -155,11 +183,37 @@ export default function SurveyResponsesPage() {
   const [showMap, setShowMap] = useState(false)
   const [locationData, setLocationData] = useState<any[]>([])
   const [selectedLocation, setSelectedLocation] = useState<any>(null)
+  const [variableNames, setVariableNames] = useState<Record<string, string>>({})
+  const [customHeaders, setCustomHeaders] = useState<{
+    responseId: string
+    responseDate: string
+  }>({
+    responseId: '回答ID',
+    responseDate: '回答日時'
+  })
+  const [purchases, setPurchases] = useState<any[]>([])
+  const [showPurchases, setShowPurchases] = useState(false)
+
+  // convertToEnglishの状態が変わった時にカスタムヘッダーをリセット
+  useEffect(() => {
+    if (convertToEnglish) {
+      setCustomHeaders({
+        responseId: 'response_id',
+        responseDate: 'response_date'
+      })
+    } else {
+      setCustomHeaders({
+        responseId: '回答ID',
+        responseDate: '回答日時'
+      })
+    }
+  }, [convertToEnglish])
 
   useEffect(() => {
     if (session && surveyId) {
       fetchSurveyResponses()
       fetchUserPlan()
+      fetchPurchases()
     }
   }, [session, surveyId])
 
@@ -175,12 +229,43 @@ export default function SurveyResponsesPage() {
     }
   }
 
+  const fetchPurchases = async () => {
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/purchases`)
+      if (response.ok) {
+        const data = await response.json()
+        setPurchases(data.purchases || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch purchases:', error)
+    }
+  }
+
   useEffect(() => {
     if (survey) {
       fetchCSVPreview()
       extractLocationData()
     }
-  }, [survey, selectedFormat, includePersonalData])
+  }, [survey, selectedFormat, includePersonalData, convertToEnglish, customHeaders, variableNames])
+
+  const handleVariableNameChange = (questionId: string, newName: string) => {
+    setVariableNames(prev => ({
+      ...prev,
+      [questionId]: newName
+    }))
+  }
+
+  const handleCustomHeaderChange = (field: 'responseId' | 'responseDate', newName: string) => {
+    console.log('handleCustomHeaderChange called:', field, newName)
+    setCustomHeaders(prev => {
+      const updated = {
+        ...prev,
+        [field]: newName
+      }
+      console.log('Updated customHeaders:', updated)
+      return updated
+    })
+  }
 
   const extractLocationData = () => {
     if (!survey) return
@@ -239,6 +324,18 @@ export default function SurveyResponsesPage() {
       const params = new URLSearchParams({
         format: selectedFormat,
         includePersonalData: includePersonalData.toString(),
+        convertToEnglish: convertToEnglish.toString(),
+        customHeaders: JSON.stringify(customHeaders),
+        variableNames: JSON.stringify(variableNames),
+      })
+      
+      console.log('CSV Preview request params:', {
+        format: selectedFormat,
+        includePersonalData: includePersonalData.toString(),
+        convertToEnglish: convertToEnglish.toString(),
+        customHeaders: customHeaders,
+        variableNames: variableNames,
+        url: `/api/surveys/${surveyId}/export/preview?${params}`
       })
       
       const response = await fetch(`/api/surveys/${surveyId}/export/preview?${params}`)
@@ -270,6 +367,18 @@ export default function SurveyResponsesPage() {
       const params = new URLSearchParams({
         format: selectedFormat,
         includePersonalData: includePersonalData.toString(),
+        convertToEnglish: convertToEnglish.toString(),
+        customHeaders: JSON.stringify(customHeaders),
+        variableNames: JSON.stringify(variableNames),
+      })
+      
+      console.log('CSV Download request params:', {
+        format: selectedFormat,
+        includePersonalData: includePersonalData.toString(),
+        convertToEnglish: convertToEnglish.toString(),
+        customHeaders: JSON.stringify(customHeaders),
+        variableNames: JSON.stringify(variableNames),
+        url: `/api/surveys/${surveyId}/export?${params}`
       })
       
       const url = `/api/surveys/${surveyId}/export?${params}`
@@ -366,6 +475,88 @@ export default function SurveyResponsesPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 購入履歴 */}
+        {purchases.length > 0 && (
+          <div className="mb-8 bg-white shadow-sm rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">購入履歴</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    このアンケートに関連するプラン購入履歴
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPurchases(!showPurchases)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {showPurchases ? '履歴を非表示' : '履歴を表示'}
+                </button>
+              </div>
+            </div>
+            {showPurchases && (
+              <div className="p-6">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          プラン
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          金額
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          ステータス
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          購入日時
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {purchases.map((purchase) => (
+                        <tr key={purchase.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {purchase.planType === 'FREE' && '無料プラン'}
+                            {purchase.planType === 'STANDARD' && 'スタンダードプラン'}
+                            {purchase.planType === 'PROFESSIONAL' && 'プロフェッショナルプラン'}
+                            {purchase.planType === 'ENTERPRISE' && 'エンタープライズプラン'}
+                            {purchase.planType === 'ONETIME_UNLIMITED' && '無制限プラン'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {purchase.amount ? 
+                              new Intl.NumberFormat('ja-JP', {
+                                style: 'currency',
+                                currency: purchase.currency || 'JPY'
+                              }).format(purchase.amount) : '無料'
+                            }
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              purchase.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+                              purchase.status === 'CANCELLED' ? 'bg-gray-100 text-gray-800' :
+                              purchase.status === 'REFUNDED' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {purchase.status === 'ACTIVE' && '有効'}
+                              {purchase.status === 'CANCELLED' && 'キャンセル'}
+                              {purchase.status === 'REFUNDED' && '返金済み'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(purchase.purchasedAt).toLocaleString('ja-JP')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 統計情報 */}
         <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -465,6 +656,18 @@ export default function SurveyResponsesPage() {
                 個人情報を含める
               </label>
             </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="convertToEnglish"
+                checked={convertToEnglish}
+                onChange={(e) => setConvertToEnglish(e.target.checked)}
+                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+              />
+              <label htmlFor="convertToEnglish" className="ml-2 block text-sm text-gray-700">
+                変数名を英語に変換する
+              </label>
+            </div>
             <div className="flex items-end">
               <button
                 onClick={downloadCSV}
@@ -524,7 +727,7 @@ export default function SurveyResponsesPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <CSVPreviewTable csvData={csvPreview} />
+                  <CSVPreviewTable csvData={csvPreview} variableNames={variableNames} customHeaders={customHeaders} />
                 </div>
               )}
             </div>
@@ -583,14 +786,40 @@ export default function SurveyResponsesPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      回答ID
+                      <div className="space-y-2">
+                        <div className="font-semibold">回答ID</div>
+                        <VariableNameTranslator
+                          originalName="回答ID"
+                          onNameChange={(newName) => {
+                            console.log('回答ID VariableNameTranslator onNameChange called:', newName)
+                            handleCustomHeaderChange('responseId', newName)
+                          }}
+                          disabled={convertToEnglish}
+                        />
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      回答日時
+                      <div className="space-y-2">
+                        <div className="font-semibold">回答日時</div>
+                        <VariableNameTranslator
+                          originalName="回答日時"
+                          onNameChange={(newName) => {
+                            console.log('回答日時 VariableNameTranslator onNameChange called:', newName)
+                            handleCustomHeaderChange('responseDate', newName)
+                          }}
+                          disabled={convertToEnglish}
+                        />
+                      </div>
                     </th>
                     {survey.questions.map((question) => (
                       <th key={question.id} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {question.title}
+                        <div className="space-y-2">
+                          <div className="font-semibold">{question.title}</div>
+                          <VariableNameTranslator
+                            originalName={question.title}
+                            onNameChange={(newName) => handleVariableNameChange(question.id, newName)}
+                          />
+                        </div>
                       </th>
                     ))}
                   </tr>
