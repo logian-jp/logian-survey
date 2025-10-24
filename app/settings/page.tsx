@@ -31,6 +31,7 @@ export default function Settings() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [planSlots, setPlanSlots] = useState<any[]>([])
+  const [ticketPurchases, setTicketPurchases] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [customLogo, setCustomLogo] = useState<string | null>(null)
@@ -44,12 +45,20 @@ export default function Settings() {
       fetchCustomLogo()
       fetchUserProfile()
       fetchPlanSlots()
+      fetchTicketPurchases()
     }
   }, [session])
 
   const fetchUserPlan = async () => {
     // チケットシステムに移行したため、プラン情報は不要
-    setUserPlan({ planType: 'FREE' })
+    setUserPlan({ 
+      id: 'free',
+      planType: 'FREE',
+      maxSurveys: 3,
+      maxResponses: 100,
+      canUseVideoEmbedding: false,
+      canUseLocationTracking: false
+    })
     setIsLoading(false)
   }
 
@@ -86,6 +95,18 @@ export default function Settings() {
       }
     } catch (error) {
       console.error('Failed to fetch tickets:', error)
+    }
+  }
+
+  const fetchTicketPurchases = async () => {
+    try {
+      const response = await fetch('/api/user/ticket-purchases')
+      if (response.ok) {
+        const data = await response.json()
+        setTicketPurchases(data.purchases || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch ticket purchases:', error)
     }
   }
 
@@ -327,6 +348,80 @@ export default function Settings() {
               </div>
             </div>
           </div>
+
+          {/* 招待管理 */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium text-gray-900">招待管理</h2>
+              <a
+                href="/invitations"
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                招待管理 →
+              </a>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <div className="text-sm text-gray-600 mb-3">
+                ユーザーを招待して、スタンダードチケットを獲得しましょう！
+              </div>
+              <div className="text-sm text-blue-600">
+                1人招待するごとにスタンダードチケットが1枚付与されます
+              </div>
+            </div>
+          </div>
+
+          {/* チケット購入履歴（一部表示） */}
+          {ticketPurchases.length > 0 && (
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-medium text-gray-900">チケット購入履歴</h2>
+                <a
+                  href="/ticket-history"
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  すべて表示 →
+                </a>
+              </div>
+              <div className="bg-white rounded-lg border">
+                <div className="divide-y divide-gray-200">
+                  {ticketPurchases.slice(0, 3).map((purchase) => (
+                    <div key={purchase.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {purchase.ticketType === 'STANDARD' && 'スタンダードチケット'}
+                            {purchase.ticketType === 'PROFESSIONAL' && 'プロフェッショナルチケット'}
+                            {purchase.ticketType === 'ENTERPRISE' && 'エンタープライズチケット'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {new Date(purchase.createdAt).toLocaleDateString('ja-JP')}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium text-gray-900">
+                            ¥{purchase.amount.toLocaleString()}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {purchase.currency.toUpperCase()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {ticketPurchases.length > 3 && (
+                  <div className="p-4 bg-gray-50 text-center">
+                    <a
+                      href="/ticket-history"
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      他 {ticketPurchases.length - 3} 件の購入履歴を表示
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* エンタープライズプラン用のロゴ設定 */}
           {userPlan?.planType === 'ENTERPRISE' && (

@@ -42,6 +42,11 @@ model User {
   password               String?
   role                   UserRole               @default(USER)
   customLogoUrl          String?                // エンタープライズプラン用のカスタムロゴ
+  // 招待制関連フィールド
+  invitedBy              String?                // 招待者のユーザーID
+  invitationCode         String?                // 招待コード
+  maxInvitations         Int                    @default(3) // 招待可能人数
+  usedInvitations        Int                    @default(0) // 使用済み招待数
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   accounts               Account[]
@@ -58,6 +63,11 @@ model User {
   notifications          Notification[]
   ticketPurchases        TicketPurchase[]
   tickets                UserTicket[]
+  // 招待制関連リレーション
+  inviter                User?                  @relation("UserInviter", fields: [invitedBy], references: [id])
+  invitedUsers           User[]                 @relation("UserInviter")
+  invitations            Invitation[]           @relation("InvitationCreator")
+  receivedInvitation     Invitation?            @relation("InvitationReceiver")
 }
 
 model VerificationToken {
@@ -447,5 +457,31 @@ model UserTicket {
   
   @@index([userId])
   @@index([ticketType])
+}
+
+// 招待制システム
+model Invitation {
+  id                String       @id @default(cuid())
+  code              String       @unique // 招待コード
+  inviterId         String       // 招待者のユーザーID
+  inviterEmail      String       // 招待者のメールアドレス
+  inviterName       String?      // 招待者の名前
+  invitedEmail      String?      // 招待されたメールアドレス（任意）
+  invitedName       String?      // 招待された人の名前（任意）
+  message           String?      // 招待メッセージ
+  isUsed            Boolean      @default(false) // 使用済みかどうか
+  usedAt            DateTime?    // 使用日時
+  usedByUserId      String?      @unique // 使用したユーザーID
+  expiresAt         DateTime?    // 有効期限（null = 永続）
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // リレーション
+  inviter           User         @relation("InvitationCreator", fields: [inviterId], references: [id], onDelete: Cascade)
+  usedByUser        User?        @relation("InvitationReceiver", fields: [usedByUserId], references: [id], onDelete: SetNull)
+  
+  @@index([inviterId])
+  @@index([code])
+  @@index([isUsed])
 }
 
