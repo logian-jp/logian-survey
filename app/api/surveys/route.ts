@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { checkSurveyLimit } from '@/lib/plan-check'
-import { recordDataUsage, getUserMaxDataSize, getUserDataRetentionDays, getPlanLimits } from '@/lib/plan-limits'
+import { recordDataUsage, getUserMaxDataSize, getUserDataRetentionDays } from '@/lib/plan-limits'
+import { getTicketLimits } from '@/lib/ticket-check'
 
 // Supabase クライアントの設定
 const supabase = createClient(
@@ -288,7 +289,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const limits = getPlanLimits(validTicketType)
+    const limits = getTicketLimits(validTicketType)
 
     // 回答上限の丸め（プラン上限を超えない）
     const clampedMaxResponses = (() => {

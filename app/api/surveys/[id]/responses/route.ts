@@ -22,15 +22,14 @@ export async function GET(
 
     const { id: surveyId } = await params
 
-    // アンケートの存在確認と権限チェック
+    // アンケートの存在確認
     let { data: survey, error: surveyError } = await supabase
       .from('Survey')
       .select(`
         *, 
-        questions:Question!inner(*)
+        questions:Question(*)
       `)
       .eq('id', surveyId)
-      .or(`userId.eq.${session.user.id},surveyUsers.userId.eq.${session.user.id}`)
       .single()
 
     if (surveyError && surveyError.code !== 'PGRST116') {

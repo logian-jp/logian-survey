@@ -11,7 +11,7 @@ const supabase = createClient(
 import { convertAgeGroupToNumber, PREFECTURE_REGIONS } from '@/lib/survey-parts'
 import { checkExportFormat } from '@/lib/plan-check'
 import { translateVariableName } from '@/lib/variable-translation'
-import { getPlanLimits } from '@/lib/plan-limits'
+import { getTicketLimits } from '@/lib/ticket-check'
 
 export async function GET(
   request: NextRequest,

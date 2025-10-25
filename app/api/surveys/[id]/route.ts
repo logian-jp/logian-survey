@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { canViewSurvey, canEditSurvey } from '@/lib/survey-permissions'
-import { getPlanLimits } from '@/lib/plan-limits'
+import { getTicketLimits } from '@/lib/ticket-check'
 
 // Supabase クライアントの設定
 const supabase = createClient(
@@ -171,8 +171,7 @@ export async function PUT(
     // 無料チケットの回答上限制限
     let finalMaxResponses = maxResponses
     if (surveyTicketType === 'FREE' && maxResponses !== undefined) {
-      const { getPlanLimits } = await import('@/lib/plan-limits')
-      const limits = getPlanLimits('FREE')
+      const limits = getTicketLimits('FREE')
       if (limits.maxResponsesPerSurvey !== -1) {
         finalMaxResponses = Math.min(maxResponses, limits.maxResponsesPerSurvey)
       }

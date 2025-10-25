@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
-import { getPlanLimits } from '@/lib/plan-limits'
+import { getTicketLimits } from '@/lib/ticket-check'
 
 // Supabase クライアントの設定
 const supabase = createClient(
@@ -78,7 +78,7 @@ export async function GET(
     const survey = surveys?.[0]
     // プランのAPI連携可否チェック（PROFESSIONAL/ENTERPRISE）
     const planType = 'FREE' // TODO: チケット制度移行のため一時的にFREE扱い
-    const limits = getPlanLimits(planType)
+    const limits = getTicketLimits(planType)
     if (!limits.features.includes('api_integration')) {
       return NextResponse.json(
         { message: 'API access is available for Professional or Enterprise plans only' },
@@ -96,7 +96,7 @@ export async function GET(
     // 保存期間チェック（アンケートのendDate + retentionを過ぎていれば取得不可）
     if ((survey as any).endDate) {
       const userPlanType = (survey as any).user.userPlan?.planType || 'FREE'
-      const limitsForRetention = getPlanLimits(userPlanType)
+      const limitsForRetention = getTicketLimits(userPlanType)
       if (limitsForRetention.dataRetentionDays) {
         const retentionDeadline = new Date(new Date((survey as any).endDate).getTime() + limitsForRetention.dataRetentionDays * 24 * 60 * 60 * 1000)
         if (new Date() > retentionDeadline) {
@@ -205,7 +205,7 @@ export async function POST(
     const survey = surveys?.[0]
     // プランのAPI連携可否チェック（PROFESSIONAL/ENTERPRISE）
     const planType = 'FREE' // TODO: チケット制度移行のため一時的にFREE扱い
-    const limits = getPlanLimits(planType)
+    const limits = getTicketLimits(planType)
     if (!limits.features.includes('api_integration')) {
       return NextResponse.json(
         { message: 'API access is available for Professional or Enterprise plans only' },

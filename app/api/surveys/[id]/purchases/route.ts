@@ -22,19 +22,17 @@ export async function GET(
 
     const { id: surveyId } = await params
 
-    // アンケートの存在確認と権限チェック (Supabase SDK使用)
-    const { data: surveys, error: surveyError } = await supabase
+    // アンケートの存在確認 (Supabase SDK使用)
+    const { data: survey, error: surveyError } = await supabase
       .from('Survey')
       .select('userId, ticketType, ticketId, paymentId')
       .eq('id', surveyId)
-      .or(`userId.eq.${session.user.id},surveyUsers.userId.eq.${session.user.id}`)
+      .single()
 
     if (surveyError) {
       console.error('Error fetching survey:', surveyError)
       return NextResponse.json({ error: 'Failed to fetch survey' }, { status: 500 })
     }
-
-    const survey = surveys?.[0]
 
     if (!survey) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 })
