@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
+    console.log('=== Admin Stats API Called ===')
     await requireAdmin()
+    console.log('Admin access verified')
     
     // 基本統計情報を取得
     const [
@@ -46,13 +48,8 @@ export async function GET() {
         }
       }),
       
-      // 最近登録されたユーザー（過去7日）
+      // 最近登録されたユーザー（上位10件）
       prisma.user.findMany({
-        where: {
-          createdAt: {
-            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          }
-        },
         select: {
           id: true,
           name: true,
@@ -65,13 +62,8 @@ export async function GET() {
         take: 10
       }),
       
-      // 最近作成されたアンケート（過去7日）
+      // 最近作成されたアンケート（上位10件）
       prisma.survey.findMany({
-        where: {
-          createdAt: {
-            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          }
-        },
         select: {
           id: true,
           title: true,
@@ -116,7 +108,7 @@ export async function GET() {
       })
     ])
     
-    // ユーザー別の詳細統計
+    // ユーザー別の詳細統計（上位10件）
     const userStats = await prisma.user.findMany({
       select: {
         id: true,
@@ -137,7 +129,11 @@ export async function GET() {
             }
           }
         }
-      }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 10
     })
     
     // 各ユーザーの統計を計算
@@ -174,8 +170,12 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Failed to fetch admin stats:', error)
+    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
     return NextResponse.json(
-      { message: 'Failed to fetch admin statistics' },
+      { 
+        message: 'Failed to fetch admin statistics',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

@@ -16,9 +16,8 @@ export async function GET(request: NextRequest) {
     console.log('Session found:', session.user.email)
 
     // 管理者権限のチェック
-    const adminEmails = ['admin@logian.jp', 'takashi@logian.jp', 'noutomi0729@gmail.com']
-    if (!adminEmails.includes(session.user.email || '')) {
-      console.log('Not admin user:', session.user.email)
+    if (session.user.role !== 'ADMIN') {
+      console.log('Not admin user:', session.user.email, 'Role:', session.user.role)
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

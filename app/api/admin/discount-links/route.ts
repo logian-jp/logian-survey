@@ -13,8 +13,7 @@ export async function GET() {
     }
 
     // 管理者権限のチェック（メールアドレスで判定）
-    const adminEmails = ['admin@logian.jp', 'takashi@logian.jp', 'noutomi0729@gmail.com']
-    if (!adminEmails.includes(session.user.email || '')) {
+    if (session.user.role !== 'ADMIN') {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
@@ -75,8 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 管理者権限のチェック（メールアドレスで判定）
-    const adminEmails = ['admin@logian.jp', 'takashi@logian.jp', 'noutomi0729@gmail.com']
-    if (!adminEmails.includes(session.user.email || '')) {
+    if (session.user.role !== 'ADMIN') {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 

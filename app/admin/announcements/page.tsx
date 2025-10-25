@@ -6,6 +6,11 @@ import { Announcement, AnnouncementType, AnnouncementStatus } from '@prisma/clie
 
 interface AnnouncementWithStats extends Announcement {
   readRate: number
+  creator?: {
+    id: string
+    name: string | null
+    email: string
+  }
 }
 
 export default function AnnouncementsPage() {
@@ -155,6 +160,9 @@ export default function AnnouncementsPage() {
                     既読率
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    配信者
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     作成日
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -165,7 +173,7 @@ export default function AnnouncementsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {announcements.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                       お知らせがありません
                     </td>
                   </tr>
@@ -193,6 +201,16 @@ export default function AnnouncementsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {announcement.totalSent > 0 ? `${Math.round(announcement.readRate)}%` : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {announcement.creator ? (
+                          <div>
+                            <div className="font-medium">{announcement.creator.name || '未設定'}</div>
+                            <div className="text-xs text-gray-400">{announcement.creator.email}</div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">不明</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(announcement.createdAt).toLocaleDateString('ja-JP')}

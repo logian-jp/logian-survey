@@ -32,6 +32,13 @@ export default function RichTextEditor({
   const [videoUrl, setVideoUrl] = useState('')
   const [videoType, setVideoType] = useState<'youtube' | 'google-drive'>('youtube')
   const [videoPreview, setVideoPreview] = useState('')
+  const [showImageModal, setShowImageModal] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null)
+  const [showImageControls, setShowImageControls] = useState(false)
+  const [imageControlsPosition, setImageControlsPosition] = useState({ x: 0, y: 0 })
 
   const colors = [
     { name: '黒', value: '#000000' },
@@ -45,14 +52,14 @@ export default function RichTextEditor({
   ]
 
   const backgroundColors = [
-    { name: '白', value: '#ffffff' },
-    { name: '薄い赤', value: '#fef2f2' },
-    { name: '薄い青', value: '#eff6ff' },
-    { name: '薄い緑', value: '#f0fdf4' },
-    { name: '薄い黄', value: '#fefce8' },
-    { name: '薄い紫', value: '#faf5ff' },
-    { name: '薄いピンク', value: '#fdf2f8' },
-    { name: '薄いオレンジ', value: '#fff7ed' },
+    { name: '黄色', value: '#fef08a' },
+    { name: '緑', value: '#bbf7d0' },
+    { name: '青', value: '#bfdbfe' },
+    { name: 'ピンク', value: '#fbcfe8' },
+    { name: 'オレンジ', value: '#fed7aa' },
+    { name: '紫', value: '#ddd6fe' },
+    { name: '赤', value: '#fecaca' },
+    { name: 'グレー', value: '#e5e7eb' },
   ]
 
   useEffect(() => {
@@ -73,7 +80,10 @@ export default function RichTextEditor({
       // 内容を更新
       const currentContent = editorRef.current.innerHTML
       if (currentContent !== value) {
-        editorRef.current.innerHTML = value
+        editorRef.current.innerHTML = value || ''
+        
+        // 画像クリックハンドラーを再設定
+        addImageClickHandlers()
         
         // カーソル位置を復元
         if (selection && savedRange) {
@@ -111,9 +121,306 @@ export default function RichTextEditor({
   }, [value, isComposing])
 
   const execCommand = (command: string, value?: string) => {
-    document.execCommand(command, false, value)
+    if (command === 'foreColor') {
+      // 文字色の場合は選択範囲のみの色変更
+      applyColorToSelection(command, value || '')
+    } else if (command === 'backColor') {
+      // ハイライトの場合は専用の関数を使用（execCommandは使用しない）
+      applyHighlightToSelection(value || '')
+    } else {
+      document.execCommand(command, false, value)
+    }
     editorRef.current?.focus()
     updateToolbarState()
+  }
+
+  const applyHighlightToSelection = (color: string) => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) {
+      alert('ハイライトを適用するには、まずハイライトしたい文字を選択してください。')
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+    if (range.collapsed) {
+      alert('ハイライトを適用するには、まずハイライトしたい文字を選択してください。')
+      return
+    }
+
+    const selectedText = range.toString()
+    if (!selectedText.trim()) {
+      alert('ハイライトを適用するには、まずハイライトしたい文字を選択してください。')
+      return
+    }
+
+    // 選択範囲内の既存のハイライトをクリア
+    const clearExistingHighlight = (element: Element) => {
+      const spans = element.querySelectorAll('span[style*="background-color"]')
+      spans.forEach(span => {
+        const spanElement = span as HTMLElement
+        spanElement.style.backgroundColor = ''
+        // 空のspanは削除
+        if (!spanElement.style.color && !spanElement.style.backgroundColor && !spanElement.style.fontWeight && !spanElement.style.fontStyle && !spanElement.style.textDecoration) {
+          spanElement.outerHTML = spanElement.innerHTML
+        }
+      })
+    }
+
+    // 選択範囲内の既存ハイライトをクリア
+    const commonAncestor = range.commonAncestorContainer
+    if (commonAncestor.nodeType === Node.TEXT_NODE) {
+      clearExistingHighlight(commonAncestor.parentElement!)
+    } else {
+      clearExistingHighlight(commonAncestor as Element)
+    }
+
+    // より安全な方法: 選択範囲を直接spanで囲む
+    try {
+      const span = document.createElement('span')
+      span.style.backgroundColor = color
+      range.surroundContents(span)
+      
+      // カーソル位置を復元（spanの最後に）
+      setTimeout(() => {
+        try {
+          const newRange = document.createRange()
+          newRange.selectNodeContents(span)
+          newRange.collapse(false) // 末尾にカーソル
+          selection.removeAllRanges()
+          selection.addRange(newRange)
+        } catch (error) {
+          // フォールバック: エディタの最後にカーソルを配置
+          const newRange = document.createRange()
+          newRange.selectNodeContents(editorRef.current!)
+          newRange.collapse(false)
+          selection.removeAllRanges()
+          selection.addRange(newRange)
+        }
+        
+        // エディタにフォーカスを戻す
+        editorRef.current?.focus()
+      }, 10)
+      
+    } catch (error) {
+      // surroundContentsが失敗した場合のフォールバック
+      console.warn('surroundContents failed, using fallback method:', error)
+      
+      // 選択範囲の内容を取得して削除
+      const contents = range.extractContents()
+      
+      // 新しいspan要素を作成してハイライトを適用
+      const span = document.createElement('span')
+      span.style.backgroundColor = color
+      span.appendChild(contents)
+      
+      // spanを挿入
+      range.insertNode(span)
+
+      // カーソル位置を復元（spanの最後に）
+      setTimeout(() => {
+        try {
+          const newRange = document.createRange()
+          newRange.selectNodeContents(span)
+          newRange.collapse(false) // 末尾にカーソル
+          selection.removeAllRanges()
+          selection.addRange(newRange)
+        } catch (error) {
+          // フォールバック: エディタの最後にカーソルを配置
+          const newRange = document.createRange()
+          newRange.selectNodeContents(editorRef.current!)
+          newRange.collapse(false)
+          selection.removeAllRanges()
+          selection.addRange(newRange)
+        }
+        
+        // エディタにフォーカスを戻す
+        editorRef.current?.focus()
+      }, 10)
+    }
+    
+    // エディタの内容を更新
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML || '')
+    }
+  }
+
+  const clearHighlight = () => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) {
+      alert('ハイライトをクリアするには、まずクリアしたい文字を選択してください。')
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+    if (range.collapsed) {
+      alert('ハイライトをクリアするには、まずクリアしたい文字を選択してください。')
+      return
+    }
+
+    const selectedText = range.toString()
+    if (!selectedText.trim()) {
+      alert('ハイライトをクリアするには、まずクリアしたい文字を選択してください。')
+      return
+    }
+
+    // カーソル位置を保存
+    const startOffset = range.startOffset
+    const endOffset = range.endOffset
+    const startContainer = range.startContainer
+    const endContainer = range.endContainer
+
+    // 選択範囲内のハイライトをクリア
+    const clearHighlightInRange = (element: Element) => {
+      const spans = element.querySelectorAll('span[style*="background-color"]')
+      spans.forEach(span => {
+        const spanElement = span as HTMLElement
+        spanElement.style.backgroundColor = ''
+        // 空のspanは削除
+        if (!spanElement.style.color && !spanElement.style.backgroundColor && !spanElement.style.fontWeight && !spanElement.style.fontStyle && !spanElement.style.textDecoration) {
+          spanElement.outerHTML = spanElement.innerHTML
+        }
+      })
+    }
+
+    // 選択範囲内のハイライトをクリア
+    const commonAncestor = range.commonAncestorContainer
+    if (commonAncestor.nodeType === Node.TEXT_NODE) {
+      clearHighlightInRange(commonAncestor.parentElement!)
+    } else {
+      clearHighlightInRange(commonAncestor as Element)
+    }
+
+    // カーソル位置を復元
+    setTimeout(() => {
+      try {
+        const newRange = document.createRange()
+        newRange.setStart(startContainer, startOffset)
+        newRange.setEnd(endContainer, endOffset)
+        selection.removeAllRanges()
+        selection.addRange(newRange)
+      } catch (error) {
+        // カーソル位置の復元に失敗した場合は、エディタの最後にカーソルを配置
+        const newRange = document.createRange()
+        newRange.selectNodeContents(editorRef.current!)
+        newRange.collapse(false)
+        selection.removeAllRanges()
+        selection.addRange(newRange)
+      }
+      
+      // エディタにフォーカスを戻す
+      editorRef.current?.focus()
+    }, 10)
+    
+    // エディタの内容を更新
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML || '')
+    }
+  }
+
+  const applyColorToSelection = (command: string, color: string) => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) {
+      // 選択範囲がない場合はメッセージを表示
+      alert('文字色を変更するには、まず色を変更したい文字を選択してください。')
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+    if (range.collapsed) {
+      // カーソル位置のみの場合はメッセージを表示
+      alert('文字色を変更するには、まず色を変更したい文字を選択してください。')
+      return
+    }
+
+    // 選択範囲を取得
+    const selectedText = range.toString()
+    if (!selectedText.trim()) {
+      alert('文字色を変更するには、まず色を変更したい文字を選択してください。')
+      return
+    }
+
+    // カーソル位置を保存
+    const startOffset = range.startOffset
+    const endOffset = range.endOffset
+    const startContainer = range.startContainer
+    const endContainer = range.endContainer
+
+    // 既存の色スタイルをクリア
+    const clearExistingStyles = (element: Element) => {
+      const spans = element.querySelectorAll('span[style*="color"], span[style*="background-color"]')
+      spans.forEach(span => {
+        const spanElement = span as HTMLElement
+        if (command === 'foreColor') {
+          spanElement.style.color = ''
+        } else if (command === 'backColor') {
+          spanElement.style.backgroundColor = ''
+        }
+        // 空のspanは削除
+        if (!spanElement.style.color && !spanElement.style.backgroundColor && !spanElement.style.fontWeight && !spanElement.style.fontStyle && !spanElement.style.textDecoration) {
+          spanElement.outerHTML = spanElement.innerHTML
+        }
+      })
+    }
+
+    // 選択範囲内の既存スタイルをクリア
+    const commonAncestor = range.commonAncestorContainer
+    if (commonAncestor.nodeType === Node.TEXT_NODE) {
+      clearExistingStyles(commonAncestor.parentElement!)
+    } else {
+      clearExistingStyles(commonAncestor as Element)
+    }
+
+    // 選択範囲をspanで囲む
+    const span = document.createElement('span')
+    if (command === 'foreColor') {
+      span.style.color = color
+    } else if (command === 'backColor') {
+      span.style.backgroundColor = color
+    }
+    
+    try {
+      range.surroundContents(span)
+    } catch (error) {
+      // 複雑な選択範囲の場合は、内容を置き換える
+      const contents = range.extractContents()
+      span.appendChild(contents)
+      range.insertNode(span)
+    }
+
+    // カーソル位置を復元
+    setTimeout(() => {
+      try {
+        const newRange = document.createRange()
+        newRange.setStart(startContainer, startOffset)
+        newRange.setEnd(endContainer, endOffset)
+        selection.removeAllRanges()
+        selection.addRange(newRange)
+      } catch (error) {
+        // カーソル位置の復元に失敗した場合は、spanの最後にカーソルを配置
+        try {
+          const newRange = document.createRange()
+          newRange.selectNodeContents(span)
+          newRange.collapse(false) // 末尾にカーソル
+          selection.removeAllRanges()
+          selection.addRange(newRange)
+        } catch (fallbackError) {
+          // 最終的なフォールバック: エディタの最後にカーソルを配置
+          const newRange = document.createRange()
+          newRange.selectNodeContents(editorRef.current!)
+          newRange.collapse(false)
+          selection.removeAllRanges()
+          selection.addRange(newRange)
+        }
+      }
+      
+      // エディタにフォーカスを戻す
+      editorRef.current?.focus()
+    }, 10)
+    
+    // エディタの内容を更新
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML || '')
+    }
   }
 
   const setHeading = (level: 'normal' | 'h2' | 'h3' | 'h4') => {
@@ -174,6 +481,15 @@ export default function RichTextEditor({
     if (editorRef.current && !isComposing) {
       // 即座に内容を更新（カーソル位置を保持）
       onChange(editorRef.current.innerHTML)
+    }
+  }
+
+  const handleEditorClick = (e: React.MouseEvent) => {
+    // 画像以外をクリックした場合は画像編集コントロールを閉じる
+    const target = e.target as HTMLElement
+    if (!target.closest('img[data-editable="true"]')) {
+      setShowImageControls(false)
+      setSelectedImage(null)
     }
   }
 
@@ -316,6 +632,181 @@ export default function RichTextEditor({
     }
   }
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // ファイル形式チェック
+      if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+        alert('JPEGまたはPNG形式の画像を選択してください')
+        return
+      }
+      
+      // ファイルサイズチェック（5MB制限）
+      if (file.size > 5 * 1024 * 1024) {
+        alert('ファイルサイズが大きすぎます。5MB以下の画像を選択してください')
+        return
+      }
+      
+      setImageFile(file)
+      
+      // プレビュー画像を生成
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const uploadImage = async () => {
+    if (!imageFile) return
+    
+    setIsUploading(true)
+    
+    try {
+      const formData = new FormData()
+      formData.append('image', imageFile)
+      
+      const response = await fetch('/api/image/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || '画像のアップロードに失敗しました')
+      }
+      
+      const result = await response.json()
+      
+      // 画像をエディタに挿入
+      if (editorRef.current) {
+        const currentContent = editorRef.current.innerHTML
+        const imageHtml = `<div class="image-embed"><img src="${result.url}" alt="アップロードされた画像" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer;" data-editable="true" /></div>`
+        const newContent = currentContent ? `${currentContent}<br>${imageHtml}<br>` : imageHtml
+        
+        editorRef.current.innerHTML = newContent
+        
+        // 画像クリックイベントを追加
+        addImageClickHandlers()
+        
+        // カーソルを最後に移動
+        const range = document.createRange()
+        const selection = window.getSelection()
+        range.selectNodeContents(editorRef.current)
+        range.collapse(false)
+        if (selection) {
+          selection.removeAllRanges()
+          selection.addRange(range)
+        }
+        
+        onChange(newContent)
+      }
+      
+      // モーダルを閉じる
+      setShowImageModal(false)
+      setImageFile(null)
+      setImagePreview('')
+      
+    } catch (error) {
+      console.error('画像アップロードエラー:', error)
+      alert(error instanceof Error ? error.message : '画像のアップロードに失敗しました')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const addImageClickHandlers = () => {
+    if (!editorRef.current) return
+    
+    const images = editorRef.current.querySelectorAll('img[data-editable="true"]')
+    images.forEach((img) => {
+      img.addEventListener('click', handleImageClick)
+    })
+  }
+
+  const handleImageClick = (e: Event) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const img = e.target as HTMLImageElement
+    setSelectedImage(img)
+    
+    // 画像の位置を取得
+    const rect = img.getBoundingClientRect()
+    setImageControlsPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    })
+    
+    setShowImageControls(true)
+  }
+
+  const updateImageSize = (width: number) => {
+    if (!selectedImage) return
+    
+    selectedImage.style.width = `${width}px`
+    selectedImage.style.height = 'auto'
+    
+    // エディタの内容を更新
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML || '')
+    }
+  }
+
+
+  const deleteImage = async () => {
+    if (!selectedImage) return
+    
+    try {
+      // 画像のURLを取得
+      const imageUrl = selectedImage.src
+      
+      // サーバーから画像ファイルを削除
+      const response = await fetch('/api/image/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageUrl }),
+      })
+      
+      if (!response.ok) {
+        console.error('Failed to delete image from server:', await response.text())
+        // サーバーからの削除に失敗しても、エディタからは削除を続行
+      }
+      
+      // エディタから画像を削除
+      const container = selectedImage.closest('.image-embed')
+      if (container) {
+        container.remove()
+      }
+      
+      setShowImageControls(false)
+      setSelectedImage(null)
+      
+      // エディタの内容を更新
+      if (editorRef.current) {
+        onChange(editorRef.current.innerHTML || '')
+      }
+      
+    } catch (error) {
+      console.error('画像削除エラー:', error)
+      // エラーが発生してもエディタからは削除を続行
+      const container = selectedImage.closest('.image-embed')
+      if (container) {
+        container.remove()
+      }
+      
+      setShowImageControls(false)
+      setSelectedImage(null)
+      
+      if (editorRef.current) {
+        onChange(editorRef.current.innerHTML || '')
+      }
+    }
+  }
+
   const ToolbarButton = ({ 
     onClick, 
     isActive, 
@@ -389,13 +880,24 @@ export default function RichTextEditor({
           </select>
         </div>
 
+        {/* 画像埋め込み */}
+        <div className="flex items-center gap-1">
+          <ToolbarButton
+            onClick={() => setShowImageModal(true)}
+            isActive={false}
+            title="画像を埋め込み"
+          >
+            🖼️ 画像
+          </ToolbarButton>
+        </div>
+
         {allowVideo && (
           <>
             <div className="w-px h-6 bg-gray-300"></div>
 
             {/* 動画埋め込み */}
             <div className="flex items-center gap-1">
-              {canUseVideoEmbedding(ticketType) ? (
+              {allowVideo || canUseVideoEmbedding(ticketType) ? (
                 <ToolbarButton
                   onClick={() => setShowVideoModal(true)}
                   isActive={false}
@@ -405,9 +907,9 @@ export default function RichTextEditor({
                 </ToolbarButton>
               ) : (
                 <ToolbarButton
-                  onClick={() => alert('動画埋め込み機能はプロフェッショナルプラン以上でご利用いただけます。')}
+                  onClick={() => alert('動画埋め込み機能はプロフェッショナルチケット以上でご利用いただけます。')}
                   isActive={false}
-                  title="動画埋め込み機能はプロフェッショナルプラン以上でご利用いただけます"
+                  title="動画埋め込み機能はプロフェッショナルチケット以上でご利用いただけます"
                   className="opacity-50 cursor-not-allowed"
                 >
                   📹 動画
@@ -435,7 +937,7 @@ export default function RichTextEditor({
                   textColor === color.value ? 'border-gray-400' : 'border-gray-200'
                 }`}
                 style={{ backgroundColor: color.value }}
-                title={color.name}
+                title={`${color.name} - 文字を選択してからクリックしてください`}
               />
             ))}
           </div>
@@ -443,23 +945,36 @@ export default function RichTextEditor({
 
         <div className="w-px h-6 bg-gray-300"></div>
 
-        {/* 背景色 */}
+        {/* ハイライト */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">背景色:</span>
+          <span className="text-sm text-gray-600">ハイライト:</span>
           <div className="flex gap-1">
+            {/* ハイライトクリアボタン */}
+            <button
+              type="button"
+              onClick={() => {
+                setBackgroundColor('#ffffff')
+                // ハイライトクリアの場合は特別な処理
+                clearHighlight()
+              }}
+              className="w-6 h-6 rounded border-2 border-gray-200 bg-white flex items-center justify-center"
+              title="ハイライトをクリア - 文字を選択してからクリックしてください"
+            >
+              ✕
+            </button>
             {backgroundColors.map((color) => (
               <button
                 key={color.value}
                 type="button"
                 onClick={() => {
                   setBackgroundColor(color.value)
-                  execCommand('backColor', color.value)
+                  applyHighlightToSelection(color.value)
                 }}
                 className={`w-6 h-6 rounded border-2 ${
                   backgroundColor === color.value ? 'border-gray-400' : 'border-gray-200'
                 }`}
                 style={{ backgroundColor: color.value }}
-                title={color.name}
+                title={`${color.name} - 文字を選択してからクリックしてください`}
               />
             ))}
           </div>
@@ -501,12 +1016,14 @@ export default function RichTextEditor({
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
         onMouseUp={updateToolbarState}
+        onClick={handleEditorClick}
         onCompositionStart={handleCompositionStart}
         onCompositionEnd={handleCompositionEnd}
-        className="min-h-[120px] p-4 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset prose prose-sm max-w-none"
+        className="min-h-[120px] p-4 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
         style={{ 
           color: textColor,
-          backgroundColor: backgroundColor === '#ffffff' ? 'transparent' : backgroundColor
+          backgroundColor: backgroundColor === '#ffffff' ? 'transparent' : backgroundColor,
+          textAlign: 'left'
         }}
         data-placeholder={placeholder}
         suppressContentEditableWarning={true}
@@ -621,6 +1138,132 @@ export default function RichTextEditor({
                 className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
               >
                 埋め込み
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 画像アップロードモーダル */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">画像を埋め込み</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  画像ファイルを選択
+                </label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png"
+                  onChange={handleImageSelect}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  JPEGまたはPNG形式の画像を選択してください（最大5MB）
+                </p>
+              </div>
+
+              {/* 画像プレビュー */}
+              {imagePreview && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    プレビュー
+                  </label>
+                  <div className="border border-gray-300 rounded-md p-4 bg-gray-50">
+                    <img 
+                      src={imagePreview} 
+                      alt="プレビュー" 
+                      className="max-w-full h-auto max-h-48 mx-auto rounded"
+                    />
+                  </div>
+                  <p className="text-xs text-green-600 mt-1">
+                    ✅ 画像が正しく選択されました
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImageModal(false)
+                  setImageFile(null)
+                  setImagePreview('')
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={uploadImage}
+                disabled={!imageFile || isUploading}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUploading ? 'アップロード中...' : 'アップロード'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 画像編集コントロール */}
+      {showImageControls && selectedImage && (
+        <div 
+          className="fixed bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50"
+          style={{
+            left: `${imageControlsPosition.x - 150}px`,
+            top: `${imageControlsPosition.y}px`,
+            transform: 'translateX(-50%)'
+          }}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium text-gray-900">画像編集</h4>
+              <button
+                onClick={() => {
+                  setShowImageControls(false)
+                  setSelectedImage(null)
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* サイズ調整 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                サイズ
+              </label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="range"
+                  min="100"
+                  max="800"
+                  step="10"
+                  value={selectedImage.offsetWidth}
+                  onChange={(e) => updateImageSize(parseInt(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="text-xs text-gray-500 w-12">
+                  {selectedImage.offsetWidth}px
+                </span>
+              </div>
+            </div>
+            
+            
+            {/* 削除ボタン */}
+            <div className="pt-2 border-t">
+              <button
+                onClick={deleteImage}
+                className="w-full px-3 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200"
+              >
+                画像を削除
               </button>
             </div>
           </div>

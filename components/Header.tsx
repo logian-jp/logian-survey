@@ -14,7 +14,7 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* ロゴ */}
-          <Link href="/" className="flex items-center">
+          <Link href={session ? "/dashboard" : "/"} className="flex items-center">
             <Image
               src="/images/logo.svg"
               alt="Logian Survey"
@@ -44,7 +44,7 @@ export default function Header() {
               >
                 アンケート作成
               </Link>
-            {session?.user?.email && ['admin@logian.jp', 'takashi@logian.jp', 'noutomi0729@gmail.com'].includes(session.user.email) && (
+            {session?.user?.role === 'ADMIN' && (
               <Link
                 href="/admin"
                 className="text-red-700 hover:text-red-900 px-3 py-2 rounded-md text-sm font-medium transition-colors border border-red-300 rounded-md"
@@ -170,7 +170,7 @@ export default function Header() {
               >
                 アンケート作成
               </Link>
-              {session?.user?.email && ['admin@logian.jp', 'takashi@logian.jp', 'noutomi0729@gmail.com'].includes(session.user.email) && (
+              {session?.user?.role === 'ADMIN' && (
                 <Link
                   href="/admin"
                   className="block text-red-700 hover:text-red-900 px-3 py-2 rounded-md text-sm font-medium transition-colors border border-red-300 rounded-md"

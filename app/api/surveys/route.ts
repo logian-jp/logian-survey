@@ -123,6 +123,10 @@ export async function GET(request: NextRequest) {
         targetResponses: survey.targetResponses,
         owner: survey.user,
         userPermission: isOwner ? 'OWNER' : userPermission || 'VIEW',
+        // チケット情報
+        ticketType: survey.ticketType,
+        ticketId: (survey as any).ticketId,
+        paymentId: (survey as any).paymentId,
         // データ使用量情報
         dataUsageMB: surveyDataUsage ? Math.round(surveyDataUsage.sizeBytes / 1024 / 1024 * 100) / 100 : 0,
         maxDataSizeMB,
@@ -186,22 +190,38 @@ export async function POST(request: NextRequest) {
       console.log('User found:', user)
     }
 
-    // 無料チケットでのアンケート作成数制限チェック
-    const freeSurveyCount = await prisma.survey.count({
-      where: {
-        userId: user.id,
-        ticketType: 'FREE'
-      }
+    const { title, description, maxResponses, endDate, targetResponses, ticketType } = await request.json()
+
+    console.log('Survey creation request data:', {
+      title,
+      description,
+      maxResponses,
+      endDate,
+      targetResponses,
+      ticketType
     })
 
-    if (freeSurveyCount >= 3) {
-      return NextResponse.json(
-        { message: '無料チケットでは3個までアンケートを作成できます。チケットを購入してアンケートを作成してください。' },
-        { status: 403 }
-      )
-    }
+    // チケットタイプの検証とデフォルト値
+    const validTicketType = ticketType || 'FREE'
+    
+    console.log('Valid ticket type:', validTicketType)
 
-    const { title, description, maxResponses, endDate, targetResponses, ticketType } = await request.json()
+    // 無料チケットでのアンケート作成数制限チェック（FREEの場合のみ）
+    if (validTicketType === 'FREE') {
+      const freeSurveyCount = await prisma.survey.count({
+        where: {
+          userId: user.id,
+          ticketType: 'FREE'
+        }
+      })
+
+      if (freeSurveyCount >= 3) {
+        return NextResponse.json(
+          { message: '無料チケットでは3個までアンケートを作成できます。チケットを購入してアンケートを作成してください。' },
+          { status: 403 }
+        )
+      }
+    }
 
     if (!title) {
       return NextResponse.json(
@@ -210,8 +230,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // チケットタイプの検証とデフォルト値
-    const validTicketType = ticketType || 'FREE'
     const limits = getPlanLimits(validTicketType)
 
     // 回答上限の丸め（プラン上限を超えない）
@@ -237,6 +255,9 @@ export async function POST(request: NextRequest) {
 
     // アンケート作成と作成者の管理者権限付与をトランザクションで実行（非FREEはチケット消費）
     const result = await prisma.$transaction(async (tx) => {
+      let usedTicketId = null
+      let paymentId = null
+
       // 非FREEチケットは消費
       if (validTicketType !== 'FREE') {
         const ticket = await tx.userTicket.findFirst({
@@ -246,6 +267,19 @@ export async function POST(request: NextRequest) {
         if (!ticket) {
           throw new Error('チケット残数が不足しています')
         }
+        
+        // チケットIDを記録
+        usedTicketId = ticket.id
+        
+        // 決済IDを取得（チケットに関連する決済情報から）
+        const purchase = await tx.ticketPurchase.findFirst({
+          where: { userId: user.id, ticketType: validTicketType },
+          orderBy: { createdAt: 'desc' }
+        })
+        if (purchase) {
+          paymentId = purchase.paymentIntentId
+        }
+        
         await tx.userTicket.update({
           where: { id: ticket.id },
           data: { remainingTickets: ticket.remainingTickets - 1, usedTickets: ticket.usedTickets + 1 }
@@ -262,7 +296,9 @@ export async function POST(request: NextRequest) {
           targetResponses: targetResponses || null,
           userId: user.id,
           ticketType: validTicketType,
-        },
+          ticketId: usedTicketId,
+          paymentId: paymentId,
+        } as any,
       })
 
       // 作成者を管理者権限でSurveyUserテーブルに追加
@@ -293,8 +329,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
     console.error('Failed to create survey:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    })
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { 
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

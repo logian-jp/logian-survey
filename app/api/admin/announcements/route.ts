@@ -20,8 +20,7 @@ export async function GET() {
     }
 
     // 管理者権限のチェック
-    const adminEmails = ['admin@logian.jp', 'takashi@logian.jp', 'noutomi0729@gmail.com']
-    const isAdmin = adminEmails.includes(session.user.email || '')
+    const isAdmin = session.user.role === 'ADMIN'
     console.log('User email:', session.user.email, 'Is admin:', isAdmin)
     
     if (!isAdmin) {
@@ -37,6 +36,13 @@ export async function GET() {
             select: {
               status: true,
               readAt: true
+            }
+          },
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              email: true
             }
           }
         },
@@ -63,10 +69,17 @@ export async function GET() {
       console.log('Returning announcements with stats')
       return NextResponse.json({
         success: true,
-        announcements: announcementsWithStats
+        announcements: announcementsWithStats,
+        total: announcementsWithStats.length
       })
     } catch (dbError: any) {
-      console.error('Database error:', dbError)
+      console.error('Database error details:', {
+        code: dbError.code,
+        message: dbError.message,
+        meta: dbError.meta,
+        stack: dbError.stack
+      })
+      
       // データベースエラーの場合（テーブルが存在しない等）
       if (dbError.code === 'P2021' || dbError.message?.includes('does not exist')) {
         console.log('Announcement table does not exist yet, returning empty list')
@@ -75,6 +88,16 @@ export async function GET() {
           announcements: []
         })
       }
+      
+      // リレーションエラーの場合
+      if (dbError.code === 'P2003' || dbError.message?.includes('relation')) {
+        console.log('Relation error, returning empty list')
+        return NextResponse.json({
+          success: true,
+          announcements: []
+        })
+      }
+      
       throw dbError
     }
 
@@ -101,8 +124,7 @@ export async function POST(request: Request) {
     }
 
     // 管理者権限のチェック
-    const adminEmails = ['admin@logian.jp', 'takashi@logian.jp', 'noutomi0729@gmail.com']
-    const isAdmin = adminEmails.includes(session.user.email || '')
+    const isAdmin = session.user.role === 'ADMIN'
     
     if (!isAdmin) {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
@@ -154,7 +176,8 @@ export async function POST(request: Request) {
           scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
           targetPlans: targetPlans ? targetPlans : undefined,
           conditions: conditions ? conditions : undefined,
-          status: type === 'MANUAL' ? 'SENT' : 'SCHEDULED'
+          status: type === 'MANUAL' ? 'SENT' : 'SCHEDULED',
+          createdBy: session.user.id // 配信者（管理者）のIDを記録
         }
       })
 

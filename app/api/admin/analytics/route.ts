@@ -15,7 +15,7 @@ export async function GET() {
     }
 
     // 管理者権限チェック
-    if (session.user.email !== 'noutomi0729@gmail.com') {
+    if (session.user.role !== 'ADMIN') {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
 

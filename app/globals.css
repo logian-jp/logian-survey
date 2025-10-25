@@ -23,6 +23,41 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+/* 画像埋め込み用のスタイル */
+.image-embed {
+  margin: 1rem 0;
+  text-align: center;
+  width: 100%;
+}
+
+.image-embed img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: block;
+  margin: 0 auto;
+}
+
+/* リッチテキストコンテンツ用のスタイル */
+.rich-text-content {
+  line-height: 1.6;
+}
+
+.rich-text-content .image-embed {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.rich-text-content .image-embed img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: block;
+  margin: 0 auto;
+}
+
 @media (max-width: 640px) {
   .video-embed {
     max-width: 100%;

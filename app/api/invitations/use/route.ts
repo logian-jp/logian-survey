@@ -120,6 +120,23 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // 招待リワードの購入履歴を記録
+      await tx.ticketPurchase.create({
+        data: {
+          userId: invitation.inviterId,
+          ticketType: 'STANDARD',
+          amount: 0,
+          currency: 'JPY',
+          checkoutSessionId: `invitation_reward_${invitation.id}_${Date.now()}`,
+          metadata: {
+            type: 'invitation_reward',
+            invitationId: invitation.id,
+            invitedUserEmail: email,
+            invitedUserName: name
+          }
+        }
+      })
+
       return newUser
     })
 

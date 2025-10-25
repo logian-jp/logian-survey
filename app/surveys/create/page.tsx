@@ -76,6 +76,7 @@ export default function CreateSurvey() {
   }
 
   const handlePlanSelection = (planType: string) => {
+    console.log('Plan selected:', planType)
     setSelectedPlanType(planType)
     setShowPlanSelection(false)
   }
@@ -275,6 +276,9 @@ export default function CreateSurvey() {
     e.preventDefault()
     setIsLoading(true)
 
+    console.log('Submitting survey with ticketType:', selectedPlanType || 'FREE')
+    console.log('Selected plan type:', selectedPlanType)
+
     try {
       // アンケート作成
       const surveyResponse = await fetch('/api/surveys', {
@@ -289,7 +293,8 @@ export default function CreateSurvey() {
       })
 
       if (!surveyResponse.ok) {
-        throw new Error('Failed to create survey')
+        const errorData = await surveyResponse.json()
+        throw new Error(errorData.message || 'Failed to create survey')
       }
 
       const createdSurvey = await surveyResponse.json()
@@ -316,7 +321,17 @@ export default function CreateSurvey() {
       router.push(`/surveys/${createdSurvey.id}/edit`)
     } catch (error) {
       console.error('Failed to create survey:', error)
-      alert('アンケートの作成に失敗しました')
+      const errorMessage = error instanceof Error ? error.message : 'アンケートの作成に失敗しました'
+      
+      // 無料チケット制限の場合はチケット購入ページへのリンクを表示
+      if (errorMessage.includes('無料チケットでは3個まで')) {
+        const shouldBuyTickets = confirm(`${errorMessage}\n\nチケットを購入してアンケートを作成しますか？`)
+        if (shouldBuyTickets) {
+          router.push('/tickets')
+        }
+      } else {
+        alert(errorMessage)
+      }
     } finally {
       setIsLoading(false)
     }

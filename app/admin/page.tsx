@@ -132,17 +132,97 @@ interface TicketStats {
   }
 }
 
+interface InvitationStats {
+  summary: {
+    totalInvitations: number
+    usedInvitations: number
+    pendingInvitations: number
+    successRate: number
+  }
+  invitations: Array<{
+    id: string
+    code: string
+    inviterName: string | null
+    inviterEmail: string
+    invitedName: string | null
+    invitedEmail: string | null
+    message: string | null
+    isUsed: boolean
+    usedAt: string | null
+    createdAt: string
+    expiresAt: string | null
+    inviter: {
+      id: string
+      name: string | null
+      email: string
+    }
+    usedByUser: {
+      id: string
+      name: string | null
+      email: string
+    } | null
+  }>
+  inviterBreakdown: Array<{
+    inviterId: string
+    inviterName: string
+    inviterEmail: string
+    totalInvited: number
+    successfulInvites: number
+    successRate: number
+  }>
+}
+
+interface TicketPurchase {
+  id: string
+  ticketType: string
+  amount: number
+  currency: string
+  checkoutSessionId: string
+  metadata: any
+  createdAt: string
+  user: {
+    id: string
+    name: string | null
+    email: string
+    createdAt: string
+  }
+  survey: {
+    id: string
+    title: string
+    shareUrl: string
+    createdAt: string
+  } | null
+}
+
+interface TicketPurchaseStats {
+  totalPurchases: number
+  totalAmount: number
+  averageAmount: number
+}
+
+interface TicketPurchaseFilters {
+  userId: string
+  ticketType: string
+  startDate: string
+  endDate: string
+  minAmount: string
+  maxAmount: string
+  search: string
+  page: number
+  limit: number
+}
+
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [ticketStats, setTicketStats] = useState<TicketStats | null>(null)
+  const [invitationStats, setInvitationStats] = useState<InvitationStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
   const [selectedFormat, setSelectedFormat] = useState<'raw' | 'normalized' | 'standardized'>('raw')
   const [includePersonalData, setIncludePersonalData] = useState(false)
-  const [isInitializing, setIsInitializing] = useState(false)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -155,11 +235,13 @@ export default function AdminDashboard() {
     fetchStats()
   }, [session, status])
 
+
   const fetchStats = async () => {
     try {
-      const [statsResponse, ticketStatsResponse] = await Promise.all([
+      const [statsResponse, ticketStatsResponse, invitationStatsResponse] = await Promise.all([
         fetch('/api/admin/stats'),
-        fetch('/api/admin/ticket-stats')
+        fetch('/api/admin/ticket-stats'),
+        fetch('/api/admin/invitation-stats')
       ])
       
       if (statsResponse.ok) {
@@ -185,12 +267,22 @@ export default function AdminDashboard() {
         const errorData = await ticketStatsResponse.json().catch(() => ({}))
         console.error('Failed to fetch ticket stats:', ticketStatsResponse.status, ticketStatsResponse.statusText, errorData)
       }
+
+      if (invitationStatsResponse.ok) {
+        const invitationStatsData = await invitationStatsResponse.json()
+        console.log('Invitation stats data received:', invitationStatsData)
+        setInvitationStats(invitationStatsData)
+      } else {
+        const errorData = await invitationStatsResponse.json().catch(() => ({}))
+        console.error('Failed to fetch invitation stats:', invitationStatsResponse.status, invitationStatsResponse.statusText, errorData)
+      }
     } catch (error) {
       console.error('Failed to fetch admin data:', error)
     } finally {
       setIsLoading(false)
     }
   }
+
 
   const downloadAllData = async () => {
     setIsDownloading(true)
@@ -224,29 +316,6 @@ export default function AdminDashboard() {
     }
   }
 
-  const initializePlanConfig = async () => {
-    setIsInitializing(true)
-    try {
-      const response = await fetch('/api/admin/init-plan-config', {
-        method: 'POST'
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        alert(`プラン設定を初期化しました: ${result.count}個のプランが作成されました`)
-        // データを再取得
-        fetchStats()
-      } else {
-        const errorData = await response.json()
-        alert(`プラン設定の初期化に失敗しました: ${errorData.message}`)
-      }
-    } catch (error) {
-      console.error('Plan config initialization error:', error)
-      alert('プラン設定の初期化中にエラーが発生しました')
-    } finally {
-      setIsInitializing(false)
-    }
-  }
 
   const formatToTokyoTime = (dateString: string): string => {
     const date = new Date(dateString)
@@ -289,43 +358,6 @@ export default function AdminDashboard() {
               <p className="text-sm text-gray-600">システム全体の統計情報とデータ管理</p>
             </div>
               <div className="flex items-center space-x-4">
-                <button
-                  onClick={initializePlanConfig}
-                  disabled={isInitializing}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm disabled:opacity-50"
-                >
-                  {isInitializing ? '初期化中...' : 'プラン設定初期化'}
-                </button>
-                <Link
-                  href="/admin/plan-config"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                >
-                  プラン設定管理
-                </Link>
-                <Link
-                  href="/admin/discount-links"
-                  className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm"
-                >
-                  割引リンク管理
-                </Link>
-                <Link
-                  href="/admin/announcements"
-                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
-                >
-                  お知らせ管理
-                </Link>
-                <Link
-                  href="/admin/data-addons"
-                  className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors text-sm"
-                >
-                  データアドオン管理
-                </Link>
-                <Link
-                  href="/admin/purchases"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-sm"
-                >
-                  購入履歴管理
-                </Link>
                 <Link
                   href="/dashboard"
                   className="text-sm text-gray-600 hover:text-gray-900"
@@ -338,6 +370,67 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 管理機能メニュー */}
+        <div className="mb-8 bg-white shadow-sm rounded-lg">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">管理機能</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Link
+                href="/admin/purchases"
+                className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-medium text-gray-900">チケット購入履歴</h3>
+                    <p className="text-sm text-gray-500">全ユーザーのチケット購入履歴を確認・管理</p>
+                  </div>
+                </div>
+              </Link>
+              
+              <Link
+                href="/admin/discount-links"
+                className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-medium text-gray-900">割引リンク管理</h3>
+                    <p className="text-sm text-gray-500">割引コードの発行・管理</p>
+                  </div>
+                </div>
+              </Link>
+              
+              <Link
+                href="/admin/announcements"
+                className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-medium text-gray-900">お知らせ管理</h3>
+                    <p className="text-sm text-gray-500">ユーザー向けお知らせの作成・配信</p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </div>
+
         {/* チケット統計 */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">チケット統計</h2>
@@ -438,6 +531,155 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
+
+               {/* 招待統計 */}
+               <div className="mb-8">
+                 <div className="flex justify-between items-center mb-4">
+                   <h2 className="text-xl font-semibold text-gray-900">招待統計</h2>
+                   <Link
+                     href="/admin/invitations"
+                     className="text-sm text-blue-600 hover:text-blue-800"
+                   >
+                     招待履歴一覧を見る →
+                   </Link>
+                 </div>
+          {invitationStats ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 招待サマリー */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">招待サマリー</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {invitationStats.summary.totalInvitations}
+                    </div>
+                    <div className="text-sm text-blue-800">総招待数</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">
+                      {invitationStats.summary.usedInvitations}
+                    </div>
+                    <div className="text-sm text-green-800">成功数</div>
+                  </div>
+                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {invitationStats.summary.pendingInvitations}
+                    </div>
+                    <div className="text-sm text-yellow-800">未使用</div>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {invitationStats.summary.successRate.toFixed(1)}%
+                    </div>
+                    <div className="text-sm text-purple-800">成功率</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 招待者別統計 */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">招待者別統計</h3>
+                <div className="space-y-3">
+                  {invitationStats.inviterBreakdown.map((inviter) => (
+                    <div key={inviter.inviterId} className="border rounded-lg p-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <div>
+                          <div className="font-medium text-gray-900">{inviter.inviterName}</div>
+                          <div className="text-sm text-gray-500">{inviter.inviterEmail}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-gray-900">
+                            {inviter.successfulInvites}/{inviter.totalInvited}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {inviter.successRate.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(inviter.successRate, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="text-center text-gray-500">
+                <p>招待統計データを読み込み中...</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 招待履歴 */}
+        {invitationStats && (
+          <div className="mb-8 bg-white shadow-sm rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">招待履歴</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">招待者</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">招待コード</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">招待相手</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ステータス</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">招待日時</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">使用日時</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {invitationStats.invitations.map((invitation) => (
+                    <tr key={invitation.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div>
+                          <div className="font-medium">{invitation.inviter.name || invitation.inviter.email}</div>
+                          <div className="text-gray-500">{invitation.inviter.email}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                        {invitation.code}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {invitation.invitedName || invitation.invitedEmail || '未指定'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {invitation.isUsed ? (
+                          <div className="flex items-center">
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                              使用済み
+                            </span>
+                            {invitation.usedByUser && (
+                              <div className="ml-2 text-xs text-gray-500">
+                                by {invitation.usedByUser.name || invitation.usedByUser.email}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            未使用
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatToTokyoTime(invitation.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {invitation.usedAt ? formatToTokyoTime(invitation.usedAt) : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* 経営KPI */}
         <div className="mb-8">
@@ -731,11 +973,18 @@ export default function AdminDashboard() {
           <AdminDataUsageChart />
         </div>
 
-
         {/* 最近のユーザー */}
         <div className="mb-8 bg-white shadow-sm rounded-lg">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">最近登録されたユーザー</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900">最近登録されたユーザー</h2>
+              <Link
+                href="/admin/users"
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                ユーザー一覧を見る →
+              </Link>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -768,7 +1017,15 @@ export default function AdminDashboard() {
         {/* 最近のアンケート */}
         <div className="mb-8 bg-white shadow-sm rounded-lg">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">最近作成されたアンケート</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900">最近作成されたアンケート</h2>
+              <Link
+                href="/admin/surveys"
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                アンケート一覧を見る →
+              </Link>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -816,7 +1073,15 @@ export default function AdminDashboard() {
         {/* ユーザー統計 */}
         <div className="bg-white shadow-sm rounded-lg">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">ユーザー別統計</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900">ユーザー別統計</h2>
+              <Link
+                href="/admin/users"
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                ユーザー一覧を見る →
+              </Link>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">

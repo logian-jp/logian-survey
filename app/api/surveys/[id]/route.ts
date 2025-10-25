@@ -91,6 +91,10 @@ export async function GET(
       updatedAt: survey.updatedAt,
       responseCount: survey._count.responses,
       questions: questionsWithParsedOptions,
+      // チケット情報
+      ticketType: survey.ticketType,
+      ticketId: (survey as any).ticketId,
+      paymentId: (survey as any).paymentId,
     })
   } catch (error) {
     console.error('Failed to fetch survey:', error)

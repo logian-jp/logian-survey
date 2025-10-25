@@ -33,6 +33,10 @@ interface Survey {
     email: string
   }
   userPermission: 'OWNER' | 'ADMIN' | 'EDIT' | 'VIEW'
+  // チケット情報
+  ticketType: string
+  ticketId: string | null
+  paymentId: string | null
   // データ使用量情報
   dataUsageMB: number
   maxDataSizeMB: number
@@ -228,6 +232,9 @@ export default function SurveysPage() {
                     達成率
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    チケット情報
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     データ使用量
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -360,6 +367,27 @@ export default function SurveysPage() {
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex flex-col">
+                        <div className="font-medium text-gray-900">
+                          {survey.ticketType === 'FREE' ? '無料チケット' : 
+                           survey.ticketType === 'STANDARD' ? 'スタンダード' :
+                           survey.ticketType === 'PROFESSIONAL' ? 'プロフェッショナル' :
+                           survey.ticketType === 'ENTERPRISE' ? 'エンタープライズ' :
+                           survey.ticketType}
+                        </div>
+                        {survey.ticketId && (
+                          <div className="text-xs text-gray-400">
+                            チケットID: {survey.ticketId}
+                          </div>
+                        )}
+                        {survey.paymentId && (
+                          <div className="text-xs text-gray-400">
+                            決済ID: {survey.paymentId}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex flex-col">

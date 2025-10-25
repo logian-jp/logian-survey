@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import StripePortal from '@/components/StripePortal'
-import DataUsageChart from '@/components/DataUsageChart'
-import DataAddonPurchase from '@/components/DataAddonPurchase'
 
 interface UserPlan {
   id: string
@@ -38,6 +36,7 @@ export default function Settings() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [hasEnterpriseTicket, setHasEnterpriseTicket] = useState(false)
 
   useEffect(() => {
     if (session) {
@@ -92,6 +91,12 @@ export default function Settings() {
       if (response.ok) {
         const data = await response.json()
         setPlanSlots(data.tickets || [])
+        
+        // エンタープライズチケットの有無をチェック
+        const hasEnterprise = data.tickets?.some((ticket: any) => 
+          ticket.ticketType === 'ENTERPRISE' && ticket.remainingTickets > 0
+        ) || false
+        setHasEnterpriseTicket(hasEnterprise)
       }
     } catch (error) {
       console.error('Failed to fetch tickets:', error)
@@ -100,10 +105,14 @@ export default function Settings() {
 
   const fetchTicketPurchases = async () => {
     try {
+      console.log('Fetching ticket purchases...')
       const response = await fetch('/api/user/ticket-purchases')
       if (response.ok) {
         const data = await response.json()
+        console.log('Ticket purchases data:', data)
         setTicketPurchases(data.purchases || [])
+      } else {
+        console.error('Failed to fetch ticket purchases:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Failed to fetch ticket purchases:', error)
@@ -371,7 +380,7 @@ export default function Settings() {
           </div>
 
           {/* チケット購入履歴（一部表示） */}
-          {ticketPurchases.length > 0 && (
+          {ticketPurchases.length > 0 ? (
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900">チケット購入履歴</h2>
@@ -421,17 +430,27 @@ export default function Settings() {
                 )}
               </div>
             </div>
+          ) : (
+            <div className="mb-8">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">チケット購入履歴</h2>
+              <div className="bg-gray-50 rounded-lg p-6 text-center">
+                <p className="text-gray-500">チケットの購入履歴がありません</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  チケットを購入すると、ここに履歴が表示されます
+                </p>
+              </div>
+            </div>
           )}
 
-          {/* エンタープライズプラン用のロゴ設定 */}
-          {userPlan?.planType === 'ENTERPRISE' && (
+          {/* エンタープライズチケット用のロゴ設定 */}
+          {hasEnterpriseTicket && (
             <div className="mb-8">
               <h2 className="text-lg font-medium text-gray-900 mb-4">ブランディング設定</h2>
               
               <div className="space-y-6">
                 <div>
                   <label htmlFor="customLogo" className="block text-sm font-medium text-gray-700 mb-2">
-                    オリジナルロゴ（エンタープライズプラン）
+                    オリジナルロゴ（エンタープライズチケット）
                   </label>
                   <p className="text-xs text-gray-500 mb-3">
                     公開URLのヘッダー部分（LogianSurveyロゴの代わり）に表示されます。企業独自のブランディングが可能です。
@@ -466,60 +485,6 @@ export default function Settings() {
                       </p>
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-          )}
-
-
-          {/* データ使用量 */}
-          {session?.user?.id && (
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">データ使用量</h2>
-              <DataUsageChart 
-                userId={session.user.id}
-                planType={userPlan?.planType || 'FREE'}
-                maxDataSizeMB={userPlan?.planType === 'FREE' ? 100 : 
-                              userPlan?.planType === 'BASIC' ? 500 :
-                              userPlan?.planType === 'STANDARD' ? 2000 : -1}
-              />
-            </div>
-          )}
-
-          {/* データアドオン */}
-          {session?.user?.id && (
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">データアドオン</h2>
-              <div className="bg-white rounded-lg shadow p-6">
-                <p className="text-gray-600 mb-4">容量追加や保存期間延長のアドオンを購入できます。</p>
-                <div className="space-y-4">
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2">容量追加</h3>
-                    <p className="text-sm text-gray-600 mb-3">データ保存容量を追加します</p>
-                    <div className="text-2xl font-bold text-gray-900 mb-3">月額120円〜</div>
-                    <button 
-                      onClick={() => router.push('/data-addons?type=storage')}
-                      className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                    >
-                      容量追加を購入
-                    </button>
-                  </div>
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2">保存期間延長</h3>
-                    <p className="text-sm text-gray-600 mb-3">データの保存期間を延長します</p>
-                    <div className="text-2xl font-bold text-gray-900 mb-3">500円〜</div>
-                    <button 
-                      onClick={() => router.push('/data-addons?type=retention')}
-                      className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-                    >
-                      保存期間延長を購入
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    💡 容量追加や保存期間延長の詳細な商品一覧と価格は、購入ボタンをクリックしてご確認ください。
-                  </p>
                 </div>
               </div>
             </div>

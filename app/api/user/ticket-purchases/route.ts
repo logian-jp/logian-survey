@@ -7,6 +7,13 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
+    console.log('Ticket purchases API - Session:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+      userEmail: session?.user?.email,
+      userRole: session?.user?.role
+    })
+    
     if (!session?.user?.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
@@ -30,7 +37,10 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ 
+    console.log('Found ticket purchases:', purchases.length, 'purchases')
+    console.log('Purchase details:', purchases)
+
+    const response = { 
       purchases: purchases.map(purchase => ({
         id: purchase.id,
         ticketType: purchase.ticketType,
@@ -39,7 +49,10 @@ export async function GET(request: NextRequest) {
         createdAt: purchase.createdAt,
         survey: purchase.survey
       }))
-    })
+    }
+
+    console.log('Returning ticket purchases response:', response)
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Failed to fetch ticket purchases:', error)
     return NextResponse.json(

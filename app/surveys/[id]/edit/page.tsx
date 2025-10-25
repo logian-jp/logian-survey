@@ -42,6 +42,10 @@ interface Survey {
   useCustomLogo?: boolean
   planType?: string
   questions: Question[]
+  // チケット情報
+  ticketType?: string
+  ticketId?: string | null
+  paymentId?: string | null
 }
 
 interface Collaborator {
@@ -1199,6 +1203,56 @@ export default function EditSurvey() {
               </div>
             )}
 
+            {/* チケット情報 */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">チケット情報</h3>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-blue-900 mb-1">
+                      チケットタイプ
+                    </label>
+                    <div className="text-sm text-blue-800">
+                      {survey.ticketType === 'FREE' ? '無料チケット' : 
+                       survey.ticketType === 'STANDARD' ? 'スタンダードチケット' :
+                       survey.ticketType === 'PROFESSIONAL' ? 'プロフェッショナルチケット' :
+                       survey.ticketType === 'ENTERPRISE' ? 'エンタープライズチケット' :
+                       survey.ticketType || '不明'}
+                    </div>
+                  </div>
+                  
+                  {survey.ticketId && (
+                    <div>
+                      <label className="block text-sm font-medium text-blue-900 mb-1">
+                        チケットID
+                      </label>
+                      <div className="text-sm text-blue-800 font-mono">
+                        {survey.ticketId}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {survey.paymentId && (
+                    <div>
+                      <label className="block text-sm font-medium text-blue-900 mb-1">
+                        決済ID
+                      </label>
+                      <div className="text-sm text-blue-800 font-mono">
+                        {survey.paymentId}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-3 text-xs text-blue-600">
+                  <p>このアンケートは上記のチケットで作成されました。</p>
+                  {survey.ticketType !== 'FREE' && (
+                    <p className="mt-1">有料チケットを使用したアンケートです。</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">回答設定</h3>
               
@@ -1332,8 +1386,8 @@ export default function EditSurvey() {
               </div>
             </div>
 
-            {/* エンタープライズチケット用の画像設定 */}
-            {survey.planType === 'ENTERPRISE' && (
+            {/* 有料チケット用の画像設定 */}
+            {survey.ticketType && survey.ticketType !== 'FREE' && (
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">ブランディング設定</h3>
                 

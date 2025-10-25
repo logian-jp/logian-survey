@@ -44,7 +44,7 @@ export default function Dashboard() {
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [userPlan, setUserPlan] = useState<any>(null)
-  const [planSlots, setPlanSlots] = useState<any[]>([])
+  const [tickets, setTickets] = useState<any[]>([])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -56,7 +56,7 @@ export default function Dashboard() {
     if (session) {
       fetchSurveys()
       fetchUserPlan()
-      fetchPlanSlots()
+      fetchTickets()
     }
   }, [session])
 
@@ -72,15 +72,20 @@ export default function Dashboard() {
     }
   }, [])
 
-  const fetchPlanSlots = async () => {
+
+  const fetchTickets = async () => {
     try {
-      const response = await fetch('/api/user/plan-slots')
+      console.log('Fetching tickets for dashboard...')
+      const response = await fetch('/api/user/tickets')
       if (response.ok) {
         const data = await response.json()
-        setPlanSlots(data.planSlots || [])
+        console.log('Dashboard tickets data:', data)
+        setTickets(data.tickets || [])
+      } else {
+        console.error('Failed to fetch tickets:', response.status, response.statusText)
       }
     } catch (error) {
-      console.error('Failed to fetch plan slots:', error)
+      console.error('Failed to fetch tickets:', error)
     }
   }
 
@@ -206,7 +211,22 @@ export default function Dashboard() {
                     チケットシステム
                   </h3>
                   <p className="text-xs sm:text-sm text-blue-700">
-                    <span className="block sm:inline">無料チケット: 3枚</span>
+                    <span className="block sm:inline">
+                      {tickets.length > 0 ? (
+                        tickets.map((ticket, index) => (
+                          <span key={ticket.ticketType}>
+                            {ticket.ticketType === 'FREE' && '無料チケット'}
+                            {ticket.ticketType === 'STANDARD' && 'スタンダードチケット'}
+                            {ticket.ticketType === 'PROFESSIONAL' && 'プロフェッショナルチケット'}
+                            {ticket.ticketType === 'ENTERPRISE' && 'エンタープライズチケット'}
+                            : {ticket.remainingTickets}枚
+                            {index < tickets.length - 1 && ', '}
+                          </span>
+                        ))
+                      ) : (
+                        '無料チケット: 3枚'
+                      )}
+                    </span>
                     <span className="hidden sm:inline"> | </span>
                     <span className="block sm:inline">アンケート作成時にチケットを選択</span>
                     <span className="hidden sm:inline"> | </span>
@@ -231,53 +251,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* プラン枠数表示 */}
-          {planSlots.length > 0 && (
-            <div className="mb-8">
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-green-900 mb-4">
-                  プラン枠数
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {planSlots.map((slot) => (
-                    <div key={slot.id} className="bg-white rounded-lg p-4 border border-green-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700">
-                          {slot.planType === 'FREE' ? '基本プラン' :
-                           slot.planType === 'STANDARD' ? 'スタンダードプラン' :
-                           slot.planType === 'PROFESSIONAL' ? 'プロフェッショナルプラン' :
-                           slot.planType === 'ENTERPRISE' ? 'エンタープライズプラン' :
-                           slot.planType}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(slot.purchasedAt).toLocaleDateString('ja-JP')}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl font-bold text-green-600">
-                          {slot.remainingSlots}
-                        </span>
-                        <span className="text-sm text-gray-600">
-                          残り枠数
-                        </span>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        使用済み: {slot.usedSlots} / {slot.totalSlots}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 text-center">
-                  <Link
-                    href="/plans"
-                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
-                  >
-                    追加プランを購入
-                  </Link>
-                </div>
-              </div>
-            </div>
-          )}
 
         {surveys.length === 0 ? (
           <div className="text-center py-12">

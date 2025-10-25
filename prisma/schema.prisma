@@ -68,6 +68,8 @@ model User {
   invitedUsers           User[]                 @relation("UserInviter")
   invitations            Invitation[]           @relation("InvitationCreator")
   receivedInvitation     Invitation?            @relation("InvitationReceiver")
+  // お知らせ関連リレーション
+  createdAnnouncements   Announcement[]         @relation("AnnouncementCreator")
 }
 
 model VerificationToken {
@@ -93,6 +95,8 @@ model Survey {
   
   // アンケート単位のチケット設定
   ticketType      TicketType   @default(FREE)  // このアンケートのチケット
+  ticketId        String?      // 使用したチケットのID
+  paymentId       String?      // 決済ID
   surveyEndDate   DateTime?    // アンケート終了日（回答募集終了後）
   dataRetentionDays Int?       // データ保存期間（日数）
   
@@ -250,9 +254,11 @@ model Announcement {
   targetUsers Json?
   totalSent   Int                    @default(0)
   totalRead   Int                    @default(0)
+  createdBy   String                 // 配信者（管理者）のユーザーID
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
   deliveries  AnnouncementDelivery[]
+  creator     User                   @relation("AnnouncementCreator", fields: [createdBy], references: [id])
 }
 
 model AnnouncementDelivery {

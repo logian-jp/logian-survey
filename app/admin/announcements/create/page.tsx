@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AnnouncementType, PlanType } from '@prisma/client'
+import { AnnouncementType } from '@prisma/client'
 import RichTextEditor from '@/components/RichTextEditor'
 
 interface ConditionConfig {
@@ -79,7 +79,7 @@ export default function CreateAnnouncementPage() {
     }))
   }
 
-  const planTypes = Object.values(PlanType)
+  const ticketTypes = ['FREE', 'STANDARD', 'PREMIUM', 'ENTERPRISE']
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -117,7 +117,7 @@ export default function CreateAnnouncementPage() {
                   onChange={(content) => setFormData(prev => ({ ...prev, content }))}
                   placeholder="お知らせの内容を入力（太字、色変更、動画埋め込み等が可能）"
                   allowVideo={true}
-                  userPlan="ENTERPRISE"
+                  ticketType="ENTERPRISE"
                 />
               </div>
 
@@ -168,36 +168,36 @@ export default function CreateAnnouncementPage() {
             </div>
           </div>
 
-          {/* 対象プラン設定 */}
+          {/* 対象チケット設定 */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">対象プラン</h2>
+            <h2 className="text-lg font-semibold mb-4">対象チケット</h2>
             <div className="space-y-2">
-              {planTypes.map((planType) => (
-                <label key={planType} className="flex items-center">
+              {ticketTypes.map((ticketType) => (
+                <label key={ticketType} className="flex items-center">
                   <input
                     type="checkbox"
-                    checked={formData.targetPlans.includes(planType)}
+                    checked={formData.targetPlans.includes(ticketType)}
                     onChange={(e) => {
                       if (e.target.checked) {
                         setFormData(prev => ({ 
                           ...prev, 
-                          targetPlans: [...prev.targetPlans, planType] 
+                          targetPlans: [...prev.targetPlans, ticketType] 
                         }))
                       } else {
                         setFormData(prev => ({ 
                           ...prev, 
-                          targetPlans: prev.targetPlans.filter(p => p !== planType) 
+                          targetPlans: prev.targetPlans.filter(p => p !== ticketType) 
                         }))
                       }
                     }}
                     className="mr-2"
                   />
-                  <span className="text-sm text-gray-700">{planType}</span>
+                  <span className="text-sm text-gray-700">{ticketType}</span>
                 </label>
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              何も選択しない場合は全プランが対象になります
+              何も選択しない場合は全チケットが対象になります
             </p>
           </div>
 

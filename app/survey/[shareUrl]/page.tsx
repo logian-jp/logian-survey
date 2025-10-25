@@ -414,7 +414,10 @@ export default function SurveyPage() {
                           </label>
                 
                 {question.description && (
-                  <p className="text-sm text-gray-500">{question.description}</p>
+                  <div 
+                    className="text-sm text-gray-500 rich-text-content"
+                    dangerouslySetInnerHTML={{ __html: question.description }}
+                  />
                 )}
 
                 {question.type === 'TEXT' && (

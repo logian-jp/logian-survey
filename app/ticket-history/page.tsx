@@ -10,6 +10,12 @@ interface TicketPurchase {
   amount: number
   currency: string
   createdAt: string
+  metadata?: {
+    type?: string
+    invitedUserName?: string
+    invitedUserEmail?: string
+    [key: string]: any
+  } | null
   survey?: {
     id: string
     title: string
@@ -135,13 +141,34 @@ export default function TicketHistoryPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-xl font-bold text-gray-900">
-                        ¥{purchase.amount.toLocaleString()}
+                        {purchase.amount === 0 ? (
+                          <span className="text-green-600">招待リワード</span>
+                        ) : (
+                          `¥${purchase.amount.toLocaleString()}`
+                        )}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {purchase.currency.toUpperCase()}
+                        {purchase.amount === 0 ? '無料' : purchase.currency.toUpperCase()}
                       </div>
                     </div>
                   </div>
+
+                  {/* 招待リワードの詳細情報 */}
+                  {purchase.amount === 0 && purchase.metadata?.type === 'invitation_reward' && (
+                    <div className="border-t pt-4">
+                      <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                        <div className="flex items-center mb-2">
+                          <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-sm font-medium text-green-800">招待リワード</span>
+                        </div>
+                        <div className="text-sm text-green-700">
+                          招待したユーザー: {purchase.metadata.invitedUserName} ({purchase.metadata.invitedUserEmail})
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* 関連するアンケート */}
                   {purchase.survey ? (
@@ -200,7 +227,7 @@ export default function TicketHistoryPage() {
         {purchases.length > 0 && (
           <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">購入統計</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
                   {purchases.length}
@@ -212,6 +239,12 @@ export default function TicketHistoryPage() {
                   ¥{purchases.reduce((sum, purchase) => sum + purchase.amount, 0).toLocaleString()}
                 </div>
                 <div className="text-sm text-gray-500">総購入金額</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">
+                  {purchases.filter(p => p.amount === 0).length}
+                </div>
+                <div className="text-sm text-gray-500">招待リワード</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">
