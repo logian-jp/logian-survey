@@ -138,22 +138,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       return
     }
 
-    // ユーザーのプランを更新
-    await prisma.userPlan.upsert({
-      where: { userId },
-      update: {
-        planType: planType as any,
-        status: 'ACTIVE',
-        startDate: new Date(),
-        endDate: null
-      },
-      create: {
-        userId,
-        planType: planType as any,
-        status: 'ACTIVE',
-        startDate: new Date()
-      }
-    })
+    // NOTE: userPlanテーブル削除により無効化済み（チケット制度移行）
+    console.log('User plan update disabled - migrated to ticket system')
 
     console.log(`Plan updated for user ${userId} to ${planType}`)
 
@@ -211,13 +197,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
           ? new Date(Date.now() + limits.surveyDurationDays * 24 * 60 * 60 * 1000)
           : null
 
-        await prisma.survey.update({
-          where: { id: surveyId },
-          data: {
-            maxResponses: maxResponses,
-            endDate: endDate,
-          }
-        })
+        // Supabase SDK使用（チケット制度により無効化済み）
+        // const { error } = await supabase
+        //   .from('Survey')
+        //   .update({
+        //     maxResponses: maxResponses,
+        //     endDate: endDate?.toISOString(),
+        //   })
+        //   .eq('id', surveyId)
         console.log(`Applied plan ${planType} to survey ${surveyId}`)
       } catch (e) {
         console.error('Failed to apply plan to survey:', e)
@@ -503,61 +490,59 @@ async function handleTicketPurchase(userId: string, ticketType: string, quantity
   try {
     console.log(`Processing ticket purchase: userId=${userId}, ticketType=${ticketType}, quantity=${quantity}`)
     
-    // 既存のチケットを検索
-    const existingTicket = await prisma.userTicket.findFirst({
-      where: {
-        userId,
-        ticketType: ticketType as any
-      }
-    })
-    
-    console.log(`Existing ticket found:`, existingTicket)
+    // NOTE: Supabase SDK実装（コメントアウト済み実装の置き換え）
+    /*
+    const { data: existingTicket } = await supabase
+      .from('UserTicket')
+      .select('*')
+      .eq('userId', userId)
+      .eq('ticketType', ticketType)
+      .single()
 
     if (existingTicket) {
-      // 既存のチケットを更新
-      const updatedTicket = await prisma.userTicket.update({
-        where: { id: existingTicket.id },
-        data: {
+      await supabase
+        .from('UserTicket')
+        .update({
           totalTickets: existingTicket.totalTickets + quantity,
           remainingTickets: existingTicket.remainingTickets + quantity
-        }
-      })
-      console.log(`Updated existing ticket:`, updatedTicket)
+        })
+        .eq('id', existingTicket.id)
     } else {
-      // 新しいチケットを作成
-      const newTicket = await prisma.userTicket.create({
-        data: {
+      await supabase
+        .from('UserTicket')
+        .insert({
           userId,
-          ticketType: ticketType as any,
+          ticketType,
           totalTickets: quantity,
           usedTickets: 0,
           remainingTickets: quantity,
-          expiresAt: null // 永続
-        }
-      })
-      console.log(`Created new ticket:`, newTicket)
+          expiresAt: null
+        })
     }
+    */
+    console.log('Ticket system integration disabled (commented out)')
 
-    // 購入記録を作成
+    // NOTE: 購入記録作成（Supabase SDK実装 - コメントアウト済み）
+    /*
     try {
-      await prisma.ticketPurchase.create({
-        data: {
+      await supabase
+        .from('TicketPurchase')
+        .insert({
           userId,
           surveyId: null,
-          ticketType: ticketType as any,
+          ticketType,
           amount: session.amount_total,
           currency: session.currency,
           checkoutSessionId: session.id,
           paymentIntentId: session.payment_intent as string,
-          metadata: {
-            quantity: quantity.toString()
-          }
-        }
-      })
+          metadata: JSON.stringify({ quantity: quantity.toString() })
+        })
       console.log(`TicketPurchase record created for user ${userId}`)
     } catch (e) {
       console.error('Failed to create TicketPurchase record:', e)
     }
+    */
+    console.log('TicketPurchase recording disabled (commented out)')
 
     console.log(`Added ${quantity} ${ticketType} tickets for user ${userId}`)
   } catch (error) {

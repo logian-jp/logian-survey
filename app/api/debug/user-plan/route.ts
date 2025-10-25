@@ -35,30 +35,27 @@ export async function GET() {
     console.log('Session user ID:', session.user.id)
     console.log('Session user email:', session.user.email)
 
-    // メールアドレスでユーザーを検索
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      // TODO: userPlan参照を削除（チケット制度移行のため）
-    })
+    // メールアドレスでユーザーを検索 (Supabase SDK使用)
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
+      console.error('User not found:', userError)
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
     console.log('Found user:', {
       id: user.id,
       email: user.email,
-      name: user.name,
-      userPlan: user.userPlan
+      name: user.name
     })
 
-    // 全ユーザープランを確認
-    const allUserPlans = await prisma.userPlan.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    console.log('All user plans for this user:', allUserPlans)
+    // 注：userPlanテーブルは削除済み（チケット制度移行のため）
+    const allUserPlans = [] // 空配列
+    console.log('User plans disabled - migrated to ticket system')
 
     return NextResponse.json({
       user: {

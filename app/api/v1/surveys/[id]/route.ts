@@ -48,35 +48,35 @@ export async function GET(
 
     const surveyId = (await params).id
 
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        // ユーザー認証の場合、自分のアンケートのみ
-        ...(user && !apiUser ? { userId: user.id } : {}),
-      },
-      include: {
-        questions: {
-          orderBy: {
-            order: 'asc',
-          },
-        },
-        _count: {
-          select: {
-            responses: true,
-          },
-        },
-      },
-    })
+    // アンケートを取得 (Supabase SDK使用)
+    let surveyQuery = supabase
+      .from('Survey')
+      .select('*, questions:Question(*)')
+      .eq('id', surveyId)
 
-    if (!survey) {
-      return NextResponse.json(
-        { message: 'Survey not found' },
-        { status: 404 }
-      )
+    // ユーザー認証の場合、自分のアンケートのみ
+    if (user && !apiUser) {
+      surveyQuery = surveyQuery.eq('userId', user.id)
     }
 
+    const { data: survey, error: surveyError } = await surveyQuery.single()
+
+    if (surveyError || !survey) {
+      console.error('Survey not found:', surveyError)
+      return NextResponse.json({ message: 'Survey not found' }, { status: 404 })
+    }
+
+    // 回答数を別途取得
+    const { count: responseCount } = await supabase
+      .from('Response')
+      .select('*', { count: 'exact', head: true })
+      .eq('surveyId', surveyId)
+
+    // 質問をソート
+    const sortedQuestions = (survey.questions || []).sort((a: any, b: any) => a.order - b.order)
+
     // 質問のオプションをパース
-    const questionsWithParsedOptions = survey.questions.map(question => ({
+    const questionsWithParsedOptions = sortedQuestions.map((question: any) => ({
       id: question.id,
       type: question.type,
       title: question.title,
@@ -95,7 +95,7 @@ export async function GET(
       shareUrl: survey.shareUrl,
       createdAt: survey.createdAt,
       updatedAt: survey.updatedAt,
-      responseCount: survey._count.responses,
+      responseCount: responseCount || 0,
       questions: questionsWithParsedOptions,
     })
   } catch (error) {
@@ -123,31 +123,44 @@ export async function PUT(
     const surveyId = (await params).id
     const { title, description, status } = await request.json()
 
-    // アンケートの存在確認と権限チェック
-    const existingSurvey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        // ユーザー認証の場合、自分のアンケートのみ
-        ...(user && !apiUser ? { userId: user.id } : {}),
-      },
-    })
+    // アンケートの存在確認と権限チェック (Supabase SDK使用)
+    let checkQuery = supabase
+      .from('Survey')
+      .select('*')
+      .eq('id', surveyId)
 
-    if (!existingSurvey) {
+    // ユーザー認証の場合、自分のアンケートのみ
+    if (user && !apiUser) {
+      checkQuery = checkQuery.eq('userId', user.id)
+    }
+
+    const { data: existingSurvey, error: checkError } = await checkQuery.single()
+
+    if (checkError || !existingSurvey) {
+      console.error('Survey not found for update:', checkError)
       return NextResponse.json(
         { message: 'Survey not found' },
         { status: 404 }
       )
     }
 
-    // アンケートを更新
-    const updatedSurvey = await prisma.survey.update({
-      where: { id: surveyId },
-      data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description }),
-        ...(status && { status }),
-      },
-    })
+    // アンケートを更新 (Supabase SDK使用)
+    const updateData: any = {}
+    if (title) updateData.title = title
+    if (description !== undefined) updateData.description = description
+    if (status) updateData.status = status
+
+    const { data: updatedSurvey, error: updateError } = await supabase
+      .from('Survey')
+      .update(updateData)
+      .eq('id', surveyId)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Failed to update survey:', updateError)
+      return NextResponse.json({ message: 'Failed to update survey' }, { status: 500 })
+    }
 
     return NextResponse.json(updatedSurvey)
   } catch (error) {
@@ -174,26 +187,37 @@ export async function DELETE(
 
     const surveyId = (await params).id
 
-    // アンケートの存在確認と権限チェック
-    const existingSurvey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        // ユーザー認証の場合、自分のアンケートのみ
-        ...(user && !apiUser ? { userId: user.id } : {}),
-      },
-    })
+    // アンケートの存在確認と権限チェック (Supabase SDK使用)
+    let deleteCheckQuery = supabase
+      .from('Survey')
+      .select('*')
+      .eq('id', surveyId)
 
-    if (!existingSurvey) {
+    // ユーザー認証の場合、自分のアンケートのみ
+    if (user && !apiUser) {
+      deleteCheckQuery = deleteCheckQuery.eq('userId', user.id)
+    }
+
+    const { data: existingSurvey, error: checkError } = await deleteCheckQuery.single()
+
+    if (checkError || !existingSurvey) {
+      console.error('Survey not found for deletion:', checkError)
       return NextResponse.json(
         { message: 'Survey not found' },
         { status: 404 }
       )
     }
 
-    // アンケートを削除（関連する質問と回答も自動削除）
-    await prisma.survey.delete({
-      where: { id: surveyId },
-    })
+    // アンケートを削除 (Supabase SDK使用)
+    const { error: deleteError } = await supabase
+      .from('Survey')
+      .delete()
+      .eq('id', surveyId)
+
+    if (deleteError) {
+      console.error('Failed to delete survey:', deleteError)
+      return NextResponse.json({ message: 'Failed to delete survey' }, { status: 500 })
+    }
 
     return NextResponse.json({ message: 'Survey deleted successfully' })
   } catch (error) {

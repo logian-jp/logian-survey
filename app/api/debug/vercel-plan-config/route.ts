@@ -22,27 +22,12 @@ export async function GET() {
   try {
     console.log('Checking Vercel plan configuration...')
     
-    // プラン設定を取得
-    const planConfigs = await prisma.planConfig.findMany({
-      orderBy: {
-        sortOrder: 'asc'
-      }
-    })
+    // NOTE: チケット制度移行により無効化済み
+    const planConfigs = [] // 空配列
+    console.log('Found plan configs: 0 (disabled)')
     
-    console.log('Found plan configs:', planConfigs.length)
-    
-    // ユーザープランを取得
-    const userPlans = await prisma.userPlan.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+    // NOTE: チケット制度移行により無効化済み
+    const userPlans = [] // 空配列
     
     console.log('Found user plans:', userPlans.length)
     

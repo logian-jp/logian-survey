@@ -62,24 +62,49 @@ export async function GET(request: NextRequest) {
       whereClause.status = status
     }
 
-    const surveys = await prisma.survey.findMany({
-      where: whereClause,
-      include: {
-        _count: {
-          select: {
-            questions: true,
-            responses: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-      skip: offset,
-    })
+    // アンケート一覧を取得 (Supabase SDK使用)
+    let query = supabase
+      .from('Survey')
+      .select('*')
+      .order('createdAt', { ascending: false })
+      .range(offset, offset + limit - 1)
 
-    const surveysWithCounts = surveys.map(survey => ({
+    // ユーザー認証の場合、自分のアンケートのみ
+    if (user && !apiUser) {
+      query = query.eq('userId', user.id)
+    }
+    
+    // ステータスフィルター
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    const { data: surveys, error: surveyError } = await query
+
+    if (surveyError) {
+      console.error('Failed to fetch surveys:', surveyError)
+      return NextResponse.json({ message: 'Failed to fetch surveys' }, { status: 500 })
+    }
+
+    // 各アンケートの質問数と回答数を別途取得
+    const surveysWithCounts = await Promise.all(
+      (surveys || []).map(async (survey) => {
+        const [questionCount, responseCount] = await Promise.all([
+          supabase.from('Question').select('*', { count: 'exact', head: true }).eq('surveyId', survey.id),
+          supabase.from('Response').select('*', { count: 'exact', head: true }).eq('surveyId', survey.id)
+        ])
+
+        return {
+          ...survey,
+          _count: {
+            questions: questionCount.count || 0,
+            responses: responseCount.count || 0
+          }
+        }
+      })
+    )
+
+    const formattedSurveys = surveysWithCounts.map(survey => ({
       id: survey.id,
       title: survey.title,
       description: survey.description,
@@ -92,11 +117,11 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({
-      surveys: surveysWithCounts,
+      surveys: formattedSurveys,
       pagination: {
         limit,
         offset,
-        total: surveys.length,
+        total: formattedSurveys.length,
       },
     })
   } catch (error) {
@@ -130,31 +155,43 @@ export async function POST(request: NextRequest) {
     // ユーザーIDを決定
     const userId = user?.id || 'api-user' // APIユーザーの場合は仮のID
 
-    // アンケート作成
-    const survey = await prisma.survey.create({
-      data: {
+    // アンケート作成 (Supabase SDK使用)
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .insert({
         title,
         description: description || null,
         userId: userId,
-      },
-    })
+      })
+      .select()
+      .single()
 
-    // 質問を作成
+    if (surveyError) {
+      console.error('Failed to create survey:', surveyError)
+      return NextResponse.json({ message: 'Failed to create survey' }, { status: 500 })
+    }
+
+    // 質問を作成 (Supabase SDK使用)
     if (questions && Array.isArray(questions)) {
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i]
-        await prisma.question.create({
-          data: {
+        const { error: questionError } = await supabase
+          .from('Question')
+          .insert({
             surveyId: survey.id,
             type: question.type,
             title: question.title,
             description: question.description || null,
             required: question.required || false,
             order: i,
-            options: question.options ? JSON.stringify(question.options) : undefined,
-            settings: question.settings ? JSON.stringify(question.settings) : undefined,
-          },
-        })
+            options: question.options ? JSON.stringify(question.options) : null,
+            settings: question.settings ? JSON.stringify(question.settings) : null,
+          })
+
+        if (questionError) {
+          console.error('Failed to create question:', questionError)
+          return NextResponse.json({ message: 'Failed to create question' }, { status: 500 })
+        }
       }
     }
 
