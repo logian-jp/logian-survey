@@ -46,15 +46,17 @@ export async function PUT(
       )
     }
 
-    // プランタイプの重複チェック（自分以外）
-    const existingPlan = await prisma.planConfig.findFirst({
-      where: {
-        planType,
-        id: { not: (await params).id }
-      }
-    })
+    const { id } = await params
 
-    if (existingPlan) {
+    // プランタイプの重複チェック（自分以外）
+    const { data: existingPlan, error: checkError } = await supabase
+      .from('PlanConfig')
+      .select('*')
+      .eq('planType', planType)
+      .neq('id', id)
+      .single()
+
+    if (!checkError && existingPlan) {
       return NextResponse.json(
         { message: 'Plan type already exists' },
         { status: 400 }
@@ -62,11 +64,13 @@ export async function PUT(
     }
 
     // 既存のプラン設定を取得
-    const currentPlan = await prisma.planConfig.findUnique({
-      where: { id: (await params).id }
-    })
+    const { data: currentPlan, error: currentPlanError } = await supabase
+      .from('PlanConfig')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-    if (!currentPlan) {
+    if (currentPlanError || !currentPlan) {
       return NextResponse.json(
         { message: 'Plan config not found' },
         { status: 404 }
@@ -74,9 +78,9 @@ export async function PUT(
     }
 
     // データベースを更新
-    const planConfig = await prisma.planConfig.update({
-      where: { id: (await params).id },
-      data: {
+    const { data: planConfig, error: updateError } = await supabase
+      .from('PlanConfig')
+      .update({
         planType,
         name,
         description,
@@ -85,8 +89,15 @@ export async function PUT(
         limits,
         isActive,
         sortOrder
-      }
-    })
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Error updating plan config:', updateError)
+      return NextResponse.json({ message: 'Failed to update plan config' }, { status: 500 })
+    }
 
     // Stripe商品・価格の更新
     try {
@@ -130,10 +141,14 @@ export async function PUT(
           }
 
           // データベースに新しい価格IDを保存
-          await prisma.planConfig.update({
-            where: { id: (await params).id },
-            data: { stripePriceId: newPrice.id }
-          })
+          const { error: priceUpdateError } = await supabase
+            .from('PlanConfig')
+            .update({ stripePriceId: newPrice.id })
+            .eq('id', id)
+
+          if (priceUpdateError) {
+            console.error('Error updating price ID:', priceUpdateError)
+          }
         }
       } else {
         // Stripe商品が存在しない場合は作成
@@ -166,13 +181,17 @@ export async function PUT(
         })
 
         // データベースにStripe情報を保存
-        await prisma.planConfig.update({
-          where: { id: (await params).id },
-          data: {
+        const { error: stripeUpdateError } = await supabase
+          .from('PlanConfig')
+          .update({
             stripeProductId: product.id,
             stripePriceId: price.id
-          }
-        })
+          })
+          .eq('id', id)
+
+        if (stripeUpdateError) {
+          console.error('Error updating Stripe info:', stripeUpdateError)
+        }
       }
     } catch (stripeError) {
       console.error('Stripe update error:', stripeError)
@@ -206,9 +225,16 @@ export async function DELETE(
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
-    await prisma.planConfig.delete({
-      where: { id: (await params).id }
-    })
+    const { id } = await params
+    const { error: deleteError } = await supabase
+      .from('PlanConfig')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      console.error('Error deleting plan config:', deleteError)
+      return NextResponse.json({ message: 'Failed to delete plan config' }, { status: 500 })
+    }
 
     return NextResponse.json({ message: 'Plan config deleted successfully' })
   } catch (error) {

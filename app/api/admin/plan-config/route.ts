@@ -28,18 +28,21 @@ export async function GET() {
       return NextResponse.json({ message: 'Database connection error' }, { status: 500 })
     }
 
-    console.log('Prisma client available:', !!prisma)
-    console.log('PlanConfig model available:', !!prisma.planConfig)
+    console.log('Supabase client available:', !!supabase)
 
     try {
-      const planConfigs = await prisma.planConfig.findMany({
-        orderBy: {
-          sortOrder: 'asc'
-        }
-      })
+      const { data: planConfigs, error: fetchError } = await supabase
+        .from('PlanConfig')
+        .select('*')
+        .order('sortOrder', { ascending: true })
 
-      console.log('Found plan configs:', planConfigs.length)
-      return NextResponse.json(planConfigs)
+      if (fetchError) {
+        console.error('Error fetching plan configs:', fetchError)
+        return NextResponse.json({ message: 'Failed to fetch plan configs' }, { status: 500 })
+      }
+
+      console.log('Found plan configs:', planConfigs?.length || 0)
+      return NextResponse.json(planConfigs || [])
     } catch (error: any) {
       if (error.code === 'P2021') {
         // テーブルが存在しない場合、空の配列を返す
@@ -90,19 +93,22 @@ export async function POST(request: NextRequest) {
     }
 
     // プランタイプの重複チェック
-    const existingPlan = await prisma.planConfig.findUnique({
-      where: { planType }
-    })
+    const { data: existingPlan, error: checkError } = await supabase
+      .from('PlanConfig')
+      .select('*')
+      .eq('planType', planType)
+      .single()
 
-    if (existingPlan) {
+    if (!checkError && existingPlan) {
       return NextResponse.json(
         { message: 'Plan type already exists' },
         { status: 400 }
       )
     }
 
-    const planConfig = await prisma.planConfig.create({
-      data: {
+    const { data: planConfig, error: createError } = await supabase
+      .from('PlanConfig')
+      .insert({
         planType,
         name,
         description,
@@ -111,8 +117,14 @@ export async function POST(request: NextRequest) {
         limits,
         isActive: isActive ?? true,
         sortOrder: sortOrder ?? 0
-      }
-    })
+      })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Error creating plan config:', createError)
+      return NextResponse.json({ message: 'Failed to create plan config' }, { status: 500 })
+    }
 
     return NextResponse.json(planConfig)
   } catch (error) {
