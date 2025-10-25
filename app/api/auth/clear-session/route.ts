@@ -10,14 +10,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // セッションを無効化するために、データベースからセッションを削除
-    const { prisma } = await import('@/lib/prisma')
+    // セッションを無効化するために、データベースからセッションを削除 (Supabase SDK使用)
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
     
-    await prisma.session.deleteMany({
-      where: {
-        userId: session.user.id
-      }
-    })
+    const { error } = await supabase
+      .from('Session')
+      .delete()
+      .eq('userId', session.user.id)
+
+    if (error) {
+      console.error('Failed to clear sessions:', error)
+      return NextResponse.json({ error: 'Failed to clear session' }, { status: 500 })
+    }
 
     return NextResponse.json({ message: 'Session cleared successfully' })
   } catch (error) {

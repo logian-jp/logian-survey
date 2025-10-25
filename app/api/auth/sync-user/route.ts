@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { createClient } from '@supabase/supabase-js'
 
-const prisma = new PrismaClient()
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,47 +15,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // ユーザーが既に存在するかチェック
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
+    // ユーザーが既に存在するかチェック (Supabase SDK使用)
+    const { data: existingUser, error: userCheckError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', email)
+      .single()
 
-    if (existingUser) {
+    if (existingUser && !userCheckError) {
       // 既存ユーザーの情報を更新
-      await prisma.user.update({
-        where: { email },
-        data: {
+      const { error: updateError } = await supabase
+        .from('User')
+        .update({
           name: name || existingUser.name,
           image: image || existingUser.image,
-          updatedAt: new Date()
-        }
-      })
+          updatedAt: new Date().toISOString()
+        })
+        .eq('email', email)
+
+      if (updateError) {
+        console.error('Failed to update user:', updateError)
+        return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+      }
     } else {
       // 新規ユーザーを作成
-      await prisma.user.create({
-        data: {
+      const { error: createError } = await supabase
+        .from('User')
+        .insert({
           id,
           email,
           name: name || email,
           image,
           role: 'USER',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      })
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+
+      if (createError) {
+        console.error('Failed to create user:', createError)
+        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
+      }
 
       // TODO: チケット制度移行により、プラン設定を削除
       // デフォルトでチケット制度を使用（プラン設定不要）
-      /*
-      await prisma.userPlan.create({
-        data: {
-          userId: id,
-          planType: 'FREE',
-          status: 'ACTIVE',
-          startDate: new Date()
-        }
-      })
-      */
     }
 
     return NextResponse.json({ success: true })
@@ -59,7 +65,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error syncing user:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  } finally {
-    await prisma.$disconnect()
   }
 }

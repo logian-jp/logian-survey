@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(request: Request) {
   try {
@@ -44,12 +50,14 @@ export async function POST(request: Request) {
       )
     }
 
-    // 既存ユーザーのチェック
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
+    // 既存ユーザーのチェック (Supabase SDK使用)
+    const { data: existingUser, error: userCheckError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', email)
+      .single()
 
-    if (existingUser) {
+    if (existingUser && !userCheckError) {
       return NextResponse.json(
         { 
           message: 'このメールアドレスは既に登録されています',
@@ -62,14 +70,21 @@ export async function POST(request: Request) {
     // パスワードのハッシュ化
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // ユーザー作成
-    const user = await prisma.user.create({
-      data: {
+    // ユーザー作成 (Supabase SDK使用)
+    const { data: user, error: createError } = await supabase
+      .from('User')
+      .insert({
         name,
         email,
         password: hashedPassword
-      }
-    })
+      })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Failed to create user:', createError)
+      return NextResponse.json({ message: 'ユーザー作成に失敗しました' }, { status: 500 })
+    }
 
     return NextResponse.json(
       { 
