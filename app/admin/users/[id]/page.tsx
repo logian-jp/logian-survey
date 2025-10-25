@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
 interface User {
@@ -46,15 +46,10 @@ interface User {
   }>
 }
 
-interface UserDetailPageProps {
-  params: {
-    id: string
-  }
-}
-
-export default function UserDetailPage({ params }: UserDetailPageProps) {
+export default function UserDetailPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const params = useParams()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 

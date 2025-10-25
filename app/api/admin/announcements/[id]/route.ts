@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 // GET: 個別お知らせ取得
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -26,8 +26,9 @@ export async function GET(
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
+    const { id } = await params
     const announcement = await prisma.announcement.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         deliveries: {
           include: {
@@ -76,7 +77,7 @@ export async function GET(
 // PUT: お知らせ更新
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -93,6 +94,7 @@ export async function PUT(
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const {
       title,
@@ -113,7 +115,7 @@ export async function PUT(
     }
 
     const announcement = await prisma.announcement.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         title,
         content,
@@ -147,7 +149,7 @@ export async function PUT(
 // DELETE: お知らせ削除
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -164,9 +166,10 @@ export async function DELETE(
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
+    const { id } = await params
     // お知らせが存在するかチェック
     const existingAnnouncement = await prisma.announcement.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     })
 
     if (!existingAnnouncement) {
@@ -178,7 +181,7 @@ export async function DELETE(
 
     // お知らせを削除（関連する配信レコードも自動削除される）
     await prisma.announcement.delete({
-      where: { id: params.id }
+      where: { id: id }
     })
 
     return NextResponse.json({
