@@ -17,28 +17,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const purchases = await (prisma as any).ticketPurchase.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        survey: {
-          select: {
-            id: true,
-            title: true
-          }
-        }
-      },
-      orderBy: {
-        purchasedAt: 'desc'
-      }
-    })
+    const { data: purchases, error } = await supabase
+      .from('TicketPurchase')
+      .select(`
+        *,
+        user:User(id, name, email),
+        survey:Survey(id, title)
+      `)
+      .order('purchasedAt', { ascending: false })
 
-    return NextResponse.json({ purchases })
+    if (error) {
+      console.error('Error fetching purchases:', error)
+      return NextResponse.json({ error: 'Failed to fetch purchases' }, { status: 500 })
+    }
+
+    return NextResponse.json({ purchases: purchases || [] })
   } catch (error) {
     console.error('Error fetching purchases:', error)
     return NextResponse.json(

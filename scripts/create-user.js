@@ -46,17 +46,24 @@ async function createUser() {
     console.log(`- Role: ${user.role}`)
     
     // ユーザープランも作成
-      data: {
+    const { data: userPlan, error: planError } = await supabase
+      .from('UserPlan')
+      .insert({
         userId: user.id,
         planType: 'FREE',
         status: 'ACTIVE',
-        startDate: new Date()
-      }
-    })
+        startDate: new Date().toISOString()
+      })
+      .select()
+      .single()
     
-    console.log('User plan created:')
-    console.log(`- Plan Type: ${userPlan.planType}`)
-    console.log(`- Status: ${userPlan.status}`)
+    if (planError) {
+      console.error('Error creating user plan:', planError)
+    } else {
+      console.log('User plan created:')
+      console.log(`- Plan Type: ${userPlan.planType}`)
+      console.log(`- Status: ${userPlan.status}`)
+    }
     
   } catch (error) {
     console.error('Error creating user:', error)

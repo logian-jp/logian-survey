@@ -149,13 +149,20 @@ export async function getSurveyTicketType(surveyId: string): Promise<string> {
 // ユーザーのチケット数を取得
 export async function getUserTicketCount(userId: string, ticketType: string): Promise<number> {
   try {
-    const userTicket = await (prisma as any).userTicket.findFirst({
-      where: {
-        userId,
-        ticketType
-      }
-    })
-    return userTicket ? userTicket.remainingTickets : 0
+    const { data: userTicket, error } = await supabase
+      .from('UserTicket')
+      .select('remainingTickets')
+      .eq('userId', userId)
+      .eq('ticketType', ticketType)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Failed to get user ticket count:', error)
+      return 0
+    }
+
+    return userTicket?.remainingTickets || 0
   } catch (error) {
     console.error('Failed to get user ticket count:', error)
     return 0

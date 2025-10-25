@@ -52,7 +52,7 @@ export async function GET(
     }
 
     // 質問のオプションをパース
-    const questionsWithParsedOptions = (survey.questions || []).map(question => ({
+    const questionsWithParsedOptions = (survey.questions || []).map((question: any) => ({
       ...question,
       options: question.options ? JSON.parse(question.options as string) : null,
       settings: question.settings ? JSON.parse(question.settings as string) : null,

@@ -93,8 +93,8 @@ export async function GET(request: NextRequest) {
       pagination: {
         page,
         limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit)
+        total: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit)
       }
     })
   } catch (error) {

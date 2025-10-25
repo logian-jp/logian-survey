@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     // 統計サマリーを計算
     const totalInvitations = invitationStats.length
-    const usedInvitations = invitationStats.filter(inv => inv.isUsed).length
+    const usedInvitations = invitationStats.filter((inv: any) => inv.isUsed).length
     const pendingInvitations = totalInvitations - usedInvitations
     const successRate = totalInvitations > 0 ? (usedInvitations / totalInvitations) * 100 : 0
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     const inviterBreakdown = inviterStats.map(inviter => {
       const totalInvited = inviter.invitations.length
-      const successfulInvites = inviter.invitations.filter(inv => inv.isUsed).length
+      const successfulInvites = inviter.invitations.filter((inv: any) => inv.isUsed).length
       return {
         inviterId: inviter.id,
         inviterName: inviter.name || inviter.email,

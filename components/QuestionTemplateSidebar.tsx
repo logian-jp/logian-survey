@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 // Prisma型定義をSupabase型定義に置き換え
-type QuestionType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'NUMBER' | 'SELECT' | 'MULTISELECT' | 'RADIO' | 'CHECKBOX' | 'DATE' | 'TIME' | 'DATETIME' | 'FILE' | 'IMAGE' | 'URL' | 'PHONE' | 'RATING' | 'SCALE' | 'MATRIX' | 'RANKING' | 'LOCATION' | 'SECTION' | 'PAGE_BREAK'
+type QuestionType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'NUMBER' | 'SELECT' | 'MULTISELECT' | 'RADIO' | 'CHECKBOX' | 'DATE' | 'TIME' | 'DATETIME' | 'FILE' | 'IMAGE' | 'URL' | 'PHONE' | 'RATING' | 'SCALE' | 'MATRIX' | 'RANKING' | 'LOCATION' | 'SECTION' | 'PAGE_BREAK' | 'PREFECTURE' | 'NAME' | 'AGE_GROUP' | 'FILE_UPLOAD'
 
 interface QuestionTemplate {
   id: string
@@ -137,14 +137,23 @@ export default function QuestionTemplateSidebar({
       EMAIL: 'メールアドレス',
       PHONE: '電話番号',
       DATE: '日付',
+      TIME: '時刻',
+      DATETIME: '日時',
       RADIO: '単一選択',
       CHECKBOX: '複数選択',
       SELECT: 'プルダウン',
+      MULTISELECT: '複数選択（プルダウン）',
       RATING: '評価',
+      SCALE: 'スケール',
+      MATRIX: 'マトリクス',
+      RANKING: 'ランキング',
       PREFECTURE: '都道府県',
       NAME: '名前',
       AGE_GROUP: '年代',
       LOCATION: '位置情報',
+      FILE: 'ファイル',
+      IMAGE: '画像',
+      URL: 'URL',
       FILE_UPLOAD: 'ファイルアップロード',
       SECTION: 'セクション',
       PAGE_BREAK: '改ページ'

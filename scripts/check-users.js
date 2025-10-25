@@ -33,10 +33,13 @@ async function checkUsers() {
     })
 
     // 特定のメールアドレスを検索
-      where: { email: 'noutomi0729@gmail.com' }
-    })
+    const { data: specificUser, error: specificError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', 'noutomi0729@gmail.com')
+      .single()
 
-    if (specificUser) {
+    if (specificUser && !specificError) {
       console.log('\nSpecific user (noutomi0729@gmail.com):')
       console.log(`- ID: ${specificUser.id}`)
       console.log(`- Name: ${specificUser.name || 'N/A'}`)

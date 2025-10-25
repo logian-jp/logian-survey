@@ -37,42 +37,53 @@ export async function POST(request: NextRequest) {
     console.log('[TicketPurchase] user=', session.user.id, 'type=', ticketType, 'qty=', quantity)
 
     // 既存のチケットを検索
-    const existing = await (prisma as any).userTicket.findFirst({
-      where: { userId: session.user.id, ticketType }
-    })
+    const { data: existing, error: findError } = await supabase
+      .from('UserTicket')
+      .select('*')
+      .eq('userId', session.user.id)
+      .eq('ticketType', ticketType)
+      .single()
 
-    if (existing) {
-      try {
-        const updated = await (prisma as any).userTicket.update({
-          where: { id: existing.id },
-          data: {
-            totalTickets: existing.totalTickets + quantity,
-            remainingTickets: existing.remainingTickets + quantity
-          }
+    if (existing && !findError) {
+      // 既存のチケットを更新
+      const { data: updated, error: updateError } = await supabase
+        .from('UserTicket')
+        .update({
+          totalTickets: existing.totalTickets + quantity,
+          remainingTickets: existing.remainingTickets + quantity
         })
-        return NextResponse.json({ ticket: updated })
-      } catch (e: any) {
-        console.error('Update userTicket failed', e)
-        return NextResponse.json({ message: e?.message || 'Update failed' }, { status: 500 })
+        .eq('id', existing.id)
+        .select()
+        .single()
+
+      if (updateError) {
+        console.error('Update userTicket failed', updateError)
+        return NextResponse.json({ message: 'Update failed' }, { status: 500 })
       }
+      
+      return NextResponse.json({ ticket: updated })
     }
 
-    try {
-      const created = await (prisma as any).userTicket.create({
-        data: {
-          userId: session.user.id,
-          ticketType,
-          totalTickets: quantity,
-          usedTickets: 0,
-          remainingTickets: quantity,
-          expiresAt: null
-        }
+    // 新しいチケットを作成
+    const { data: created, error: createError } = await supabase
+      .from('UserTicket')
+      .insert({
+        userId: session.user.id,
+        ticketType,
+        totalTickets: quantity,
+        usedTickets: 0,
+        remainingTickets: quantity,
+        expiresAt: null
       })
-      return NextResponse.json({ ticket: created })
-    } catch (e: any) {
-      console.error('Create userTicket failed', e)
-      return NextResponse.json({ message: e?.message || 'Create failed' }, { status: 500 })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Create userTicket failed', createError)
+      return NextResponse.json({ message: 'Create failed' }, { status: 500 })
     }
+
+    return NextResponse.json({ ticket: created })
   } catch (error: any) {
     console.error('Mock ticket purchase error:', error)
     return NextResponse.json({ message: error?.message || 'Internal server error' }, { status: 500 })

@@ -22,12 +22,6 @@ export async function GET() {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
-    // Prismaクライアントの確認
-    if (!prisma) {
-      console.error('Prisma client is not initialized')
-      return NextResponse.json({ message: 'Database connection error' }, { status: 500 })
-    }
-
     console.log('Supabase client available:', !!supabase)
 
     try {
