@@ -62,7 +62,7 @@ export async function GET(
     }
 
     // アンケートの存在確認と権限チェック
-    const { data: survey, error: surveyError } = await supabase
+    let { data: survey, error: surveyError } = await supabase
       .from('Survey')
       .select(`
         *,
@@ -111,7 +111,7 @@ export async function GET(
 
     // Supabaseでは質問の順序を手動でソート
     if (survey?.questions) {
-      survey.questions.sort((a, b) => (a.order || 0) - (b.order || 0))
+      survey.questions.sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
     }
 
     // レスポンスを別途取得（プレビュー用に5件のみ）

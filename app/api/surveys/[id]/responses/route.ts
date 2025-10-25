@@ -23,7 +23,7 @@ export async function GET(
     const { id: surveyId } = await params
 
     // アンケートの存在確認と権限チェック
-    const { data: survey, error: surveyError } = await supabase
+    let { data: survey, error: surveyError } = await supabase
       .from('Survey')
       .select(`
         *, 

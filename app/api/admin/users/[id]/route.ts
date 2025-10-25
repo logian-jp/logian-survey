@@ -44,41 +44,6 @@ export async function GET(
     }
 
     const user = users?.[0]
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 10
-        },
-        ticketPurchases: {
-          select: {
-            id: true,
-            ticketType: true,
-            amount: true,
-            currency: true,
-            createdAt: true,
-            metadata: true
-          },
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 10
-        },
-        invitations: {
-          select: {
-            id: true,
-            code: true,
-            invitedEmail: true,
-            isUsed: true,
-            createdAt: true,
-            usedAt: true
-          },
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 10
-        }
-      }
-    })
 
     console.log('User query completed, user found:', !!user)
 
