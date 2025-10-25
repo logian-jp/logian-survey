@@ -39,36 +39,31 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    // チケット購入統計
-    const ticketPurchases = await (prisma as any).ticketPurchase.findMany({
-      where: {
-        status: 'ACTIVE',
-        purchasedAt: {
-          gte: startDate
-        }
-      },
-      select: {
-        ticketType: true,
-        amount: true,
-        purchasedAt: true,
-        metadata: true
-      }
-    })
+    // チケット購入統計 (Supabase SDK使用)
+    const { data: ticketPurchases, error: purchaseError } = await supabase
+      .from('TicketPurchase')
+      .select('ticketType, amount, purchasedAt, metadata')
+      .eq('status', 'ACTIVE')
+      .gte('purchasedAt', startDate.toISOString())
 
-    console.log('Ticket purchases found:', ticketPurchases.length)
+    if (purchaseError) {
+      console.error('Error fetching ticket purchases:', purchaseError)
+      return NextResponse.json({ message: 'Failed to fetch ticket purchases' }, { status: 500 })
+    }
 
-    // チケット使用統計
-    const userTickets = await (prisma as any).userTicket.findMany({
-      select: {
-        ticketType: true,
-        totalTickets: true,
-        usedTickets: true,
-        remainingTickets: true,
-        purchasedAt: true
-      }
-    })
+    console.log('Ticket purchases found:', ticketPurchases?.length || 0)
 
-    console.log('User tickets found:', userTickets.length)
+    // チケット使用統計 (Supabase SDK使用)
+    const { data: userTickets, error: ticketError } = await supabase
+      .from('UserTicket')
+      .select('ticketType, totalTickets, usedTickets, remainingTickets, purchasedAt')
+
+    if (ticketError) {
+      console.error('Error fetching user tickets:', ticketError)
+      return NextResponse.json({ message: 'Failed to fetch user tickets' }, { status: 500 })
+    }
+
+    console.log('User tickets found:', userTickets?.length || 0)
 
     // チケットタイプ別の統計を計算
     const ticketStats = {
@@ -79,7 +74,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 購入統計の計算
-    ticketPurchases.forEach((purchase: any) => {
+    ticketPurchases?.forEach((purchase: any) => {
       const ticketType = purchase.ticketType as keyof typeof ticketStats
       if (ticketStats[ticketType]) {
         ticketStats[ticketType].purchased += 1
@@ -88,7 +83,7 @@ export async function GET(request: NextRequest) {
     })
 
     // 使用統計の計算
-    userTickets.forEach((ticket: any) => {
+    userTickets?.forEach((ticket: any) => {
       const ticketType = ticket.ticketType as keyof typeof ticketStats
       if (ticketStats[ticketType]) {
         ticketStats[ticketType].total += ticket.totalTickets
@@ -123,7 +118,7 @@ export async function GET(request: NextRequest) {
       const dayEnd = new Date(date)
       dayEnd.setHours(23, 59, 59, 999)
 
-      const dayRevenue = ticketPurchases
+      const dayRevenue = (ticketPurchases || [])
         .filter((purchase: any) => {
           const purchaseDate = new Date(purchase.purchasedAt)
           return purchaseDate >= dayStart && purchaseDate <= dayEnd
@@ -137,11 +132,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 総売上
-    const totalRevenue = ticketPurchases.reduce((sum: number, purchase: any) => sum + (purchase.amount || 0), 0)
+    const totalRevenue = (ticketPurchases || []).reduce((sum: number, purchase: any) => sum + (purchase.amount || 0), 0)
 
     // 総チケット数
-    const totalTickets = userTickets.reduce((sum: number, ticket: any) => sum + ticket.totalTickets, 0)
-    const totalUsedTickets = userTickets.reduce((sum: number, ticket: any) => sum + ticket.usedTickets, 0)
+    const totalTickets = (userTickets || []).reduce((sum: number, ticket: any) => sum + ticket.totalTickets, 0)
+    const totalUsedTickets = (userTickets || []).reduce((sum: number, ticket: any) => sum + ticket.usedTickets, 0)
     const overallUsageRate = totalTickets > 0 ? (totalUsedTickets / totalTickets) * 100 : 0
 
     const responseData = {
