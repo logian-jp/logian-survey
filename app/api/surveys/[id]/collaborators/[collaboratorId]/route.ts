@@ -40,21 +40,17 @@ export async function PUT(
     }
 
     // 更新対象の協力者情報を取得
-    const collaboratorToUpdate = await prisma.surveyUser.findUnique({
-      where: {
-        id: collaboratorId,
-        surveyId: surveyId
-      },
-      include: {
-        survey: {
-          select: {
-            userId: true // 所有者のIDを取得
-          }
-        }
-      }
-    })
+    const { data: collaboratorToUpdate, error: collaboratorError } = await supabase
+      .from('SurveyUser')
+      .select(`
+        *,
+        survey:Survey!surveyId(userId)
+      `)
+      .eq('id', collaboratorId)
+      .eq('surveyId', surveyId)
+      .single()
 
-    if (!collaboratorToUpdate) {
+    if (collaboratorError || !collaboratorToUpdate) {
       return NextResponse.json({ message: '協力者が見つかりません' }, { status: 404 })
     }
 
@@ -64,24 +60,23 @@ export async function PUT(
     }
 
     // 協力者を更新
-    const updatedCollaborator = await prisma.surveyUser.update({
-      where: {
-        id: collaboratorId,
-        surveyId: surveyId
-      },
-      data: {
+    const { data: updatedCollaborator, error: updateError } = await supabase
+      .from('SurveyUser')
+      .update({
         permission: permission as 'EDIT' | 'VIEW' | 'ADMIN'
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+      })
+      .eq('id', collaboratorId)
+      .eq('surveyId', surveyId)
+      .select(`
+        *,
+        user:User!userId(id, name, email)
+      `)
+      .single()
+
+    if (updateError) {
+      console.error('Error updating collaborator:', updateError)
+      return NextResponse.json({ message: 'Failed to update collaborator' }, { status: 500 })
+    }
 
     return NextResponse.json(updatedCollaborator)
   } catch (error) {
@@ -115,21 +110,17 @@ export async function DELETE(
     }
 
     // 削除対象の協力者情報を取得
-    const collaboratorToDelete = await prisma.surveyUser.findUnique({
-      where: {
-        id: collaboratorId,
-        surveyId: surveyId
-      },
-      include: {
-        survey: {
-          select: {
-            userId: true // 所有者のIDを取得
-          }
-        }
-      }
-    })
+    const { data: collaboratorToDelete, error: deleteCollaboratorError } = await supabase
+      .from('SurveyUser')
+      .select(`
+        *,
+        survey:Survey!surveyId(userId)
+      `)
+      .eq('id', collaboratorId)
+      .eq('surveyId', surveyId)
+      .single()
 
-    if (!collaboratorToDelete) {
+    if (deleteCollaboratorError || !collaboratorToDelete) {
       return NextResponse.json({ message: '協力者が見つかりません' }, { status: 404 })
     }
 
@@ -139,12 +130,16 @@ export async function DELETE(
     }
 
     // 協力者を削除
-    await prisma.surveyUser.delete({
-      where: {
-        id: collaboratorId,
-        surveyId: surveyId
-      }
-    })
+    const { error: deleteError } = await supabase
+      .from('SurveyUser')
+      .delete()
+      .eq('id', collaboratorId)
+      .eq('surveyId', surveyId)
+
+    if (deleteError) {
+      console.error('Error deleting collaborator:', deleteError)
+      return NextResponse.json({ message: 'Failed to delete collaborator' }, { status: 500 })
+    }
 
     return NextResponse.json({ message: 'Collaborator removed successfully' })
   } catch (error) {

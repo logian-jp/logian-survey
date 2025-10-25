@@ -62,36 +62,76 @@ export async function GET(
     }
 
     // アンケートの存在確認と権限チェック
-    console.log('Static prisma:', !!prisma, 'type:', typeof prisma)
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id,
-                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
-              }
-            }
-          }
-        ]
-      },
-      include: {
-        questions: {
-          orderBy: {
-            order: 'asc',
-          },
-        },
-        responses: {
-          include: {
-            answers: true,
-          },
-          take: 5, // プレビュー用に5件のみ取得
-        },
-      },
-    })
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        questions:Question(*)
+      `)
+      .eq('id', surveyId)
+      .or(`userId.eq.${session.user.id},surveyUsers.userId.eq.${session.user.id}`)
+      .single()
+
+    if (surveyError && surveyError.code !== 'PGRST116') {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+    }
+
+    // 権限チェック（SurveyUserから）
+    if (!survey) {
+      const { data: surveyUser, error: surveyUserError } = await supabase
+        .from('SurveyUser')
+        .select('permission')
+        .eq('surveyId', surveyId)
+        .eq('userId', session.user.id)
+        .in('permission', ['EDIT', 'ADMIN', 'VIEW'])
+        .single()
+
+      if (surveyUserError) {
+        return NextResponse.json({ message: 'アンケートが見つからないか、アクセス権限がありません' }, { status: 404 })
+      }
+
+      // 権限があればアンケートを再取得
+      const { data: authorizedSurvey, error: authorizedSurveyError } = await supabase
+        .from('Survey')
+        .select(`
+          *,
+          questions:Question(*)
+        `)
+        .eq('id', surveyId)
+        .single()
+
+      if (authorizedSurveyError) {
+        console.error('Error fetching authorized survey:', authorizedSurveyError)
+        return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+      }
+
+      survey = authorizedSurvey
+    }
+
+    // Supabaseでは質問の順序を手動でソート
+    if (survey?.questions) {
+      survey.questions.sort((a, b) => (a.order || 0) - (b.order || 0))
+    }
+
+    // レスポンスを別途取得（プレビュー用に5件のみ）
+    const { data: responses, error: responsesError } = await supabase
+      .from('Response')
+      .select(`
+        *,
+        answers:Answer(*)
+      `)
+      .eq('surveyId', surveyId)
+      .limit(5)
+      .order('createdAt', { ascending: false })
+
+    if (responsesError) {
+      console.error('Error fetching responses:', responsesError)
+      return NextResponse.json({ message: 'Failed to fetch responses' }, { status: 500 })
+    }
+
+    // surveyオブジェクトにレスポンスを追加
+    survey.responses = responses || []
 
     if (!survey) {
       return NextResponse.json(

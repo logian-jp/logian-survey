@@ -31,32 +31,23 @@ export async function GET(
     }
 
     // アンケート情報を取得
-    const survey = await prisma.survey.findUnique({
-      where: { id: surveyId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        surveyUsers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
-          },
-          orderBy: {
-            createdAt: 'asc'
-          }
-        }
-      }
-    })
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        user:User!userId(id, name, email),
+        surveyUsers:SurveyUser(
+          id, permission, invitedAt, acceptedAt, invitedBy,
+          user:User!userId(id, name, email)
+        )
+      `)
+      .eq('id', surveyId)
+      .single()
+
+    if (surveyError) {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+    }
 
     if (!survey) {
       return NextResponse.json({ message: 'Survey not found' }, { status: 404 })
@@ -115,20 +106,24 @@ export async function POST(
     }
 
     // アンケートの存在確認
-    const survey = await prisma.survey.findUnique({
-      where: { id: surveyId }
-    })
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select('*')
+      .eq('id', surveyId)
+      .single()
 
-    if (!survey) {
+    if (surveyError || !survey) {
       return NextResponse.json({ message: 'アンケートが見つかりません' }, { status: 404 })
     }
 
     // 招待するユーザーを検索
-    const invitedUser = await prisma.user.findUnique({
-      where: { email }
-    })
+    const { data: invitedUser, error: userError } = await supabase
+      .from('User')
+      .select('id, name, email')
+      .eq('email', email)
+      .single()
 
-    if (!invitedUser) {
+    if (userError || !invitedUser) {
       return NextResponse.json({ message: 'このメールアドレスで登録されているユーザーが見つかりません。まずユーザーにアカウント登録をしてもらってください。' }, { status: 404 })
     }
 
@@ -138,37 +133,36 @@ export async function POST(
     }
 
     // 既に招待されているかチェック
-    const existingInvitation = await prisma.surveyUser.findUnique({
-      where: {
-        userId_surveyId: {
-          userId: invitedUser.id,
-          surveyId: surveyId
-        }
-      }
-    })
+    const { data: existingInvitation, error: invitationError } = await supabase
+      .from('SurveyUser')
+      .select('*')
+      .eq('userId', invitedUser.id)
+      .eq('surveyId', surveyId)
+      .single()
 
-    if (existingInvitation) {
+    if (!invitationError && existingInvitation) {
       return NextResponse.json({ message: 'このユーザーは既に招待されています' }, { status: 400 })
     }
 
     // 招待を作成
-    const invitation = await prisma.surveyUser.create({
-      data: {
+    const { data: invitation, error: createError } = await supabase
+      .from('SurveyUser')
+      .insert({
         userId: invitedUser.id,
         surveyId: surveyId,
         permission: permission as 'EDIT' | 'VIEW' | 'ADMIN',
         invitedBy: session.user.id
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+      })
+      .select(`
+        *,
+        user:User!userId(id, name, email)
+      `)
+      .single()
+
+    if (createError) {
+      console.error('Error creating invitation:', createError)
+      return NextResponse.json({ message: 'Failed to create invitation' }, { status: 500 })
+    }
 
     return NextResponse.json(invitation, { status: 201 })
   } catch (error) {

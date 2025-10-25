@@ -23,29 +23,52 @@ export async function GET(
     const { id: surveyId } = await params
 
     // アンケートの存在確認と権限チェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id,
-                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
-              }
-            }
-          }
-        ]
-      },
-      include: {
-        questions: {
-          orderBy: {
-            order: 'asc',
-          },
-        },
-      },
-    })
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *, 
+        questions:Question!inner(*)
+      `)
+      .eq('id', surveyId)
+      .or(`userId.eq.${session.user.id},surveyUsers.userId.eq.${session.user.id}`)
+      .single()
+
+    if (surveyError && surveyError.code !== 'PGRST116') {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+    }
+
+    // 権限チェック（SurveyUserから）
+    if (!survey) {
+      const { data: surveyUser, error: surveyUserError } = await supabase
+        .from('SurveyUser')
+        .select('permission')
+        .eq('surveyId', surveyId)
+        .eq('userId', session.user.id)
+        .in('permission', ['EDIT', 'ADMIN', 'VIEW'])
+        .single()
+
+      if (surveyUserError) {
+        return NextResponse.json({ message: 'アンケートが見つからないか、アクセス権限がありません' }, { status: 404 })
+      }
+
+      // 権限があればアンケートを再取得
+      const { data: authorizedSurvey, error: authorizedSurveyError } = await supabase
+        .from('Survey')
+        .select(`
+          *, 
+          questions:Question!inner(*)
+        `)
+        .eq('id', surveyId)
+        .single()
+
+      if (authorizedSurveyError) {
+        console.error('Error fetching authorized survey:', authorizedSurveyError)
+        return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+      }
+
+      survey = authorizedSurvey
+    }
 
     if (!survey) {
       return NextResponse.json(

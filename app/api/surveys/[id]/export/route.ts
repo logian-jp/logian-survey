@@ -62,24 +62,26 @@ export async function GET(
     }
 
     // アンケートの所有者を確認
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        userId: session.user.id,
-      },
-      include: {
-        questions: {
-          orderBy: {
-            order: 'asc',
-          },
-        },
-        responses: {
-          include: {
-            answers: true,
-          },
-        },
-      },
-    })
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        questions:Question(*),
+        responses:Response(*, answers:Answer(*))
+      `)
+      .eq('id', surveyId)
+      .eq('userId', session.user.id)
+      .single()
+
+    if (surveyError) {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+    }
+
+    // Supabaseでは質問の順序を手動でソート
+    if (survey?.questions) {
+      survey.questions.sort((a, b) => (a.order || 0) - (b.order || 0))
+    }
 
     if (!survey) {
       return NextResponse.json(
