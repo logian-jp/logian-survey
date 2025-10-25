@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: false,
         test: 'user_query',
-        error: userError.message,
+        error: String((userError as any)?.message || userError),
         details: userError
       }, { status: 500 })
     }
@@ -73,18 +73,18 @@ export async function GET(request: NextRequest) {
         userQuery: {
           success: !userError,
           count: users?.length || 0,
-          error: userError?.message || null
+          error: userError ? String((userError as any)?.message || userError) : null
         },
         surveyQuery: {
           success: !surveyError,
           count: surveys?.length || 0,
-          error: surveyError?.message || null
+          error: surveyError ? String((surveyError as any)?.message || surveyError) : null
         },
         specificUser: {
           found: !!specificUser,
           email: specificUser?.email || null,
           role: specificUser?.role || null,
-          error: specificError?.message || null
+          error: specificError ? String((specificError as any)?.message || specificError) : null
         }
       },
       data: {
