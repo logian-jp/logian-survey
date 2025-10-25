@@ -208,7 +208,7 @@ model DiscountLink {
   description                String?
   discountType               DiscountType @default(PERCENTAGE)
   discountValue              Float
-  targetTicketType           TicketType
+  targetTicketType           TicketType?
   originalPrice              Float
   discountedPrice            Float
   maxUses                    Int?
@@ -218,10 +218,10 @@ model DiscountLink {
   validUntil                 DateTime
   subscriptionDiscountMonths Int?
   totalSavings               Float?
-  createdBy                  String
+  createdBy                  String?
   createdAt                  DateTime     @default(now())
   updatedAt                  DateTime     @updatedAt
-  creator                    User         @relation("DiscountLinkCreator", fields: [createdBy], references: [id])
+  creator                    User?        @relation("DiscountLinkCreator", fields: [createdBy], references: [id])
   users                      User[]       @relation("DiscountLinkUsers")
 }
 
@@ -254,11 +254,11 @@ model Announcement {
   targetUsers Json?
   totalSent   Int                    @default(0)
   totalRead   Int                    @default(0)
-  createdBy   String                 // 配信者（管理者）のユーザーID
+  createdBy   String?                // 配信者（管理者）のユーザーID
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
   deliveries  AnnouncementDelivery[]
-  creator     User                   @relation("AnnouncementCreator", fields: [createdBy], references: [id])
+  creator     User?                  @relation("AnnouncementCreator", fields: [createdBy], references: [id])
 }
 
 model AnnouncementDelivery {
