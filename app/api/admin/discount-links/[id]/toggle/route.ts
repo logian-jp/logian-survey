@@ -42,26 +42,20 @@ export async function PUT(
     }
 
     console.log('Updating discount link in database...')
-    const updatedDiscountLink = await prisma.discountLink.update({
-      where: { id },
-      data: { isActive },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+    const { data: updatedDiscountLink, error: updateError } = await supabase
+      .from('DiscountLink')
+      .update({ isActive })
+      .eq('id', id)
+      .select(`
+        *,
+        creator:User!createdBy(id, name, email)
+      `)
+      .single()
+
+    if (updateError) {
+      console.error('Error updating discount link:', updateError)
+      return NextResponse.json({ message: 'Failed to update discount link' }, { status: 500 })
+    }
 
     console.log('Successfully updated discount link:', updatedDiscountLink.id, 'isActive:', updatedDiscountLink.isActive)
 

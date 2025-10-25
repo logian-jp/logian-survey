@@ -21,22 +21,20 @@ export async function GET(request: NextRequest) {
     }
 
     // 全ユーザーのデータ使用量を取得
-    const dataUsage = await prisma.dataUsage.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+    const { data: dataUsage, error: dataUsageError } = await supabase
+      .from('DataUsage')
+      .select(`
+        *,
+        user:User!userId(id, name, email)
+      `)
+      .order('createdAt', { ascending: false })
 
-    console.log('Found data usage records:', dataUsage.length)
+    if (dataUsageError) {
+      console.error('Error fetching data usage:', dataUsageError)
+      return NextResponse.json({ message: 'Failed to fetch data usage' }, { status: 500 })
+    }
+
+    console.log('Found data usage records:', dataUsage?.length || 0)
 
     // データタイプ別に集計
     const systemData = dataUsage.filter(usage => 

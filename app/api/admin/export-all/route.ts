@@ -21,27 +21,24 @@ export async function GET(request: NextRequest) {
     const includePersonalData = searchParams.get('includePersonalData') === 'true'
     
     // 全アンケートと回答データを取得
-    const surveys = await prisma.survey.findMany({
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        questions: {
-          orderBy: {
-            order: 'asc'
-          }
-        },
-        responses: {
-          include: {
-            answers: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
+    const { data: surveys, error: surveysError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        user:User!userId(name, email),
+        questions:Question(*),
+        responses:Response(*, answers:Answer(*))
+      `)
+
+    if (surveysError) {
+      console.error('Error fetching surveys:', surveysError)
+      return NextResponse.json({ message: 'Failed to fetch surveys' }, { status: 500 })
+    }
+
+    // 質問を手動でソート
+    surveys?.forEach(survey => {
+      if (survey.questions) {
+        survey.questions.sort((a, b) => (a.order || 0) - (b.order || 0))
       }
     })
     
