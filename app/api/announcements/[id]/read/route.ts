@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -18,35 +24,46 @@ export async function POST(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // 配信レコードを更新
-    const delivery = await prisma.announcementDelivery.updateMany({
-      where: {
-        announcementId: (await params).id,
-        userId: session.user.id,
-        status: 'SENT'
-      },
-      data: {
+    // 配信レコードを更新 (Supabase SDK使用)
+    const { data, error } = await supabase
+      .from('AnnouncementDelivery')
+      .update({
         status: 'READ',
-        readAt: new Date()
-      }
-    })
+        readAt: new Date().toISOString()
+      })
+      .eq('announcementId', (await params).id)
+      .eq('userId', session.user.id)
+      .eq('status', 'SENT')
+      .select()
 
-    if (delivery.count === 0) {
+    if (error) {
+      console.error('Failed to update delivery status:', error)
+      return NextResponse.json({ message: 'Failed to update read status' }, { status: 500 })
+    }
+
+    if (!data || data.length === 0) {
       return NextResponse.json(
         { message: 'お知らせが見つからないか、既に既読です' },
         { status: 404 }
       )
     }
 
-    // お知らせの統計を更新
-    await prisma.announcement.update({
-      where: { id: (await params).id },
-      data: {
-        totalRead: {
-          increment: 1
-        }
-      }
-    })
+    // お知らせの統計を更新 (Supabase SDK使用)
+    // Note: Supabaseでは直接incrementができないため、現在の値を取得して更新
+    const { data: announcement, error: getAnnouncementError } = await supabase
+      .from('Announcement')
+      .select('totalRead')
+      .eq('id', (await params).id)
+      .single()
+
+    if (!getAnnouncementError && announcement) {
+      await supabase
+        .from('Announcement')
+        .update({
+          totalRead: (announcement.totalRead || 0) + 1
+        })
+        .eq('id', (await params).id)
+    }
 
     return NextResponse.json({
       success: true,
@@ -78,18 +95,22 @@ export async function DELETE(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // 配信レコードを非表示に更新
-    const delivery = await prisma.announcementDelivery.updateMany({
-      where: {
-        announcementId: (await params).id,
-        userId: session.user.id
-      },
-      data: {
+    // 配信レコードを非表示に更新 (Supabase SDK使用)
+    const { data, error } = await supabase
+      .from('AnnouncementDelivery')
+      .update({
         status: 'HIDDEN'
-      }
-    })
+      })
+      .eq('announcementId', (await params).id)
+      .eq('userId', session.user.id)
+      .select()
 
-    if (delivery.count === 0) {
+    if (error) {
+      console.error('Failed to hide announcement:', error)
+      return NextResponse.json({ message: 'Failed to hide announcement' }, { status: 500 })
+    }
+
+    if (!data || data.length === 0) {
       return NextResponse.json(
         { message: 'お知らせが見つかりません' },
         { status: 404 }

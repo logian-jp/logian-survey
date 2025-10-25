@@ -1,7 +1,13 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 質問テンプレート詳細取得
 export async function GET(
@@ -15,39 +21,34 @@ export async function GET(
       return NextResponse.json({ message: '認証が必要です' }, { status: 401 })
     }
 
-    // メールアドレスでユーザーを検索
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! }
-    })
+    // メールアドレスでユーザーを検索 (Supabase SDK使用)
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+      .single()
 
-    if (!user) {
-      console.error('User not found in database:', session.user.email)
+    if (userError || !user) {
+      console.error('User not found in database:', session.user.email, userError)
       return NextResponse.json({
         message: 'ユーザーがデータベースに存在しません',
         email: session.user.email
       }, { status: 400 })
     }
 
-    const template = await prisma.questionTemplate.findFirst({
-      where: {
-        id: (await params).id,
-        OR: [
-          { userId: user.id },
-          { isPublic: true }
-        ]
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+    // 質問テンプレートを取得 (Supabase SDK使用)
+    const { data: template, error: templateError } = await supabase
+      .from('QuestionTemplate')
+      .select(`
+        *,
+        user:User(id, name, email)
+      `)
+      .eq('id', (await params).id)
+      .or(`userId.eq.${user.id},isPublic.eq.true`)
+      .single()
 
-    if (!template) {
+    if (templateError || !template) {
+      console.error('Template not found:', templateError)
       return NextResponse.json({ message: '質問テンプレートが見つかりません' }, { status: 404 })
     }
 
