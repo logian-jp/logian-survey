@@ -111,8 +111,8 @@ export default function SurveysPage() {
       if (response.ok) {
         const data = await response.json()
         console.log('Fetched surveys:', data)
-        // 配列であることを確認してからセット
-        setSurveys(Array.isArray(data) ? data : [])
+        // APIは { surveys: [...], planType: ..., ... } の構造で返すので、data.surveysを使用
+        setSurveys(Array.isArray(data.surveys) ? data.surveys : [])
       } else {
         const errorData = await response.json().catch(() => ({}))
         console.error('Failed to fetch surveys, status:', response.status, 'Error:', errorData)
