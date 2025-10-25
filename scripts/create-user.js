@@ -1,3 +1,4 @@
+// PRISMA DISABLED - Supabase SDK migration in progress
 // NOTE: Prisma → Supabase SDK移行済み（一時無効化）
 const { createClient } = require('@supabase/supabase-js')
 const bcrypt = require('bcryptjs')
