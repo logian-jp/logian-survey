@@ -6,8 +6,8 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
-  // 開発環境でもadapterを使用しない（JWT戦略を使用）
-  // ...(process.env.NODE_ENV === 'production' ? { adapter: PrismaAdapter(prisma) } : {}),
+  // CredentialsProviderを使用するためJWTストラテジーのみ使用
+  // PrismaAdapterは使わずJWTで認証を管理
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -77,24 +77,79 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user }) {
-      console.log('JWT callback:', { token: token ? 'exists' : 'null', user: user ? 'exists' : 'null' })
+    async signIn({ user, account, profile }) {
+      // Googleプロバイダーの場合、データベースにユーザーを保存/更新
+      if (account?.provider === 'google' && profile?.email) {
+        try {
+          const existingUser = await prisma.user.findUnique({
+            where: { email: profile.email }
+          })
+          
+          if (!existingUser) {
+            // 新規ユーザーを作成
+            await prisma.user.create({
+              data: {
+                id: user.id,
+                email: profile.email,
+                name: profile.name || '',
+                role: 'user',
+                emailVerified: new Date(),
+              }
+            })
+            console.log('Created new Google user:', profile.email)
+          } else {
+            // 既存ユーザーの情報を更新
+            await prisma.user.update({
+              where: { email: profile.email },
+              data: {
+                name: profile.name || existingUser.name,
+                emailVerified: new Date(),
+              }
+            })
+            console.log('Updated existing Google user:', profile.email)
+          }
+        } catch (error) {
+          console.error('Error managing Google user:', error)
+          return false
+        }
+      }
+      return true
+    },
+    async jwt({ token, user, account }) {
+      console.log('JWT callback:', { 
+        token: token ? 'exists' : 'null', 
+        user: user ? 'exists' : 'null',
+        account: account?.provider || 'none'
+      })
+      
       if (user) {
+        // 初回ログイン時
         token.role = user.role
         console.log('JWT: Added role to token:', user.role)
-      } else if (token?.sub) {
+      } else if (token?.email || token?.sub) {
         // 既存のトークンからユーザー情報を取得
         try {
-          const dbUser = await prisma.user.findUnique({
-            where: { id: token.sub },
-            select: { role: true }
+          const dbUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { id: token.sub || '' },
+                { email: token.email || '' }
+              ]
+            },
+            select: { id: true, role: true, email: true }
           })
           if (dbUser) {
             token.role = dbUser.role
-            console.log('JWT: Updated role from database:', dbUser.role)
+            token.sub = dbUser.id
+            console.log('JWT: Updated user info from database:', { 
+              id: dbUser.id, 
+              role: dbUser.role,
+              email: dbUser.email 
+            })
           }
         } catch (error) {
           console.error('JWT: Error fetching user role:', error)
+          // エラーが発生してもトークンは返す（認証を続行）
         }
       }
       return token
@@ -111,5 +166,11 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/auth/signin',
+  },
+  debug: process.env.NODE_ENV === 'development',
+  secret: process.env.NEXTAUTH_SECRET,
+  // JWT設定
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 }
