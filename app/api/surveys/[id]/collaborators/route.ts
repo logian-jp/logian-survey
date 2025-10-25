@@ -1,8 +1,14 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { canAdminSurvey } from '@/lib/survey-permissions'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // アンケートの協力者一覧を取得
 export async function GET(

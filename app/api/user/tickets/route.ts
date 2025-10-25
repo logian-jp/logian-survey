@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,20 +25,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // ユーザーのチケット情報を取得
-    const tickets = await prisma.userTicket.findMany({
-      where: {
-        userId: session.user.id
-      },
-      orderBy: {
-        ticketType: 'asc'
-      }
-    })
+    // ユーザーのチケット情報を取得 (Supabase SDK使用)
+    console.log('Fetching user tickets for userId:', session.user.id)
+    const { data: tickets, error: ticketError } = await supabase
+      .from('UserTicket')
+      .select('*')
+      .eq('userId', session.user.id)
+      .order('ticketType', { ascending: true })
+    
+    if (ticketError) {
+      console.error('Error fetching user tickets:', ticketError)
+      return NextResponse.json({ message: 'Failed to fetch tickets' }, { status: 500 })
+    }
+    
+    console.log('User tickets fetched successfully:', tickets?.length || 0)
 
+    // ticketsが配列でない場合は空配列として初期化
+    const ticketsArray = tickets || []
+    
     // FREEチケットが存在しない場合はデフォルトで追加
-    const freeTicket = tickets.find(t => t.ticketType === 'FREE')
+    const freeTicket = ticketsArray.find(t => t.ticketType === 'FREE')
     if (!freeTicket) {
-      tickets.unshift({
+      ticketsArray.unshift({
         id: 'free-default',
         userId: session.user.id,
         ticketType: 'FREE',
@@ -47,7 +61,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      tickets
+      tickets: ticketsArray
     })
   } catch (error) {
     console.error('Failed to fetch user tickets:', error)

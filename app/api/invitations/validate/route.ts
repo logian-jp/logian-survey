@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,19 +18,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 招待コードを検証
-    const invitation = await prisma.invitation.findUnique({
-      where: { code },
-      include: {
-        inviter: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+    // 招待コードを検証 (Supabase SDK使用)
+    const { data: invitations, error: invitationError } = await supabase
+      .from('Invitation')
+      .select(`
+        *,
+        inviter:User!inviterId(id, name, email)
+      `)
+      .eq('code', code)
+      .single()
+
+    if (invitationError) {
+      console.error('Error fetching invitation:', invitationError)
+      return NextResponse.json(
+        { message: '招待コードの確認中にエラーが発生しました' },
+        { status: 500 }
+      )
+    }
+
+    const invitation = invitations
 
     if (!invitation) {
       return NextResponse.json(

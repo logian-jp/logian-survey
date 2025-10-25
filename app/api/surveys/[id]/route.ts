@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { canViewSurvey, canEditSurvey } from '@/lib/survey-permissions'
 import { getPlanLimits } from '@/lib/plan-limits'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(
   request: NextRequest,
@@ -27,34 +33,45 @@ export async function GET(
       )
     }
 
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id,
-                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
-              }
-            }
-          }
-        ]
-      },
-      include: {
-        questions: {
-          orderBy: {
-            order: 'asc',
-          },
-        },
-        _count: {
-          select: {
-            responses: true,
-          },
-        },
-      },
-    })
+    // Supabase SDKを使用してアンケート情報を取得
+    const { data: surveys, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        questions:Question(*)
+      `)
+      .eq('id', surveyId)
+      .or(`userId.eq.${session.user.id},surveyUsers.userId.eq.${session.user.id}`)
+
+    if (surveyError) {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+    }
+
+    const survey = surveys?.[0]
+    
+    // レスポンス数を取得
+    let responseCount = 0
+    if (survey) {
+      const { count, error: countError } = await supabase
+        .from('Response')
+        .select('*', { count: 'exact', head: true })
+        .eq('surveyId', surveyId)
+      
+      if (!countError) {
+        responseCount = count || 0
+      }
+    }
+
+    // questionsの順序でソート
+    if (survey?.questions) {
+      survey.questions.sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+    }
+
+    // _countフィールドを追加（Prismaと同じ形式にするため）
+    if (survey) {
+      survey._count = { responses: responseCount }
+    }
 
     if (!survey) {
       return NextResponse.json(
@@ -128,10 +145,18 @@ export async function PUT(
       )
     }
 
-    // アンケートの存在確認
-    const existingSurvey = await prisma.survey.findUnique({
-      where: { id: surveyId }
-    })
+    // アンケートの存在確認 (Supabase SDK使用)
+    const { data: existingSurveys, error: existingError } = await supabase
+      .from('Survey')
+      .select('*')
+      .eq('id', surveyId)
+
+    if (existingError) {
+      console.error('Error checking survey existence:', existingError)
+      return NextResponse.json({ message: 'Failed to check survey' }, { status: 500 })
+    }
+
+    const existingSurvey = existingSurveys?.[0]
 
     if (!existingSurvey) {
       return NextResponse.json(
@@ -165,21 +190,30 @@ export async function PUT(
       // 失敗時はそのまま
     }
 
-    // アンケートを更新
-    const updatedSurvey = await prisma.survey.update({
-      where: { id: surveyId },
-      data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description: sanitizedDescription }),
-        ...(status && { status }),
-        maxResponses: finalMaxResponses !== undefined ? finalMaxResponses : null,
-        endDate: endDate !== undefined ? endDate : null,
-        targetResponses: targetResponses !== undefined ? targetResponses : null,
-        headerImageUrl: headerImageUrl !== undefined ? headerImageUrl : null,
-        ogImageUrl: ogImageUrl !== undefined ? ogImageUrl : null,
-        useCustomLogo: useCustomLogo !== undefined ? useCustomLogo : null,
-      },
-    })
+    // アンケートを更新 (Supabase SDK使用)
+    const updateData: any = {}
+    if (title) updateData.title = title
+    if (description !== undefined) updateData.description = sanitizedDescription
+    if (status) updateData.status = status
+    if (finalMaxResponses !== undefined) updateData.maxResponses = finalMaxResponses
+    if (endDate !== undefined) updateData.endDate = endDate
+    if (targetResponses !== undefined) updateData.targetResponses = targetResponses
+    if (headerImageUrl !== undefined) updateData.headerImageUrl = headerImageUrl
+    if (ogImageUrl !== undefined) updateData.ogImageUrl = ogImageUrl
+    if (useCustomLogo !== undefined) updateData.useCustomLogo = useCustomLogo
+
+    const { data: updatedSurveys, error: updateError } = await supabase
+      .from('Survey')
+      .update(updateData)
+      .eq('id', surveyId)
+      .select()
+
+    if (updateError) {
+      console.error('Error updating survey:', updateError)
+      return NextResponse.json({ message: 'Failed to update survey' }, { status: 500 })
+    }
+
+    const updatedSurvey = updatedSurveys?.[0]
 
     return NextResponse.json(updatedSurvey)
   } catch (error) {

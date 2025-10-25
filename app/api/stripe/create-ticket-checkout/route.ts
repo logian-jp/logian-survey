@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { getStripe } from '@/lib/stripe'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 const TICKET_PRICES: Record<string, number> = {
   'FREE': 0,
@@ -40,10 +46,16 @@ export async function POST(request: NextRequest) {
     // 割引コードが提供された場合、検証して価格を調整
     if (discountCode) {
       try {
-        // 直接データベースから割引リンクを検索
-        const discountLink = await prisma.discountLink.findUnique({
-          where: { code: discountCode }
-        })
+        // Supabase SDKを使用して割引リンクを検索
+        const { data: discountLink, error: discountError } = await supabase
+          .from('DiscountLink')
+          .select('*')
+          .eq('code', discountCode)
+          .single()
+
+        if (discountError && discountError.code !== 'PGRST116') {
+          console.error('Error fetching discount link:', discountError)
+        }
 
         if (discountLink && 
             discountLink.isActive && 

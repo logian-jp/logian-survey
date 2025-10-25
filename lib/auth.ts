@@ -1,8 +1,6 @@
 import { NextAuthOptions } from 'next-auth'
-import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import GoogleProvider from 'next-auth/providers/google'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 
@@ -154,7 +152,6 @@ export const authOptions: NextAuthOptions = {
         // 既存のトークンからユーザー情報を取得
         try {
           console.log('NODE_ENV:', process.env.NODE_ENV) // Added debug log
-          console.log('Prisma instance:', prisma ? 'exists' : 'null') // Added debug log
           
           let dbUser = null
           let error = null

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,41 +94,76 @@ export async function GET(request: NextRequest) {
         skip: (page - 1) * limit,
         take: limit
       }),
-      prisma.ticketPurchase.count({ where })
+      supabase.from('TicketPurchase').select('*', { count: 'exact', head: true })
     ])
 
-    // 統計情報を取得
-    const stats = await prisma.ticketPurchase.aggregate({
-      where,
-      _sum: {
-        amount: true
-      },
-      _count: {
-        id: true
-      }
-    })
+    // Supabaseでは上記のPrismaスタイルが使えないため、別途修正が必要
+    // TODO: 後でSupabase SDKに完全移行
 
-    // チケットタイプ別の統計
-    const ticketTypeStats = await prisma.ticketPurchase.groupBy({
-      by: ['ticketType'],
-      where,
-      _sum: {
-        amount: true
-      },
-      _count: {
-        id: true
-      }
-    })
+    // 統計情報を取得 (Supabase SDK使用)
+    let statsQuery = supabase
+      .from('TicketPurchase')
+      .select('amount')
 
-    // ユーザー一覧（フィルター用）
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true
-      },
-      orderBy: { name: 'asc' }
-    })
+    if (search) {
+      statsQuery = statsQuery.or(`checkoutSessionId.ilike.%${search}%`)
+    }
+
+    const { data: purchaseAmounts, error: statsError } = await statsQuery
+
+    if (statsError) {
+      console.error('Error fetching purchase stats:', statsError)
+      return NextResponse.json({ message: 'Failed to fetch stats' }, { status: 500 })
+    }
+
+    // 手動で集計
+    const totalAmount = purchaseAmounts?.reduce((sum, purchase) => sum + (purchase.amount || 0), 0) || 0
+    const purchaseCount = purchaseAmounts?.length || 0
+
+    const stats = {
+      _sum: { amount: totalAmount },
+      _count: { id: purchaseCount }
+    }
+
+    // チケットタイプ別の統計 (Supabase SDK使用)
+    let typeStatsQuery = supabase
+      .from('TicketPurchase')
+      .select('ticketType, amount')
+
+    if (search) {
+      typeStatsQuery = typeStatsQuery.or(`checkoutSessionId.ilike.%${search}%`)
+    }
+
+    const { data: typeStatsData, error: typeStatsError } = await typeStatsQuery
+
+    if (typeStatsError) {
+      console.error('Error fetching type stats:', typeStatsError)
+      return NextResponse.json({ message: 'Failed to fetch type stats' }, { status: 500 })
+    }
+
+    // 手動でグループ化・集計
+    const ticketTypeStats = typeStatsData?.reduce((acc, purchase) => {
+      const type = purchase.ticketType
+      if (!acc[type]) {
+        acc[type] = { ticketType: type, _sum: { amount: 0 }, _count: { id: 0 } }
+      }
+      acc[type]._sum.amount += purchase.amount || 0
+      acc[type]._count.id += 1
+      return acc
+    }, {} as any) || {}
+
+    const ticketTypeStatsArray = Object.values(ticketTypeStats)
+
+    // ユーザー一覧（フィルター用） (Supabase SDK使用)
+    const { data: users, error: usersError } = await supabase
+      .from('User')
+      .select('id, name, email')
+      .order('name', { ascending: true })
+
+    if (usersError) {
+      console.error('Error fetching users:', usersError)
+      return NextResponse.json({ message: 'Failed to fetch users' }, { status: 500 })
+    }
 
     return NextResponse.json({
       purchases,

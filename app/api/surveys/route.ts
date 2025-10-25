@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { checkSurveyLimit } from '@/lib/plan-check'
 import { recordDataUsage, getUserMaxDataSize, getUserDataRetentionDays, getPlanLimits } from '@/lib/plan-limits'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,59 +27,115 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveys = await prisma.survey.findMany({
-      where: {
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id
-              }
-            }
-          }
-        ]
-      },
-      include: {
-        _count: {
-          select: {
-            responses: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        surveyUsers: {
-          where: {
-            userId: session.user.id
-          },
-          select: {
-            permission: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
-
-    // ユーザーのチケット情報を取得（プラン情報の代わり）
-    const userTickets = await prisma.userTicket.findMany({
-      where: { userId: session.user.id },
-      orderBy: { ticketType: 'asc' }
-    })
+    // Supabase SDKを使用してサーベイ情報を取得
+    console.log('Fetching surveys for user:', session.user.id)
     
-    // 最も高いチケットタイプを取得（FREE以外）
-    const highestTicket = userTickets
-      .filter(t => t.ticketType !== 'FREE' && t.remainingTickets > 0)
-      .sort((a, b) => {
-        const order = ['FREE', 'STANDARD', 'PROFESSIONAL', 'ENTERPRISE']
-        return order.indexOf(a.ticketType) - order.indexOf(b.ticketType)
-      })[0]
+    // 1. ユーザーが所有するサーベイを取得
+    const { data: ownSurveys, error: ownSurveysError } = await supabase
+      .from('Survey')
+      .select('*')
+      .eq('userId', session.user.id)
+      .order('createdAt', { ascending: false })
+    
+    if (ownSurveysError) {
+      console.error('Error fetching own surveys:', ownSurveysError)
+      return NextResponse.json({ message: 'Failed to fetch surveys' }, { status: 500 })
+    }
+    
+    // 2. ユーザーが共有されているサーベイを取得
+    const { data: sharedSurveys, error: sharedSurveysError } = await supabase
+      .from('SurveyUser')
+      .select('surveyId, permission, Survey(*)')
+      .eq('userId', session.user.id)
+    
+    if (sharedSurveysError) {
+      console.error('Error fetching shared surveys:', sharedSurveysError)
+      return NextResponse.json({ message: 'Failed to fetch shared surveys' }, { status: 500 })
+    }
+    
+    // 3. 全てのサーベイをまとめる（重複排除）
+    const allSurveyIds = new Set()
+    const surveys = []
+    
+    // 自分のサーベイを追加
+    if (ownSurveys) {
+      for (const survey of ownSurveys) {
+        allSurveyIds.add(survey.id)
+        surveys.push({
+          ...survey,
+          isOwner: true,
+          permission: 'ADMIN'
+        })
+      }
+    }
+    
+    // 共有されたサーベイを追加（重複を除外）
+    if (sharedSurveys) {
+      for (const surveyUser of sharedSurveys) {
+        if (!allSurveyIds.has(surveyUser.surveyId) && surveyUser.Survey) {
+          allSurveyIds.add(surveyUser.surveyId)
+          surveys.push({
+            ...surveyUser.Survey,
+            isOwner: false,
+            permission: surveyUser.permission
+          })
+        }
+      }
+    }
+    
+    console.log('Found surveys:', surveys.length)
+
+    // 4. 各サーベイのレスポンス件数を取得
+    const surveysWithCounts = []
+    for (const survey of surveys) {
+      const { count: responseCount, error: countError } = await supabase
+        .from('Response')
+        .select('*', { count: 'exact', head: true })
+        .eq('surveyId', survey.id)
+      
+      if (countError) {
+        console.error('Error counting responses for survey:', survey.id, countError)
+      }
+      
+      surveysWithCounts.push({
+        ...survey,
+        _count: {
+          responses: responseCount || 0
+        }
+      })
+    }
+    
+    // 5. ユーザー情報を取得
+    const { data: userData, error: userError } = await supabase
+      .from('User')
+      .select('id, name, email')
+      .eq('id', session.user.id)
+      .single()
+    
+    if (userError) {
+      console.error('Error fetching user data:', userError)
+    }
+    
+    // 6. ユーザーのチケット情報を取得（プラン情報の代わり）
+    const { data: userTickets, error: ticketError } = await supabase
+      .from('UserTicket')
+      .select('*')
+      .eq('userId', session.user.id)
+      .order('ticketType', { ascending: true })
+    
+    if (ticketError) {
+      console.error('Error fetching user tickets:', ticketError)
+    }
+    
+    // 最も高いチケットタイプを取得（FREE以外）  
+    const highestTicket = userTickets && userTickets.length > 0 
+      ? userTickets
+          .filter(t => t.ticketType !== 'FREE' && t.remainingTickets > 0)
+          .sort((a, b) => {
+            const order = ['FREE', 'STANDARD', 'PROFESSIONAL', 'ENTERPRISE']
+            return order.indexOf(a.ticketType) - order.indexOf(b.ticketType)
+          })[0]
+      : null
     
     const planType = highestTicket?.ticketType || 'FREE'
 
@@ -81,70 +143,49 @@ export async function GET(request: NextRequest) {
     const maxDataSizeMB = await getUserMaxDataSize(session.user.id, planType)
     const dataRetentionDays = await getUserDataRetentionDays(session.user.id, planType)
 
-    // 各アンケートのデータ使用量を計算
-    const surveysWithDataUsage = await Promise.all(surveys.map(async (survey) => {
-      // アンケートのデータ使用量を取得
-      const surveyDataUsage = await prisma.dataUsage.findFirst({
-        where: {
-          userId: session.user.id,
-          surveyId: survey.id,
-          dataType: 'survey_data'
-        }
-      })
-
-          // アンケート固有のアドオン情報を取得
-          const surveyAddons = await prisma.userDataAddon.findMany({
-            where: {
-              userId: session.user.id,
-              status: 'ACTIVE',
-              OR: [
-                { expiresAt: null },
-                { expiresAt: { gt: new Date() } }
-              ]
-            },
-            include: {
-              addon: true
-            }
-          })
-
-      const isOwner = survey.userId === session.user.id
-      const userPermission = survey.surveyUsers[0]?.permission
-
-      return {
+    // 簡略化されたレスポンスを返す（データ使用量計算はSupabase SDKで後で実装）
+    const responseData = {
+      surveys: surveysWithCounts.map(survey => ({
         id: survey.id,
         title: survey.title,
         description: survey.description,
         status: survey.status,
         shareUrl: survey.shareUrl,
         createdAt: survey.createdAt,
+        updatedAt: survey.updatedAt,
         responseCount: survey._count.responses,
         maxResponses: survey.maxResponses,
         endDate: survey.endDate,
         targetResponses: survey.targetResponses,
-        owner: survey.user,
-        userPermission: isOwner ? 'OWNER' : userPermission || 'VIEW',
-        // チケット情報
-        ticketType: survey.ticketType,
-        ticketId: (survey as any).ticketId,
-        paymentId: (survey as any).paymentId,
-        // データ使用量情報
-        dataUsageMB: surveyDataUsage ? Math.round(surveyDataUsage.sizeBytes / 1024 / 1024 * 100) / 100 : 0,
-        maxDataSizeMB,
-        dataRetentionDays,
-        // アドオン情報
-        hasAddons: surveyAddons.length > 0,
-        addons: surveyAddons.map((addon: any) => ({
-          id: addon.addon.id,
-          name: addon.addon.name,
-          type: addon.addon.type,
-          amount: addon.addon.amount,
-          isMonthly: addon.addon.isMonthly,
-          expiresAt: addon.expiresAt
-        }))
+        headerImageUrl: survey.headerImageUrl,
+        ogImageUrl: survey.ogImageUrl,
+        useCustomLogo: survey.useCustomLogo,
+        customDomain: survey.customDomain,
+        dataRetentionDays: survey.dataRetentionDays,
+        user: userData,
+        permission: survey.permission || 'ADMIN',
+        isOwner: survey.isOwner || false
+      })),
+      planType,
+      userPlan: {
+        type: planType,
+        maxSurveys: planType === 'FREE' ? 1 : planType === 'STANDARD' ? 5 : planType === 'PROFESSIONAL' ? 20 : 100,
+        maxResponses: planType === 'FREE' ? 100 : planType === 'STANDARD' ? 1000 : planType === 'PROFESSIONAL' ? 5000 : 50000,
+        canCreateSurvey: true,
+        canViewResponses: true,
+        canExportData: planType !== 'FREE',
+        canCustomizeLogo: planType === 'ENTERPRISE'
+      },
+      tickets: userTickets || [],
+      meta: {
+        totalSurveys: surveysWithCounts.length,
+        maxDataSizeMB: planType === 'FREE' ? 10 : planType === 'STANDARD' ? 100 : planType === 'PROFESSIONAL' ? 500 : 2000,
+        dataRetentionDays: planType === 'FREE' ? 30 : planType === 'STANDARD' ? 90 : planType === 'PROFESSIONAL' ? 365 : 1095
       }
-    }))
-
-    return NextResponse.json(surveysWithDataUsage)
+    }
+    
+    console.log('Returning survey data for user:', session.user.id, 'surveys:', responseData.surveys.length)
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('Failed to fetch surveys:', error)
     console.error('Error details:', {
@@ -170,23 +211,36 @@ export async function POST(request: NextRequest) {
     console.log('Creating survey for user:', session.user.id)
     console.log('Session user:', session.user)
 
-    // メールアドレスでユーザーを検索
-    let user = await prisma.user.findUnique({
-      where: { email: session.user.email! }
-    })
+    // メールアドレスでユーザーを検索 (Supabase SDK使用)
+    const { data: existingUser, error: findUserError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+      .single()
 
-    if (!user) {
+    let user
+    if (findUserError || !existingUser) {
       console.log('User not found, creating new user...')
       // ユーザーが存在しない場合は作成
-      user = await prisma.user.create({
-        data: {
+      const { data: newUser, error: createUserError } = await supabase
+        .from('User')
+        .insert({
           name: session.user.name,
           email: session.user.email,
           role: 'USER'
-        }
-      })
+        })
+        .select()
+        .single()
+      
+      if (createUserError) {
+        console.error('Failed to create user:', createUserError)
+        return NextResponse.json({ message: 'Failed to create user' }, { status: 500 })
+      }
+      
+      user = newUser
       console.log('User created:', user)
     } else {
+      user = existingUser
       console.log('User found:', user)
     }
 
@@ -208,14 +262,18 @@ export async function POST(request: NextRequest) {
 
     // 無料チケットでのアンケート作成数制限チェック（FREEの場合のみ）
     if (validTicketType === 'FREE') {
-      const freeSurveyCount = await prisma.survey.count({
-        where: {
-          userId: user.id,
-          ticketType: 'FREE'
-        }
-      })
+      const { count: freeSurveyCount, error: countError } = await supabase
+        .from('Survey')
+        .select('*', { count: 'exact', head: true })
+        .eq('userId', user.id)
+        .eq('ticketType', 'FREE')
 
-      if (freeSurveyCount >= 3) {
+      if (countError) {
+        console.error('Failed to count surveys:', countError)
+        return NextResponse.json({ message: 'Failed to check survey limit' }, { status: 500 })
+      }
+
+      if ((freeSurveyCount || 0) >= 3) {
         return NextResponse.json(
           { message: '無料チケットでは3個までアンケートを作成できます。チケットを購入してアンケートを作成してください。' },
           { status: 403 }
@@ -253,67 +311,99 @@ export async function POST(request: NextRequest) {
       return requested < maxEndDateByPlan ? requested : maxEndDateByPlan
     })()
 
-    // アンケート作成と作成者の管理者権限付与をトランザクションで実行（非FREEはチケット消費）
-    const result = await prisma.$transaction(async (tx) => {
-      let usedTicketId = null
-      let paymentId = null
+    // アンケート作成と作成者の管理者権限付与 (Supabase SDK使用)
+    let usedTicketId = null
+    let paymentId = null
 
-      // 非FREEチケットは消費
-      if (validTicketType !== 'FREE') {
-        const ticket = await tx.userTicket.findFirst({
-          where: { userId: user.id, ticketType: validTicketType, remainingTickets: { gt: 0 } },
-          orderBy: { createdAt: 'asc' }
-        })
-        if (!ticket) {
-          throw new Error('チケット残数が不足しています')
-        }
-        
-        // チケットIDを記録
-        usedTicketId = ticket.id
-        
-        // 決済IDを取得（チケットに関連する決済情報から）
-        const purchase = await tx.ticketPurchase.findFirst({
-          where: { userId: user.id, ticketType: validTicketType },
-          orderBy: { createdAt: 'desc' }
-        })
-        if (purchase) {
-          paymentId = purchase.paymentIntentId
-        }
-        
-        await tx.userTicket.update({
-          where: { id: ticket.id },
-          data: { remainingTickets: ticket.remainingTickets - 1, usedTickets: ticket.usedTickets + 1 }
-        })
+    // 非FREEチケットは消費
+    if (validTicketType !== 'FREE') {
+      // チケットを検索
+      const { data: tickets, error: ticketError } = await supabase
+        .from('UserTicket')
+        .select('*')
+        .eq('userId', user.id)
+        .eq('ticketType', validTicketType)
+        .gt('remainingTickets', 0)
+        .order('createdAt', { ascending: true })
+        .limit(1)
+
+      if (ticketError || !tickets || tickets.length === 0) {
+        return NextResponse.json(
+          { message: 'チケット残数が不足しています' },
+          { status: 403 }
+        )
       }
 
-      // アンケートを作成
-      const survey = await tx.survey.create({
-        data: {
-          title,
-          description: description || null,
-          maxResponses: clampedMaxResponses,
-          endDate: clampedEndDate,
-          targetResponses: targetResponses || null,
-          userId: user.id,
-          ticketType: validTicketType,
-          ticketId: usedTicketId,
-          paymentId: paymentId,
-        } as any,
+      const ticket = tickets[0]
+      usedTicketId = ticket.id
+
+      // 決済IDを取得（チケットに関連する決済情報から）
+      const { data: purchases, error: purchaseError } = await supabase
+        .from('TicketPurchase')
+        .select('*')
+        .eq('userId', user.id)
+        .eq('ticketType', validTicketType)
+        .order('createdAt', { ascending: false })
+        .limit(1)
+
+      if (!purchaseError && purchases && purchases.length > 0) {
+        paymentId = purchases[0].paymentIntentId
+      }
+
+      // チケット数を更新
+      const { error: updateTicketError } = await supabase
+        .from('UserTicket')
+        .update({
+          remainingTickets: ticket.remainingTickets - 1,
+          usedTickets: ticket.usedTickets + 1
+        })
+        .eq('id', ticket.id)
+
+      if (updateTicketError) {
+        console.error('Failed to update ticket:', updateTicketError)
+        return NextResponse.json({ message: 'Failed to consume ticket' }, { status: 500 })
+      }
+    }
+
+    // アンケートを作成
+    const { data: survey, error: createSurveyError } = await supabase
+      .from('Survey')
+      .insert({
+        title,
+        description: description || null,
+        maxResponses: clampedMaxResponses,
+        endDate: clampedEndDate,
+        targetResponses: targetResponses || null,
+        userId: user.id,
+        ticketType: validTicketType,
+        ticketId: usedTicketId,
+        paymentId: paymentId,
+      })
+      .select()
+      .single()
+
+    if (createSurveyError) {
+      console.error('Failed to create survey:', createSurveyError)
+      return NextResponse.json({ message: 'Failed to create survey' }, { status: 500 })
+    }
+
+    // 作成者を管理者権限でSurveyUserテーブルに追加
+    const { error: createSurveyUserError } = await supabase
+      .from('SurveyUser')
+      .insert({
+        userId: user.id,
+        surveyId: survey.id,
+        permission: 'ADMIN',
+        invitedBy: user.id, // 自分自身を招待者として設定
+        acceptedAt: new Date().toISOString(), // 即座に承認済みとして設定
       })
 
-      // 作成者を管理者権限でSurveyUserテーブルに追加
-      await tx.surveyUser.create({
-        data: {
-          userId: user.id,
-          surveyId: survey.id,
-          permission: 'ADMIN',
-          invitedBy: user.id, // 自分自身を招待者として設定
-          acceptedAt: new Date(), // 即座に承認済みとして設定
-        },
-      })
+    if (createSurveyUserError) {
+      console.error('Failed to create survey user relationship:', createSurveyUserError)
+      // アンケート作成は成功しているので、ログだけ出して続行
+    }
 
-      return survey
-    })
+    const result = survey
 
     // データ使用量を記録（アンケート作成時）
     const surveyDataSize = JSON.stringify({

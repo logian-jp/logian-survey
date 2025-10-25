@@ -1,5 +1,11 @@
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { getPlanLimits, checkPlanFeature, checkPlanLimit } from '@/lib/plan-limits'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function getUserPlan(userId: string) {
   // TODO: チケット制度移行により、常にFREEプランを返す
@@ -24,11 +30,16 @@ export async function checkSurveyLimit(userId: string): Promise<{ allowed: boole
       return { allowed: true }
     }
 
-    const surveyCount = await prisma.survey.count({
-      where: { userId }
-    })
+    const { count: surveyCount, error: countError } = await supabase
+      .from('Survey')
+      .select('*', { count: 'exact', head: true })
+      .eq('userId', userId)
 
-    if (surveyCount >= limits.maxSurveys) {
+    if (countError) {
+      throw countError
+    }
+
+    if ((surveyCount || 0) >= limits.maxSurveys) {
       return {
         allowed: false,
         message: `アンケート作成数の上限（${limits.maxSurveys}個）に達しています。プランをアップグレードしてください。`
@@ -41,11 +52,12 @@ export async function checkSurveyLimit(userId: string): Promise<{ allowed: boole
     // エラーの場合は無料プランの制限を適用
     const limits = getPlanLimits('FREE')
     try {
-      const surveyCount = await prisma.survey.count({
-        where: { userId }
-      })
+      const { count: surveyCount, error: countError } = await supabase
+        .from('Survey')
+        .select('*', { count: 'exact', head: true })
+        .eq('userId', userId)
       
-      if (surveyCount >= limits.maxSurveys) {
+      if (!countError && (surveyCount || 0) >= limits.maxSurveys) {
         return {
           allowed: false,
           message: `アンケート作成数の上限（${limits.maxSurveys}個）に達しています。プランをアップグレードしてください。`

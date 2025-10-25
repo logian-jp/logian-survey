@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -20,19 +26,28 @@ export async function GET() {
     }
 
     // TODO: userPlanテーブルが削除されたため、一時的に簡易版を返す
-    // 基本的なユーザー統計のみ取得
-    const totalUsers = await prisma.user.count()
+    // 基本的なユーザー統計のみ取得 (Supabase SDK使用)
+    const { count: totalUsers, error: totalUsersError } = await supabase
+      .from('User')
+      .select('*', { count: 'exact', head: true })
+
+    if (totalUsersError) {
+      console.error('Error counting total users:', totalUsersError)
+      return NextResponse.json({ message: 'Failed to get user count' }, { status: 500 })
+    }
     
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     
-    const newUsersThisMonth = await prisma.user.count({
-      where: {
-        createdAt: {
-          gte: startOfMonth
-        }
-      }
-    })
+    const { count: newUsersThisMonth, error: newUsersError } = await supabase
+      .from('User')
+      .select('*', { count: 'exact', head: true })
+      .gte('createdAt', startOfMonth.toISOString())
+
+    if (newUsersError) {
+      console.error('Error counting new users:', newUsersError)
+      return NextResponse.json({ message: 'Failed to get new users count' }, { status: 500 })
+    }
 
     return NextResponse.json({
       totalUsers,

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 import { convertAgeGroupToNumber, PREFECTURE_REGIONS } from '@/lib/survey-parts'
 import { checkExportFormat } from '@/lib/plan-check'
 import { translateVariableName } from '@/lib/variable-translation'

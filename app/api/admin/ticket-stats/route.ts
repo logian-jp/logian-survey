@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,13 +17,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // 管理者権限チェック
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
-    })
+    // 管理者権限チェック (Supabase SDK使用)
+    const { data: users, error: userError } = await supabase
+      .from('User')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
 
-    if (user?.role !== 'ADMIN') {
+    if (userError || !users) {
+      console.error('Error fetching user role:', userError)
+      return NextResponse.json({ message: 'Failed to verify user' }, { status: 500 })
+    }
+
+    if (users.role !== 'ADMIN') {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
 

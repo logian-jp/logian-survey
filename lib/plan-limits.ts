@@ -1,4 +1,10 @@
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 export interface PlanLimits {
   maxSurveys: number // -1 = 無制限
   maxResponsesPerSurvey: number // -1 = 無制限
@@ -137,7 +143,7 @@ export async function getUserPlan(userId: string) {
 }
 
 
-// データ使用量を記録する関数
+// データ使用量を記録する関数 (Supabase SDK使用)
 export async function recordDataUsage(
   userId: string, 
   surveyId: string | null, 
@@ -146,33 +152,42 @@ export async function recordDataUsage(
   description?: string
 ) {
   try {
-    await (prisma as any).dataUsage.create({
-      data: {
+    const { error } = await supabase
+      .from('DataUsage')
+      .insert({
         userId,
         surveyId,
         dataType,
         sizeBytes,
         description
-      }
-    })
+      })
+    
+    if (error) {
+      console.error('Failed to record data usage:', error)
+    }
   } catch (error) {
     console.error('Failed to record data usage:', error)
   }
 }
 
-// ユーザーのデータ使用量を取得する関数
+// ユーザーのデータ使用量を取得する関数 (Supabase SDK使用)
 export async function getUserDataUsage(userId: string) {
   try {
-    const usage = await (prisma as any).dataUsage.aggregate({
-      where: { userId },
-      _sum: {
-        sizeBytes: true
-      }
-    })
+    const { data: usageData, error } = await supabase
+      .from('DataUsage')
+      .select('sizeBytes')
+      .eq('userId', userId)
+    
+    if (error) {
+      console.error('Failed to fetch user data usage:', error)
+      return { totalBytes: 0, totalMB: 0 }
+    }
+    
+    const totalBytes = (usageData || []).reduce((sum, item) => sum + (item.sizeBytes || 0), 0)
     
     return {
-      totalBytes: usage._sum.sizeBytes || 0,
-      totalMB: Math.round((usage._sum.sizeBytes || 0) / (1024 * 1024) * 100) / 100
+      totalBytes: totalBytes,
+      totalMB: Math.round(totalBytes / (1024 * 1024) * 100) / 100
     }
   } catch (error) {
     console.error('Failed to fetch user data usage:', error)
@@ -187,27 +202,26 @@ export async function getUserMaxDataSize(userId: string, planType: string): Prom
     const planLimits = getPlanLimits(planType)
     let maxDataSizeMB: number = planLimits.maxDataSizeMB as number
 
-    // ユーザーのアクティブな容量追加アドオンを取得
-    const storageAddons = await (prisma as any).userDataAddon.findMany({
-      where: {
-        userId,
-        status: 'ACTIVE',
-        addon: {
-          type: 'storage',
-          isActive: true
-        },
-        OR: [
-          { expiresAt: null }, // 買い切り
-          { expiresAt: { gt: new Date() } } // 月額でまだ有効
-        ]
-      },
-      include: {
-        addon: true
-      }
-    })
+    // ユーザーのアクティブな容量追加アドオンを取得 (Supabase SDK使用)
+    const { data: storageAddons, error } = await supabase
+      .from('UserDataAddon')
+      .select(`
+        *,
+        addon:DataAddon(*)
+      `)
+      .eq('userId', userId)
+      .eq('status', 'ACTIVE')
+      .or('expiresAt.is.null,expiresAt.gt.' + new Date().toISOString())
+
+    if (error) {
+      console.error('Failed to fetch storage addons:', error)
+      return maxDataSizeMB
+    }
 
     // 追加容量を合計
-    const additionalStorageMB = storageAddons.reduce((total: number, addon: { addon: { amount: number } }) => total + addon.addon.amount, 0)
+    const additionalStorageMB = (storageAddons || [])
+      .filter((addon: any) => addon.addon?.type === 'storage' && addon.addon?.isActive)
+      .reduce((total: number, addon: any) => total + (addon.addon?.amount || 0), 0)
     
     return maxDataSizeMB === -1 ? -1 : maxDataSizeMB + additionalStorageMB
   } catch (error) {
@@ -223,27 +237,26 @@ export async function getUserDataRetentionDays(userId: string, planType: string)
     const planLimits = getPlanLimits(planType)
     let dataRetentionDays: number = planLimits.dataRetentionDays as number
 
-    // ユーザーのアクティブな保存期間延長アドオンを取得
-    const retentionAddons = await (prisma as any).userDataAddon.findMany({
-      where: {
-        userId,
-        status: 'ACTIVE',
-        addon: {
-          type: 'retention',
-          isActive: true
-        },
-        OR: [
-          { expiresAt: null }, // 買い切り
-          { expiresAt: { gt: new Date() } } // 月額でまだ有効
-        ]
-      },
-      include: {
-        addon: true
-      }
-    })
+    // ユーザーのアクティブな保存期間延長アドオンを取得 (Supabase SDK使用)
+    const { data: retentionAddons, error } = await supabase
+      .from('UserDataAddon')
+      .select(`
+        *,
+        addon:DataAddon(*)
+      `)
+      .eq('userId', userId)
+      .eq('status', 'ACTIVE')
+      .or('expiresAt.is.null,expiresAt.gt.' + new Date().toISOString())
+
+    if (error) {
+      console.error('Failed to fetch retention addons:', error)
+      return dataRetentionDays
+    }
 
     // 延長期間を合計
-    const additionalRetentionDays = retentionAddons.reduce((total: number, addon: { addon: { amount: number } }) => total + addon.addon.amount, 0)
+    const additionalRetentionDays = (retentionAddons || [])
+      .filter((addon: any) => addon.addon?.type === 'retention' && addon.addon?.isActive)
+      .reduce((total: number, addon: any) => total + (addon.addon?.amount || 0), 0)
     
     return dataRetentionDays + additionalRetentionDays
   } catch (error) {

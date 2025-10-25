@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { getPlanLimits } from '@/lib/plan-limits'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // APIキー認証のヘルパー関数
 async function authenticateApiKey(request: NextRequest) {
@@ -47,22 +53,29 @@ export async function GET(
     const offset = parseInt(searchParams.get('offset') || '0')
     const format = searchParams.get('format') || 'json' // json, csv
 
-    // アンケートの存在確認と権限チェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        // ユーザー認証の場合、自分のアンケートのみ
-        ...(user && !apiUser ? { userId: user.id } : {}),
-      },
-      include: {
-        questions: {
-          orderBy: {
-            order: 'asc',
-          },
-        },
-        user: true, // TODO: userPlan参照を削除（チケット制度移行のため）
-      },
-    })
+    // アンケートの存在確認と権限チェック (Supabase SDK使用)
+    let query = supabase
+      .from('Survey')
+      .select(`
+        *,
+        questions:Question(*, order),
+        user:User(*)
+      `)
+      .eq('id', surveyId)
+
+    // ユーザー認証の場合、自分のアンケートのみ
+    if (user && !apiUser) {
+      query = query.eq('userId', user.id)
+    }
+
+    const { data: surveys, error: surveyError } = await query
+
+    if (surveyError) {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+    }
+
+    const survey = surveys?.[0]
     // プランのAPI連携可否チェック（PROFESSIONAL/ENTERPRISE）
     const planType = 'FREE' // TODO: チケット制度移行のため一時的にFREE扱い
     const limits = getPlanLimits(planType)
@@ -95,20 +108,21 @@ export async function GET(
       }
     }
 
-    // 回答を取得
-    const responses = await prisma.response.findMany({
-      where: {
-        surveyId: surveyId,
-      },
-      include: {
-        answers: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-      skip: offset,
-    })
+    // 回答を取得 (Supabase SDK使用)
+    const { data: responses, error: responsesError } = await supabase
+      .from('Response')
+      .select(`
+        *,
+        answers:Answer(*)
+      `)
+      .eq('surveyId', surveyId)
+      .order('createdAt', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (responsesError) {
+      console.error('Error fetching responses:', responsesError)
+      return NextResponse.json({ message: 'Failed to fetch responses' }, { status: 500 })
+    }
 
     if (format === 'csv') {
       // CSV形式で出力
@@ -173,14 +187,22 @@ export async function POST(
       )
     }
 
-    // アンケートが存在し、公開中かチェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        status: 'ACTIVE',
-      },
-      include: { user: true } // TODO: userPlan参照を削除
-    })
+    // アンケートが存在し、公開中かチェック (Supabase SDK使用)
+    const { data: surveys, error: activeSurveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        user:User(*)
+      `)
+      .eq('id', surveyId)
+      .eq('status', 'ACTIVE')
+
+    if (activeSurveyError) {
+      console.error('Error fetching active survey:', activeSurveyError)
+      return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+    }
+
+    const survey = surveys?.[0]
     // プランのAPI連携可否チェック（PROFESSIONAL/ENTERPRISE）
     const planType = 'FREE' // TODO: チケット制度移行のため一時的にFREE扱い
     const limits = getPlanLimits(planType)
@@ -206,14 +228,22 @@ export async function POST(
       )
     }
 
-    // 回答を作成
-    const response = await prisma.response.create({
-      data: {
+    // 回答を作成 (Supabase SDK使用)
+    const { data: response, error: responseError } = await supabase
+      .from('Response')
+      .insert({
         surveyId: surveyId,
-      },
-    })
+      })
+      .select()
+      .single()
+
+    if (responseError) {
+      console.error('Error creating response:', responseError)
+      return NextResponse.json({ message: 'Failed to create response' }, { status: 500 })
+    }
 
     // 各質問の回答を作成
+    const answerData = []
     for (const [questionId, value] of Object.entries(answers)) {
       if (value !== null && value !== undefined && value !== '') {
         let answerValue: string
@@ -225,13 +255,23 @@ export async function POST(
           answerValue = String(value)
         }
 
-        await prisma.answer.create({
-          data: {
-            questionId: questionId,
-            responseId: response.id,
-            value: answerValue,
-          },
+        answerData.push({
+          questionId: questionId,
+          responseId: response.id,
+          value: answerValue,
         })
+      }
+    }
+
+    // 回答データを一括作成
+    if (answerData.length > 0) {
+      const { error: answersError } = await supabase
+        .from('Answer')
+        .insert(answerData)
+
+      if (answersError) {
+        console.error('Error creating answers:', answersError)
+        return NextResponse.json({ message: 'Failed to create answers' }, { status: 500 })
       }
     }
 

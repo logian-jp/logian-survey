@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(
   request: NextRequest,
@@ -48,18 +54,20 @@ export async function GET(
       )
     }
 
-    // 回答を取得
-    const responses = await prisma.response.findMany({
-      where: {
-        surveyId: surveyId,
-      },
-      include: {
-        answers: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    // 回答を取得 (Supabase SDK使用)
+    const { data: responses, error: responsesError } = await supabase
+      .from('Response')
+      .select(`
+        *,
+        answers:Answer(*)
+      `)
+      .eq('surveyId', surveyId)
+      .order('createdAt', { ascending: false })
+
+    if (responsesError) {
+      console.error('Error fetching responses:', responsesError)
+      return NextResponse.json({ message: 'Failed to fetch responses' }, { status: 500 })
+    }
 
     // 質問のオプションをパース
     const questionsWithParsedOptions = survey.questions.map((question: any) => ({

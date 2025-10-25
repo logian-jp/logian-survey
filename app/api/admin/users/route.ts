@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,34 +77,69 @@ export async function GET(request: NextRequest) {
       orderBy[sortBy] = sortOrder
     }
 
-    // ユーザー一覧を取得
-    const [users, totalCount] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        include: {
-          _count: {
-            select: {
-              surveys: true
-            }
-          },
-          surveys: {
-            select: {
-              id: true,
-              status: true,
-              _count: {
-                select: {
-                  responses: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: isComputedField ? { createdAt: 'desc' } : orderBy, // 計算フィールドの場合はデフォルトソート
-        // 計算フィールドの場合は全件取得してからソート
-        ...(isComputedField ? {} : { skip: (page - 1) * limit, take: limit })
-      }),
-      prisma.user.count({ where })
-    ])
+    // ユーザー一覧を取得 (Supabase SDK使用)
+    let usersQuery = supabase
+      .from('User')
+      .select(`
+        *,
+        surveys:Survey(id, status)
+      `)
+
+    // 検索条件を適用
+    if (search) {
+      usersQuery = usersQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+    if (role) {
+      usersQuery = usersQuery.eq('role', role)
+    }
+    if (dateRange) {
+      const [start, end] = dateRange.split(',')
+      if (start) usersQuery = usersQuery.gte('createdAt', start)
+      if (end) usersQuery = usersQuery.lte('createdAt', end)
+    }
+
+    // ソートを適用（計算フィールドでない場合）
+    if (!isComputedField) {
+      usersQuery = usersQuery.order(sortBy, { ascending: sortOrder === 'asc' })
+    } else {
+      usersQuery = usersQuery.order('createdAt', { ascending: false })
+    }
+
+    // ページネーション（計算フィールドでない場合）
+    if (!isComputedField) {
+      usersQuery = usersQuery.range((page - 1) * limit, page * limit - 1)
+    }
+
+    const { data: users, error: usersError } = await usersQuery
+
+    if (usersError) {
+      console.error('Error fetching users:', usersError)
+      return NextResponse.json({ message: 'Failed to fetch users' }, { status: 500 })
+    }
+
+    // 総数を取得
+    let countQuery = supabase
+      .from('User')
+      .select('*', { count: 'exact', head: true })
+
+    if (search) {
+      countQuery = countQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+    if (role) {
+      countQuery = countQuery.eq('role', role)
+    }
+    if (dateRange) {
+      const [start, end] = dateRange.split(',')
+      if (start) countQuery = countQuery.gte('createdAt', start)
+      if (end) countQuery = countQuery.lte('createdAt', end)
+    }
+
+    const { count: totalCount, error: countError } = await countQuery
+
+    if (countError) {
+      console.error('Error counting users:', countError)
+      return NextResponse.json({ message: 'Failed to count users' }, { status: 500 })
+    }
 
     // 各ユーザーの統計を計算
     const usersWithStats = users.map(user => {

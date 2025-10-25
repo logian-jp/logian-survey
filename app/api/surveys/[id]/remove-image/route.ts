@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -20,13 +26,21 @@ export async function POST(
     const surveyId = (await params).id
     const { type } = await request.json()
 
-    // アンケートの所有者権限を確認
-    const survey = await prisma.survey.findUnique({
-      where: { id: surveyId },
-      include: {
-        user: true
-      }
-    })
+    // アンケートの所有者権限を確認 (Supabase SDK使用)
+    const { data: surveys, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        user:User(*)
+      `)
+      .eq('id', surveyId)
+
+    if (surveyError) {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
+    }
+
+    const survey = surveys?.[0]
 
     if (!survey) {
       return NextResponse.json({ message: 'Survey not found' }, { status: 404 })
@@ -59,10 +73,16 @@ export async function POST(
       updateData.ogImageUrl = null
     }
 
-    await prisma.survey.update({
-      where: { id: surveyId },
-      data: updateData
-    })
+    // データベースを更新 (Supabase SDK使用)
+    const { error: updateError } = await supabase
+      .from('Survey')
+      .update(updateData)
+      .eq('id', surveyId)
+
+    if (updateError) {
+      console.error('Error updating survey:', updateError)
+      return NextResponse.json({ message: 'Failed to update survey' }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,

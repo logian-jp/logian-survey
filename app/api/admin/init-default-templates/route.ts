@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { QuestionType } from '@prisma/client'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+// QuestionType は文字列として直接使用
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -29,7 +35,32 @@ export async function POST() {
     console.log('Session user email:', session.user.email)
 
     // 管理者ユーザーを取得（最初のユーザーまたは管理者メールのユーザー）
-    let adminUser = await prisma.user.findFirst({
+    const { data: adminUsers, error: adminError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('role', 'ADMIN')
+      .limit(1)
+
+    let adminUser = adminUsers?.[0]
+
+    if (adminError) {
+      console.error('Error finding admin user:', adminError)
+      return NextResponse.json({ message: 'Failed to find admin user' }, { status: 500 })
+    }
+
+    if (!adminUser) {
+      const { data: firstUsers, error: firstUserError } = await supabase
+        .from('User')
+        .select('*')
+        .limit(1)
+      
+      adminUser = firstUsers?.[0]
+      
+      if (firstUserError || !adminUser) {
+        console.error('No users found in database')
+        return NextResponse.json({ message: 'No users found' }, { status: 404 })
+      }
+    }
       where: {
         email: {
           in: adminEmails

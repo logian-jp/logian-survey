@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(
   request: NextRequest,
@@ -22,30 +28,22 @@ export async function GET(
     const userId = (await params).id
     console.log('Fetching user with ID:', userId)
 
-    // ユーザー詳細情報を取得
+    // ユーザー詳細情報を取得 (Supabase SDK使用)
     console.log('Starting user query...')
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        _count: {
-          select: {
-            surveys: true,
-            invitations: true,
-            ticketPurchases: true
-          }
-        },
-        surveys: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            createdAt: true,
-            _count: {
-              select: {
-                responses: true
-              }
-            }
-          },
+    const { data: users, error: userError } = await supabase
+      .from('User')
+      .select(`
+        *,
+        surveys:Survey(id, title, status, createdAt)
+      `)
+      .eq('id', userId)
+
+    if (userError) {
+      console.error('Error fetching user:', userError)
+      return NextResponse.json({ message: 'Failed to fetch user' }, { status: 500 })
+    }
+
+    const user = users?.[0]
           orderBy: {
             createdAt: 'desc'
           },

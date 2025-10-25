@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,10 +36,22 @@ export async function GET(request: NextRequest) {
     let totalSessionCount = 0
     try {
       console.log('Checking database connection...')
-      totalUserCount = await prisma.user.count()
-      totalSessionCount = await prisma.session.count()
+      const { count: userCount, error: userError } = await supabase
+        .from('User')
+        .select('*', { count: 'exact', head: true })
+      
+      totalUserCount = userCount || 0
+      
+      // Session テーブルは廃止されたため、0を返す
+      totalSessionCount = 0
+      
       console.log(`Total users in database: ${totalUserCount}`)
       console.log(`Total sessions in database: ${totalSessionCount}`)
+      
+      if (userError) {
+        console.error('Error fetching user count:', userError)
+        return NextResponse.json({ error: 'Failed to fetch user count' }, { status: 500 })
+      }
     } catch (dbError) {
       console.error('Database connection error:', dbError)
       return NextResponse.json({ 
@@ -51,13 +69,16 @@ export async function GET(request: NextRequest) {
     // 期間開始時点の総ユーザー数を取得
     let totalUsersAtStart = 0
     try {
-      totalUsersAtStart = await prisma.user.count({
-        where: {
-          createdAt: {
-            lt: startDate
-          }
-        }
-      })
+      const { count: usersAtStart, error: startCountError } = await supabase
+        .from('User')
+        .select('*', { count: 'exact', head: true })
+        .lt('createdAt', startDate.toISOString())
+      
+      totalUsersAtStart = usersAtStart || 0
+      
+      if (startCountError) {
+        console.error('Error getting users at start:', startCountError)
+      }
       console.log('Total users at start:', totalUsersAtStart)
     } catch (error) {
       console.error('Error getting total users at start:', error)
@@ -66,15 +87,28 @@ export async function GET(request: NextRequest) {
     // 日別の新規ユーザー数を取得（登録日時ベース）
     let newUsers: any[] = []
     try {
-      newUsers = await prisma.$queryRaw`
-        SELECT 
-          DATE("createdAt") as date,
-          COUNT(*) as new_users
-        FROM "User"
-        WHERE "createdAt" >= ${startDate}
-        GROUP BY DATE("createdAt")
-        ORDER BY DATE("createdAt")
-      ` as Array<{
+      // Raw SQLクエリはSupabaseでは複雑なため、簡易版に変更
+      const { data: newUserData, error: newUserError } = await supabase
+        .from('User')
+        .select('createdAt')
+        .gte('createdAt', startDate.toISOString())
+        .order('createdAt', { ascending: true })
+      
+      if (newUserError) {
+        console.error('Error fetching new users:', newUserError)
+        newUsers = []
+      } else {
+        // 日付別にグループ化
+        const usersByDate = newUserData?.reduce((acc, user) => {
+          const date = new Date(user.createdAt).toISOString().split('T')[0]
+          acc[date] = (acc[date] || 0) + 1
+          return acc
+        }, {} as Record<string, number>) || {}
+        
+        newUsers = Object.entries(usersByDate).map(([date, count]) => ({
+          date,
+          new_users: count
+        })) as Array<{
         date: Date
         new_users: bigint
       }>

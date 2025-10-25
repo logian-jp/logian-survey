@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(
   request: NextRequest,
@@ -16,24 +22,19 @@ export async function GET(
 
     const { id: surveyId } = await params
 
-    // アンケートの存在確認と権限チェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        OR: [
-          { userId: session.user.id },
-          {
-            surveyUsers: {
-              some: {
-                userId: session.user.id,
-                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
-              }
-            }
-          }
-        ]
-      },
-      select: { userId: true, ticketType: true, ticketId: true, paymentId: true }
-    })
+    // アンケートの存在確認と権限チェック (Supabase SDK使用)
+    const { data: surveys, error: surveyError } = await supabase
+      .from('Survey')
+      .select('userId, ticketType, ticketId, paymentId')
+      .eq('id', surveyId)
+      .or(`userId.eq.${session.user.id},surveyUsers.userId.eq.${session.user.id}`)
+
+    if (surveyError) {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ error: 'Failed to fetch survey' }, { status: 500 })
+    }
+
+    const survey = surveys?.[0]
 
     if (!survey) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 })
@@ -48,24 +49,21 @@ export async function GET(
     
     // 無料チケット以外の場合のみ購入記録を取得
     if (survey?.ticketType && survey.ticketType !== 'FREE') {
-      const ticketPurchases = await prisma.ticketPurchase.findMany({
-        where: { 
-          userId: session.user.id,
-          ticketType: survey.ticketType
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        },
-        orderBy: {
-          purchasedAt: 'desc'
-        }
-      })
+      // チケット購入記録を取得 (Supabase SDK使用)
+      const { data: ticketPurchases, error: purchaseError } = await supabase
+        .from('TicketPurchase')
+        .select(`
+          *,
+          user:User(id, name, email)
+        `)
+        .eq('userId', session.user.id)
+        .eq('ticketType', survey.ticketType)
+        .order('purchasedAt', { ascending: false })
+
+      if (purchaseError) {
+        console.error('Error fetching ticket purchases:', purchaseError)
+        return NextResponse.json({ error: 'Failed to fetch purchases' }, { status: 500 })
+      }
       
       purchases = ticketPurchases
     }

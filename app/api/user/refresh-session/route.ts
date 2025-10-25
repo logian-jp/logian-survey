@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -21,11 +27,18 @@ export async function POST() {
     console.log('Session user ID:', session.user.id)
     console.log('Session user email:', session.user.email)
 
-    // メールアドレスでユーザーを検索
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      // TODO: userPlan参照を削除（チケット制度移行のため）
-    })
+    // メールアドレスでユーザーを検索 (Supabase SDK使用)
+    const { data: users, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+
+    if (userError) {
+      console.error('Error fetching user:', userError)
+      return NextResponse.json({ message: 'Failed to fetch user' }, { status: 500 })
+    }
+
+    const user = users?.[0]
 
     if (!user) {
       console.log('User not found in database')

@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -30,27 +36,23 @@ export async function GET() {
 
     try {
       console.log('Attempting to fetch announcements from database...')
-      const announcements = await prisma.announcement.findMany({
-        include: {
-          deliveries: {
-            select: {
-              status: true,
-              readAt: true
-            }
-          },
-          creator: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        },
-        orderBy: [
-          { priority: 'desc' },
-          { createdAt: 'desc' }
-        ]
-      })
+      const { data: announcements, error: announcementsError } = await supabase
+        .from('Announcement')
+        .select(`
+          *,
+          deliveries:AnnouncementDelivery(status, readAt),
+          creator:User!creator(id, name, email)
+        `)
+        .order('priority', { ascending: false })
+        .order('createdAt', { ascending: false })
+
+      if (announcementsError) {
+        console.error('Error fetching announcements:', announcementsError)
+        return NextResponse.json({ 
+          success: false, 
+          message: 'Failed to fetch announcements' 
+        }, { status: 500 })
+      }
 
       console.log('Found announcements:', announcements.length)
 
@@ -166,20 +168,27 @@ export async function POST(request: Request) {
     }
 
     try {
-      // お知らせを作成
-      const announcement = await prisma.announcement.create({
-        data: {
+      // お知らせを作成 (Supabase SDK使用)
+      const { data: announcement, error: createError } = await supabase
+        .from('Announcement')
+        .insert({
           title,
           content,
           type,
           priority: priority || 0,
-          scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-          targetPlans: targetPlans ? targetPlans : undefined,
-          conditions: conditions ? conditions : undefined,
+          scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+          targetPlans: targetPlans ? JSON.stringify(targetPlans) : null,
+          conditions: conditions ? JSON.stringify(conditions) : null,
           status: type === 'MANUAL' ? 'SENT' : 'SCHEDULED',
           createdBy: session.user.id // 配信者（管理者）のIDを記録
-        }
-      })
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('Error creating announcement:', createError)
+        throw createError
+      }
 
       // 手動配信の場合は即座に配信処理を開始
       if (type === 'MANUAL') {
@@ -215,67 +224,74 @@ export async function POST(request: Request) {
   }
 }
 
-// お知らせ配信処理
+// お知らせ配信処理 (Supabase SDK使用)
 async function distributeAnnouncement(announcementId: string) {
   try {
-    const announcement = await prisma.announcement.findUnique({
-      where: { id: announcementId },
-      include: {
-        deliveries: true
-      }
-    })
+    // お知らせと配信情報を取得
+    const { data: announcement, error: announcementError } = await supabase
+      .from('Announcement')
+      .select(`
+        *,
+        deliveries:AnnouncementDelivery(userId)
+      `)
+      .eq('id', announcementId)
+      .single()
 
-    if (!announcement) {
+    if (announcementError || !announcement) {
       throw new Error('Announcement not found')
     }
 
-    // 対象ユーザーを取得
-    let whereCondition: any = {}
+    // 既に配信済みのユーザーIDを取得
+    const deliveredUserIds = announcement.deliveries?.map((d: any) => d.userId) || []
 
-    // 対象プランのフィルタリング
-    if (announcement.targetPlans && typeof announcement.targetPlans === 'string') {
-      const targetPlans = JSON.parse(announcement.targetPlans)
-      whereCondition.userPlan = {
-        planType: {
-          in: targetPlans
-        }
-      }
-    }
+    // 対象ユーザーを取得（チケット制度移行により全ユーザーを対象とする）
+    let query = supabase
+      .from('User')
+      .select('id')
 
     // 既に配信済みのユーザーを除外
-    const deliveredUserIds = announcement.deliveries.map((d: any) => d.userId)
     if (deliveredUserIds.length > 0) {
-      whereCondition.id = {
-        notIn: deliveredUserIds
-      }
+      query = query.not('id', 'in', `(${deliveredUserIds.join(',')})`)
     }
 
-    const targetUsers = await prisma.user.findMany({
-      where: whereCondition,
-      // TODO: userPlan参照を削除（チケット制度移行のため）
-    })
+    const { data: targetUsers, error: usersError } = await query
+
+    if (usersError) {
+      console.error('Error fetching target users:', usersError)
+      throw usersError
+    }
 
     // 配信レコードを作成
-    const deliveryData = targetUsers.map((user: any) => ({
+    const deliveryData = (targetUsers || []).map((user: any) => ({
       announcementId,
       userId: user.id,
-      status: 'SENT' as const
+      status: 'SENT'
     }))
 
     if (deliveryData.length > 0) {
-      await prisma.announcementDelivery.createMany({
-        data: deliveryData
-      })
+      const { error: deliveryError } = await supabase
+        .from('AnnouncementDelivery')
+        .insert(deliveryData)
+
+      if (deliveryError) {
+        console.error('Error creating deliveries:', deliveryError)
+        throw deliveryError
+      }
     }
 
     // 統計を更新
-    await prisma.announcement.update({
-      where: { id: announcementId },
-      data: {
-        totalSent: announcement.totalSent + deliveryData.length,
+    const { error: updateError } = await supabase
+      .from('Announcement')
+      .update({
+        totalSent: (announcement.totalSent || 0) + deliveryData.length,
         status: 'SENT'
-      }
-    })
+      })
+      .eq('id', announcementId)
+
+    if (updateError) {
+      console.error('Error updating announcement stats:', updateError)
+      throw updateError
+    }
 
     console.log(`Distributed announcement ${announcementId} to ${deliveryData.length} users`)
 
