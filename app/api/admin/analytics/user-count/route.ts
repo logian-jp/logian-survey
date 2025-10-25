@@ -109,6 +109,7 @@ export async function GET(request: NextRequest) {
           date,
           new_users: count
         }))
+      }
       console.log('New users data:', newUsers)
     } catch (error) {
       console.error('Error getting new users:', error)
