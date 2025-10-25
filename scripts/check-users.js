@@ -33,7 +33,6 @@ async function checkUsers() {
     })
 
     // 特定のメールアドレスを検索
-    const specificUser = await prisma.user.findUnique({
       where: { email: 'noutomi0729@gmail.com' }
     })
 
@@ -51,7 +50,7 @@ async function checkUsers() {
   } catch (error) {
     console.error('Error checking users:', error)
   } finally {
-    await prisma.$disconnect()
+    // await // prisma.$disconnect()
   }
 }
 

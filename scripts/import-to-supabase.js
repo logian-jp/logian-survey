@@ -88,7 +88,7 @@ async function importData() {
   } catch (error) {
     console.error('Import failed:', error)
   } finally {
-    await prisma.$disconnect()
+    // await // prisma.$disconnect()
   }
 }
 

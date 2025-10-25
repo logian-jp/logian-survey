@@ -88,22 +88,24 @@ async function createTestUsers() {
       const hashedPassword = await bcrypt.hash(userData.password, 12);
       
       // ユーザーを作成
-      const user = await prisma.user.create({
-        data: {
+      // ユーザーを作成 (Supabase SDK使用)
+      const { data: user, error: userError } = await supabase
+        .from('User')
+        .insert({
           name: userData.name,
           email: userData.email,
           password: hashedPassword,
-          role: userData.role,
-          userPlan: {
-            create: {
-              planType: userData.planType,
-              status: 'ACTIVE',
-              startDate: new Date(),
-              endDate: userData.planType === 'FREE' ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30日後
-            }
-          }
-        }
-      });
+          role: userData.role
+        })
+        .select()
+        .single()
+
+      if (userError) {
+        throw userError
+      }
+
+      // NOTE: userPlanテーブル削除により無効化済み（チケット制度移行）
+      console.log(`  -> User plan assignment disabled (migrated to ticket system)`)
 
       console.log(`Created user: ${user.name} (${user.email}) with plan: ${userData.planType}`);
     }
@@ -112,7 +114,7 @@ async function createTestUsers() {
   } catch (error) {
     console.error('Error creating test users:', error);
   } finally {
-    await prisma.$disconnect();
+    // await // prisma.$disconnect();
   }
 }
 

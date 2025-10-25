@@ -46,7 +46,6 @@ async function createUser() {
     console.log(`- Role: ${user.role}`)
     
     // ユーザープランも作成
-    const userPlan = await prisma.userPlan.create({
       data: {
         userId: user.id,
         planType: 'FREE',
@@ -62,7 +61,7 @@ async function createUser() {
   } catch (error) {
     console.error('Error creating user:', error)
   } finally {
-    await prisma.$disconnect()
+    // await // prisma.$disconnect()
   }
 }
 
