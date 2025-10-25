@@ -39,11 +39,27 @@ export async function GET() {
     
     try {
       // まず基本的なクエリをテスト
-      const userCount = await prisma.user.count()
+      const { count: userCount, error: userCountError } = await supabase
+        .from('User')
+        .select('*', { count: 'exact', head: true })
+
+      if (userCountError) {
+        console.error('Error counting users:', userCountError)
+        return NextResponse.json({ error: 'Failed to count users' }, { status: 500 })
+      }
+
       console.log('User count:', userCount)
       
       // お知らせテーブルの存在確認
-      const announcementCount = await prisma.announcement.count()
+      const { count: announcementCount, error: announcementCountError } = await supabase
+        .from('Announcement')
+        .select('*', { count: 'exact', head: true })
+
+      if (announcementCountError) {
+        console.error('Error counting announcements:', announcementCountError)
+        return NextResponse.json({ error: 'Failed to count announcements' }, { status: 500 })
+      }
+
       console.log('Announcement count:', announcementCount)
       
       return NextResponse.json({

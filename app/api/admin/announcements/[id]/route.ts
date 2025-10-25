@@ -33,25 +33,19 @@ export async function GET(
     }
 
     const { id } = await params
-    const announcement = await prisma.announcement.findUnique({
-      where: { id },
-      include: {
-        deliveries: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-                // TODO: userPlan参照を削除（チケット制度移行のため）
-              }
-            }
-          }
-        }
-      }
-    })
+    const { data: announcement, error: announcementError } = await supabase
+      .from('Announcement')
+      .select(`
+        *,
+        deliveries:AnnouncementDelivery(
+          *,
+          user:User!userId(id, name, email)
+        )
+      `)
+      .eq('id', id)
+      .single()
 
-    if (!announcement) {
+    if (announcementError || !announcement) {
       return NextResponse.json(
         { message: 'お知らせが見つかりません' },
         { status: 404 }
@@ -116,18 +110,25 @@ export async function PUT(
       )
     }
 
-    const announcement = await prisma.announcement.update({
-      where: { id: id },
-      data: {
+    const { data: announcement, error: updateError } = await supabase
+      .from('Announcement')
+      .update({
         title,
         content,
         type,
         priority: priority || 0,
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-        targetPlans: targetPlans ? targetPlans : undefined,
-        conditions: conditions ? conditions : undefined
-      }
-    })
+        scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        targetPlans: targetPlans ? targetPlans : null,
+        conditions: conditions ? conditions : null
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Error updating announcement:', updateError)
+      return NextResponse.json({ message: 'Failed to update announcement' }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
@@ -170,11 +171,13 @@ export async function DELETE(
 
     const { id } = await params
     // お知らせが存在するかチェック
-    const existingAnnouncement = await prisma.announcement.findUnique({
-      where: { id: id }
-    })
+    const { data: existingAnnouncement, error: checkError } = await supabase
+      .from('Announcement')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-    if (!existingAnnouncement) {
+    if (checkError || !existingAnnouncement) {
       return NextResponse.json(
         { message: 'お知らせが見つかりません' },
         { status: 404 }
@@ -182,9 +185,15 @@ export async function DELETE(
     }
 
     // お知らせを削除（関連する配信レコードも自動削除される）
-    await prisma.announcement.delete({
-      where: { id: id }
-    })
+    const { error: deleteError } = await supabase
+      .from('Announcement')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      console.error('Error deleting announcement:', deleteError)
+      return NextResponse.json({ message: 'Failed to delete announcement' }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,

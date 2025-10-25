@@ -18,35 +18,29 @@ export async function GET(request: NextRequest) {
     }
 
     // 管理者権限チェック
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
-    })
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
 
-    if (!user || user.role !== 'ADMIN') {
+    if (userError || !user || user.role !== 'ADMIN') {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
     // 招待統計を取得
-    const invitationStats = await prisma.invitation.findMany({
-      include: {
-        inviter: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        usedByUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
+    const { data: invitationStats, error: statsError } = await supabase
+      .from('Invitation')
+      .select(`
+        *,
+        inviter:User!inviterId(id, name, email),
+        usedByUser:User!usedByUserId(id, name, email)
+      `)
+
+    if (statsError) {
+      console.error('Error fetching invitation stats:', statsError)
+      return NextResponse.json({ message: 'Failed to fetch stats' }, { status: 500 })
+    }
 
     // 統計サマリーを計算
     const totalInvitations = invitationStats.length
@@ -55,26 +49,21 @@ export async function GET(request: NextRequest) {
     const successRate = totalInvitations > 0 ? (usedInvitations / totalInvitations) * 100 : 0
 
     // 招待者別統計
-    const inviterStats = await prisma.user.findMany({
-      where: {
-        invitations: {
-          some: {}
-        }
-      },
-      include: {
-        invitations: {
-          include: {
-            usedByUser: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
-          }
-        }
-      }
-    })
+    const { data: inviterStats, error: inviterStatsError } = await supabase
+      .from('User')
+      .select(`
+        *,
+        invitations:Invitation(
+          *,
+          usedByUser:User!usedByUserId(id, name, email)
+        )
+      `)
+      .not('invitations', 'is', null)
+
+    if (inviterStatsError) {
+      console.error('Error fetching inviter stats:', inviterStatsError)
+      return NextResponse.json({ message: 'Failed to fetch inviter stats' }, { status: 500 })
+    }
 
     const inviterBreakdown = inviterStats.map(inviter => {
       const totalInvited = inviter.invitations.length
