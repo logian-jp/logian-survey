@@ -56,11 +56,11 @@ export async function PUT(
     }
 
     // 既存のプラン設定を取得
-    const existingPlan = await prisma.planConfig.findUnique({
+    const currentPlan = await prisma.planConfig.findUnique({
       where: { id: params.id }
     })
 
-    if (!existingPlan) {
+    if (!currentPlan) {
       return NextResponse.json(
         { message: 'Plan config not found' },
         { status: 404 }
@@ -84,7 +84,7 @@ export async function PUT(
 
     // Stripe商品・価格の更新
     try {
-      if (existingPlan.stripeProductId) {
+      if (currentPlan.stripeProductId) {
         // 既存のStripe商品を更新
         const updateData: any = {
           name: planConfig.name,
@@ -99,12 +99,12 @@ export async function PUT(
           updateData.description = planConfig.description
         }
         
-        await stripe.products.update(existingPlan.stripeProductId, updateData)
+        await stripe.products.update(currentPlan.stripeProductId, updateData)
 
         // 価格が変更された場合は新しい価格を作成
-        if (existingPlan.price !== planConfig.price) {
+        if (currentPlan.price !== planConfig.price) {
           const newPrice = await stripe.prices.create({
-            product: existingPlan.stripeProductId,
+            product: currentPlan.stripeProductId,
             unit_amount: Math.round(planConfig.price),
             currency: 'jpy',
             recurring: planConfig.planType === 'ONETIME_UNLIMITED' ? undefined : {
@@ -117,8 +117,8 @@ export async function PUT(
           })
 
           // 古い価格を非アクティブ化
-          if (existingPlan.stripePriceId) {
-            await stripe.prices.update(existingPlan.stripePriceId, {
+          if (currentPlan.stripePriceId) {
+            await stripe.prices.update(currentPlan.stripePriceId, {
               active: false
             })
           }

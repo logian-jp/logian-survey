@@ -41,35 +41,32 @@ model User {
   image                  String?
   password               String?
   role                   UserRole               @default(USER)
-  customLogoUrl          String?                // エンタープライズプラン用のカスタムロゴ
-  // 招待制関連フィールド
-  invitedBy              String?                // 招待者のユーザーID
-  invitationCode         String?                // 招待コード
-  maxInvitations         Int                    @default(3) // 招待可能人数
-  usedInvitations        Int                    @default(0) // 使用済み招待数
+  customLogoUrl          String?
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
+  invitationCode         String?
+  invitedBy              String?
+  maxInvitations         Int                    @default(3)
+  usedInvitations        Int                    @default(0)
   accounts               Account[]
+  createdAnnouncements   Announcement[]         @relation("AnnouncementCreator")
   announcementDeliveries AnnouncementDelivery[]
+  dataUsage              DataUsage[]
   createdDiscountLinks   DiscountLink[]         @relation("DiscountLinkCreator")
+  invitations            Invitation[]           @relation("InvitationCreator")
+  receivedInvitation     Invitation?            @relation("InvitationReceiver")
+  notifications          Notification[]
   questionTemplates      QuestionTemplate[]
   sessions               Session[]
   surveys                Survey[]
   invitedSurveys         SurveyUser[]           @relation("SurveyInviter")
   surveyUsers            SurveyUser[]
-  usedDiscountLinks      DiscountLink[]         @relation("DiscountLinkUsers")
-  dataUsage              DataUsage[]
-  dataAddons             UserDataAddon[]
-  notifications          Notification[]
   ticketPurchases        TicketPurchase[]
-  tickets                UserTicket[]
-  // 招待制関連リレーション
   inviter                User?                  @relation("UserInviter", fields: [invitedBy], references: [id])
   invitedUsers           User[]                 @relation("UserInviter")
-  invitations            Invitation[]           @relation("InvitationCreator")
-  receivedInvitation     Invitation?            @relation("InvitationReceiver")
-  // お知らせ関連リレーション
-  createdAnnouncements   Announcement[]         @relation("AnnouncementCreator")
+  dataAddons             UserDataAddon[]
+  tickets                UserTicket[]
+  usedDiscountLinks      DiscountLink[]         @relation("DiscountLinkUsers")
 }
 
 model VerificationToken {
@@ -81,36 +78,31 @@ model VerificationToken {
 }
 
 model Survey {
-  id              String       @id @default(cuid())
-  title           String
-  description     String?
-  status          SurveyStatus @default(DRAFT)
-  shareUrl        String?      @unique
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  maxResponses    Int?
-  endDate         DateTime?    // 回答募集の期限
-  targetResponses Int?
-  userId          String
-  
-  // アンケート単位のチケット設定
-  ticketType      TicketType   @default(FREE)  // このアンケートのチケット
-  ticketId        String?      // 使用したチケットのID
-  paymentId       String?      // 決済ID
-  surveyEndDate   DateTime?    // アンケート終了日（回答募集終了後）
-  dataRetentionDays Int?       // データ保存期間（日数）
-  
-  // エンタープライズプラン用のカスタマイズ機能
-  headerImageUrl  String?      // オリジナルヘッダー画像
-  ogImageUrl      String?      // Open Graph用アイキャッチ画像
-  useCustomLogo   Boolean?     // オリジナルロゴを使用するかどうか
-  customDomain    String?      // カスタムドメイン
-  
-  questions       Question[]
-  responses       Response[]
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  surveyUsers     SurveyUser[]
-  ticketPurchases TicketPurchase[]
+  id                String           @id @default(cuid())
+  title             String
+  description       String?
+  status            SurveyStatus     @default(DRAFT)
+  shareUrl          String?          @unique
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  maxResponses      Int?
+  endDate           DateTime?
+  targetResponses   Int?
+  userId            String
+  headerImageUrl    String?
+  ogImageUrl        String?
+  useCustomLogo     Boolean?
+  customDomain      String?
+  dataRetentionDays Int?
+  paymentId         String?
+  surveyEndDate     DateTime?
+  ticketId          String?
+  ticketType        TicketType       @default(FREE)
+  questions         Question[]
+  responses         Response[]
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  surveyUsers       SurveyUser[]
+  ticketPurchases   TicketPurchase[]
 }
 
 model SurveyUser {
@@ -200,7 +192,6 @@ model QuestionTemplate {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-
 model DiscountLink {
   id                         String       @id @default(cuid())
   code                       String       @unique
@@ -208,7 +199,6 @@ model DiscountLink {
   description                String?
   discountType               DiscountType @default(PERCENTAGE)
   discountValue              Float
-  targetTicketType           TicketType?
   originalPrice              Float
   discountedPrice            Float
   maxUses                    Int?
@@ -221,6 +211,7 @@ model DiscountLink {
   createdBy                  String?
   createdAt                  DateTime     @default(now())
   updatedAt                  DateTime     @updatedAt
+  targetTicketType           TicketType?
   creator                    User?        @relation("DiscountLinkCreator", fields: [createdBy], references: [id])
   users                      User[]       @relation("DiscountLinkUsers")
 }
@@ -235,10 +226,10 @@ model PlanConfig {
   limits          Json
   isActive        Boolean  @default(true)
   sortOrder       Int      @default(0)
-  stripeProductId String?
-  stripePriceId   String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  stripePriceId   String?
+  stripeProductId String?
 }
 
 model Announcement {
@@ -254,11 +245,11 @@ model Announcement {
   targetUsers Json?
   totalSent   Int                    @default(0)
   totalRead   Int                    @default(0)
-  createdBy   String?                // 配信者（管理者）のユーザーID
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
-  deliveries  AnnouncementDelivery[]
+  createdBy   String?
   creator     User?                  @relation("AnnouncementCreator", fields: [createdBy], references: [id])
+  deliveries  AnnouncementDelivery[]
 }
 
 model AnnouncementDelivery {
@@ -278,46 +269,119 @@ model AnnouncementDelivery {
 model DataUsage {
   id          String   @id @default(cuid())
   userId      String
-  surveyId   String?
-  dataType    String   // 'survey_data', 'file_upload', 'export_data'
-  sizeBytes   Int      // データサイズ（バイト）
-  description String?  // データの説明
+  surveyId    String?
+  dataType    String
+  sizeBytes   Int
+  description String?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model DataStorageAddon {
-  id                String   @id @default(cuid())
-  name              String   // 例: "100MB容量追加"
-  description       String?  // 説明
-  type              String   // 'storage' または 'retention'
-  amount            Int      // 容量の場合: MB数、保存期間の場合: 日数
-  price             Int      // 価格（円）
-  stripeProductId   String?  // Stripe商品ID
-  stripePriceId     String?  // Stripe価格ID
-  isActive          Boolean  @default(true)
-  isMonthly         Boolean  @default(false) // 月額かどうか（保存期間延長は買い切り）
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  userPurchases     UserDataAddon[]
+  id              String          @id @default(cuid())
+  name            String
+  description     String?
+  type            String
+  amount          Int
+  price           Int
+  stripeProductId String?
+  stripePriceId   String?
+  isActive        Boolean         @default(true)
+  isMonthly       Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  userPurchases   UserDataAddon[]
 }
 
 model UserDataAddon {
-  id                String           @id @default(cuid())
-  userId            String
-  addonId           String
-  status            AddonStatus      @default(ACTIVE)
-  purchasedAt       DateTime         @default(now())
-  expiresAt         DateTime?        // 月額の場合のみ設定
-  stripeSubscriptionId String?       // 月額の場合のStripeサブスクリプションID
-  stripePaymentIntentId String?      // 買い切りの場合のStripe支払いID
-  surveyId          String?          // 保存期間延長の場合の対象アンケートID
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  addon             DataStorageAddon @relation(fields: [addonId], references: [id], onDelete: Cascade)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id                    String           @id @default(cuid())
+  userId                String
+  addonId               String
+  status                AddonStatus      @default(ACTIVE)
+  purchasedAt           DateTime         @default(now())
+  expiresAt             DateTime?
+  stripeSubscriptionId  String?
+  stripePaymentIntentId String?
+  surveyId              String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  addon                 DataStorageAddon @relation(fields: [addonId], references: [id], onDelete: Cascade)
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, addonId, status])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TicketPurchase {
+  id                String         @id @default(cuid())
+  userId            String
+  surveyId          String?
+  ticketType        TicketType
+  amount            Int?
+  currency          String?
+  checkoutSessionId String?        @unique
+  paymentIntentId   String?        @unique
+  metadata          Json?
+  status            PurchaseStatus @default(ACTIVE)
+  purchasedAt       DateTime       @default(now())
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  survey            Survey?        @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([surveyId])
+}
+
+model UserTicket {
+  id               String     @id @default(cuid())
+  userId           String
+  ticketType       TicketType
+  totalTickets     Int
+  usedTickets      Int        @default(0)
+  remainingTickets Int
+  purchasedAt      DateTime   @default(now())
+  expiresAt        DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([ticketType])
+}
+
+model Invitation {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  inviterId    String
+  inviterEmail String
+  inviterName  String?
+  invitedEmail String?
+  invitedName  String?
+  message      String?
+  isUsed       Boolean   @default(false)
+  usedAt       DateTime?
+  usedByUserId String?   @unique
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  inviter      User      @relation("InvitationCreator", fields: [inviterId], references: [id], onDelete: Cascade)
+  usedByUser   User?     @relation("InvitationReceiver", fields: [usedByUserId], references: [id])
+
+  @@index([inviterId])
+  @@index([code])
+  @@index([isUsed])
 }
 
 enum AddonStatus {
@@ -371,7 +435,6 @@ enum TicketType {
   ONETIME_UNLIMITED
 }
 
-
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
@@ -398,18 +461,6 @@ enum DeliveryStatus {
   HIDDEN
 }
 
-model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  type      NotificationType
-  title     String
-  message   String
-  data      String?  // JSON string for additional data
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
 enum NotificationType {
   SURVEY_RESPONSE
   ADDON_PURCHASED
@@ -422,72 +473,3 @@ enum PurchaseStatus {
   CANCELLED
   REFUNDED
 }
-
-// チケット購入記録（アンケート単位の買い切りチケットの記録）
-model TicketPurchase {
-  id                 String    @id @default(cuid())
-  userId             String
-  surveyId           String?
-  ticketType         TicketType
-  amount             Int?      // 金額（最小単位, JPYなら円）
-  currency           String?   // 例: 'jpy'
-  checkoutSessionId  String?   @unique
-  paymentIntentId    String?   @unique
-  metadata           Json?
-  status             PurchaseStatus @default(ACTIVE)
-  purchasedAt        DateTime  @default(now())
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  survey             Survey?   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([surveyId])
-}
-
-// チケット管理（ユーザーが持つチケットの数）
-model UserTicket {
-  id        String     @id @default(cuid())
-  userId    String
-  ticketType TicketType
-  totalTickets Int      // 購入した総チケット数
-  usedTickets  Int      @default(0) // 使用済みチケット数
-  remainingTickets Int  // 残りチケット数（計算フィールド）
-  purchasedAt DateTime @default(now())
-  expiresAt  DateTime? // チケットの有効期限（null = 永続）
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([ticketType])
-}
-
-// 招待制システム
-model Invitation {
-  id                String       @id @default(cuid())
-  code              String       @unique // 招待コード
-  inviterId         String       // 招待者のユーザーID
-  inviterEmail      String       // 招待者のメールアドレス
-  inviterName       String?      // 招待者の名前
-  invitedEmail      String?      // 招待されたメールアドレス（任意）
-  invitedName       String?      // 招待された人の名前（任意）
-  message           String?      // 招待メッセージ
-  isUsed            Boolean      @default(false) // 使用済みかどうか
-  usedAt            DateTime?    // 使用日時
-  usedByUserId      String?      @unique // 使用したユーザーID
-  expiresAt         DateTime?    // 有効期限（null = 永続）
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  
-  // リレーション
-  inviter           User         @relation("InvitationCreator", fields: [inviterId], references: [id], onDelete: Cascade)
-  usedByUser        User?        @relation("InvitationReceiver", fields: [usedByUserId], references: [id], onDelete: SetNull)
-  
-  @@index([inviterId])
-  @@index([code])
-  @@index([isUsed])
-}
-
