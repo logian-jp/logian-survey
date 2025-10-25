@@ -72,14 +72,19 @@ export default function NotificationPanel({ className = '' }: NotificationPanelP
       if (response.ok) {
         const data = await response.json()
         console.log('Received notifications:', data)
-        setNotifications(data)
+        // 配列であることを確認してからセット
+        setNotifications(Array.isArray(data) ? data : [])
       } else {
         console.error('Failed to fetch notifications, status:', response.status)
         const errorData = await response.json()
         console.error('Error data:', errorData)
+        // エラー時は空配列をセット
+        setNotifications([])
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error)
+      // ネットワークエラー時も空配列をセット
+      setNotifications([])
     }
   }
 
@@ -306,13 +311,13 @@ export default function NotificationPanel({ className = '' }: NotificationPanelP
       {/* 回答通知タブ */}
       {activeTab === 'notifications' && (
         <div className="max-h-96 overflow-y-auto">
-          {notifications.length === 0 ? (
+          {(notifications || []).length === 0 ? (
             <div className="px-4 py-8 text-center text-gray-500">
               <div className="text-lg mb-1">📊</div>
               <p className="text-sm">新しい回答はありません</p>
             </div>
           ) : (
-            notifications.slice(0, isExpanded ? notifications.length : 3).map((notification) => (
+            (notifications || []).slice(0, isExpanded ? (notifications || []).length : 3).map((notification) => (
               <div key={notification.id} className="px-4 py-2 border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center flex-1 min-w-0">
@@ -348,13 +353,13 @@ export default function NotificationPanel({ className = '' }: NotificationPanelP
             ))
           )}
 
-          {notifications.length > 3 && !isExpanded && (
+          {(notifications || []).length > 3 && !isExpanded && (
             <div className="px-4 py-2 text-center border-t border-gray-200">
               <button
                 onClick={() => setIsExpanded(true)}
                 className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
               >
-                他{notifications.length - 3}件を表示
+                他{(notifications || []).length - 3}件を表示
               </button>
             </div>
           )}
