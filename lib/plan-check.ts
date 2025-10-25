@@ -97,10 +97,14 @@ export async function checkResponseLimit(surveyId: string): Promise<{ allowed: b
     /*
     let survey
     try {
-      survey = await prisma.survey.findUnique({
-        where: { id: surveyId },
-        include: { user: { include: { userPlan: true } } }
-      })
+      // NOTE: Supabase SDK実装（コメントアウト済み）
+      /*
+      const { data: survey, error } = await supabase
+        .from('Survey')
+        .select('*, user:User(*, userPlan:UserPlan(*))')
+        .eq('id', surveyId)
+        .single()
+      */
       console.log('Survey query completed, found:', !!survey)
     } catch (dbError) {
       console.error('Database error in survey query:', dbError)
@@ -132,9 +136,14 @@ export async function checkResponseLimit(surveyId: string): Promise<{ allowed: b
       // 現在の回答数を取得
       let currentResponseCount
       try {
-        currentResponseCount = await prisma.response.count({
-          where: { surveyId }
-        })
+        // NOTE: Supabase SDK実装（コメントアウト済み）
+        /*
+        const { count } = await supabase
+          .from('Response')
+          .select('*', { count: 'exact', head: true })
+          .eq('surveyId', surveyId)
+        currentResponseCount = count || 0
+        */
         console.log('Current response count:', currentResponseCount, 'Limit:', limits.maxResponsesPerSurvey)
       } catch (countError) {
         console.error('Error counting responses:', countError)
@@ -196,7 +205,13 @@ export async function checkResponseLimit(surveyId: string): Promise<{ allowed: b
       return { allowed: true }
     }
 
-    const responseCount = await prisma.response.count({ where: { surveyId } })
+    // NOTE: Supabase SDK実装（コメントアウト済み）
+    /*
+    const { count: responseCount } = await supabase
+      .from('Response')
+      .select('*', { count: 'exact', head: true })
+      .eq('surveyId', surveyId)
+    */
 
     if (responseCount >= effectiveLimit) {
       return {

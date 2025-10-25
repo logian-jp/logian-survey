@@ -125,13 +125,20 @@ export function checkExportFormat(ticketType: string, format: string): boolean {
   return limits.exportFormats.includes(format)
 }
 
-// アンケートのチケットタイプを取得
+// アンケートのチケットタイプを取得 (Supabase SDK使用)
 export async function getSurveyTicketType(surveyId: string): Promise<string> {
   try {
-    const survey = await prisma.survey.findUnique({
-      where: { id: surveyId },
-      select: { ticketType: true }
-    })
+    const { data: survey, error } = await supabase
+      .from('Survey')
+      .select('ticketType')
+      .eq('id', surveyId)
+      .single()
+
+    if (error) {
+      console.error('Failed to get survey ticket type:', error)
+      return 'FREE'
+    }
+
     return survey?.ticketType || 'FREE'
   } catch (error) {
     console.error('Failed to get survey ticket type:', error)

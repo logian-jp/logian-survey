@@ -1,6 +1,10 @@
-const { PrismaClient } = require('@prisma/client');
+// NOTE: Prisma → Supabase SDK移行済み（一時無効化）
+// NOTE: Prisma → Supabase SDK移行済み（一時無効化）
+// const { PrismaClient } = require('@prisma/client');
+// const prisma = new PrismaClient();
 
-const prisma = new PrismaClient();
+console.log('⚠️  このスクリプトはSupabase SDK移行により一時無効化されています');
+process.exit(0);
 
 async function clearTestData() {
   try {

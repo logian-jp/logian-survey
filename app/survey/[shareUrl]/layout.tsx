@@ -1,6 +1,12 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 interface Props {
   params: Promise<{ shareUrl: string }>
@@ -9,19 +15,17 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { shareUrl } = await params
-    const survey = await prisma.survey.findUnique({
-      where: {
-        shareUrl: shareUrl,
-        status: 'ACTIVE',
-      },
-      include: {
-        user: {
-          select: {
-            customLogoUrl: true
-          }
-        }
-      },
-    })
+    // アンケート情報を取得 (Supabase SDK使用)
+    const { data: survey, error } = await supabase
+      .from('Survey')
+      .select('*, user:User(customLogoUrl)')
+      .eq('shareUrl', shareUrl)
+      .eq('status', 'ACTIVE')
+      .single()
+
+    if (error) {
+      console.error('Survey not found:', error)
+    }
 
     if (!survey) {
       return {

@@ -1,21 +1,24 @@
-const { PrismaClient } = require('@prisma/client')
+// NOTE: Prisma → Supabase SDK移行済み（一時無効化）
+const { createClient } = require('@supabase/supabase-js')
 
-const prisma = new PrismaClient()
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 async function checkUsers() {
   try {
     console.log('Checking users in database...')
     
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        password: true,
-        role: true,
-        createdAt: true
-      }
-    })
+    // ユーザー一覧を取得 (Supabase SDK使用)
+    const { data: users, error } = await supabase
+      .from('User')
+      .select('id, name, email, password, role, createdAt')
+
+    if (error) {
+      throw error
+    }
 
     console.log(`Found ${users.length} users:`)
     users.forEach(user => {

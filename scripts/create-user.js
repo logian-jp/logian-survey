@@ -1,7 +1,12 @@
-const { PrismaClient } = require('@prisma/client')
+// NOTE: Prisma → Supabase SDK移行済み（一時無効化）
+const { createClient } = require('@supabase/supabase-js')
 const bcrypt = require('bcryptjs')
 
-const prisma = new PrismaClient()
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 async function createUser() {
   try {
@@ -10,20 +15,27 @@ async function createUser() {
     // パスワードをハッシュ化
     const hashedPassword = await bcrypt.hash('password123', 12)
     
-    // 既存のユーザーを削除
-    await prisma.user.deleteMany({
-      where: { email: 'noutomi0729@gmail.com' }
-    })
+    // 既存のユーザーを削除 (Supabase SDK使用)
+    await supabase
+      .from('User')
+      .delete()
+      .eq('email', 'noutomi0729@gmail.com')
     
-    // 新しいユーザーを作成
-    const user = await prisma.user.create({
-      data: {
+    // 新しいユーザーを作成 (Supabase SDK使用)
+    const { data: user, error } = await supabase
+      .from('User')
+      .insert({
         name: 'Takashi Notomi',
         email: 'noutomi0729@gmail.com',
         password: hashedPassword,
         role: 'USER'
-      }
-    })
+      })
+      .select()
+      .single()
+
+    if (error) {
+      throw error
+    }
     
     console.log('User created successfully:')
     console.log(`- ID: ${user.id}`)

@@ -1,6 +1,7 @@
-const { PrismaClient } = require('@prisma/client')
+// NOTE: Prisma → Supabase SDK移行済み（一時無効化）
+// const { PrismaClient } = require('@prisma/client')
 
-const prisma = new PrismaClient()
+// const prisma = new PrismaClient()
 
 async function checkAnnouncements() {
   try {
