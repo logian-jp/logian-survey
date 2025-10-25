@@ -85,10 +85,6 @@ export async function POST() {
         // NOTE: userPlanテーブル削除により無効化済み（チケット制度移行）
         // プラン割り当ては無効化
         
-        console.log(`  -> Assigned plan: ${randomPlan}`)
-        createdUsers.push({ name: user.name, email: user.email, plan: randomPlan })
-        */
-        
         console.log(`  -> User created (no plan assigned - ticket system)`)
         createdUsers.push({ name: user.name, email: user.email, plan: 'TICKET_SYSTEM' })
         
