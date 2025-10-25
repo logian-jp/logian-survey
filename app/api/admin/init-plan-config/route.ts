@@ -28,7 +28,16 @@ export async function POST() {
     console.log('Initializing plan configuration on Vercel...')
     
     // 既存のプラン設定をクリア
-    await prisma.planConfig.deleteMany({})
+    const { error: deleteError } = await supabase
+      .from('PlanConfig')
+      .delete()
+      .neq('id', 'never-match') // 全削除のためのダミー条件
+
+    if (deleteError) {
+      console.error('Error clearing plan configurations:', deleteError)
+      return NextResponse.json({ message: 'Failed to clear existing configs' }, { status: 500 })
+    }
+
     console.log('Cleared existing plan configurations')
     
     // プラン設定を作成
@@ -96,22 +105,36 @@ export async function POST() {
     ]
     
     for (const config of planConfigs) {
-      await prisma.planConfig.create({
-        data: config
-      })
+      const { error: createError } = await supabase
+        .from('PlanConfig')
+        .insert(config)
+
+      if (createError) {
+        console.error('Error creating plan config:', createError)
+        return NextResponse.json({ message: 'Failed to create plan config' }, { status: 500 })
+      }
+
       console.log(`Created plan config: ${config.name} (${config.planType}) - ¥${config.price}`)
     }
     
     console.log('Plan configuration initialization completed!')
     
     // 確認
-    const createdConfigs = await prisma.planConfig.findMany()
-    console.log(`Total plan configs created: ${createdConfigs.length}`)
+    const { data: createdConfigs, error: fetchError } = await supabase
+      .from('PlanConfig')
+      .select('*')
+
+    if (fetchError) {
+      console.error('Error fetching created configs:', fetchError)
+      return NextResponse.json({ message: 'Failed to fetch created configs' }, { status: 500 })
+    }
+
+    console.log(`Total plan configs created: ${createdConfigs?.length || 0}`)
     
     return NextResponse.json({
       success: true,
       message: 'Plan configuration initialized successfully',
-      count: createdConfigs.length
+      count: createdConfigs?.length || 0
     })
     
   } catch (error) {

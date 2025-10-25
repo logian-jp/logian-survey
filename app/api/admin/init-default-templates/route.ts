@@ -70,9 +70,18 @@ export async function POST() {
 
     // 管理者ユーザーが見つからない場合は、最初のユーザーを使用
     if (!adminUser) {
-      adminUser = await prisma.user.findFirst({
-        orderBy: { createdAt: 'asc' }
-      })
+      const { data: firstUser, error: userError } = await supabase
+        .from('User')
+        .select('*')
+        .order('createdAt', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (userError) {
+        console.error('Error fetching first user:', userError)
+      } else {
+        adminUser = firstUser
+      }
     }
 
     if (!adminUser) {
@@ -86,14 +95,16 @@ export async function POST() {
     console.log('Using admin user:', adminUser.name, adminUser.email, adminUser.id)
 
     // 既存のデフォルトテンプレートを削除
-    await prisma.questionTemplate.deleteMany({
-      where: {
-        isPublic: true,
-        title: {
-          startsWith: '[デフォルト]'
-        }
-      }
-    })
+    const { error: deleteError } = await supabase
+      .from('QuestionTemplate')
+      .delete()
+      .eq('isPublic', true)
+      .like('title', '[デフォルト]%')
+
+    if (deleteError) {
+      console.error('Error deleting existing templates:', deleteError)
+      return NextResponse.json({ message: 'Failed to delete existing templates' }, { status: 500 })
+    }
 
     // デフォルトの質問テンプレートを作成
     const defaultTemplates = [
@@ -188,9 +199,17 @@ export async function POST() {
     for (const template of defaultTemplates) {
       try {
         console.log(`Creating template: ${template.title} for user: ${adminUser.id}`)
-        const created = await prisma.questionTemplate.create({
-          data: template
-        })
+        const { data: created, error: createError } = await supabase
+          .from('QuestionTemplate')
+          .insert(template)
+          .select()
+          .single()
+
+        if (createError) {
+          console.error(`Failed to create template: ${template.title}`, createError)
+          throw createError
+        }
+
         createdTemplates.push(created)
         console.log(`Successfully created template: ${template.title} with ID: ${created.id}`)
       } catch (error) {

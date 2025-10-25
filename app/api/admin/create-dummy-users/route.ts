@@ -65,9 +65,17 @@ export async function POST() {
     
     for (const userData of dummyUsers) {
       try {
-        const user = await prisma.user.create({
-          data: userData
-        })
+        const { data: user, error: createError } = await supabase
+          .from('User')
+          .insert(userData)
+          .select()
+          .single()
+
+        if (createError) {
+          console.error('Error creating user:', createError)
+          continue
+        }
+
         console.log(`Created user: ${user.name} (${user.email})`)
         
         // ユーザープランを作成（今月の日付で）
