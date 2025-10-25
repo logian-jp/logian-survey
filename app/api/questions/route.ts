@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'crypto'
 
 // Supabase クライアントの設定
 const supabase = createClient(
@@ -71,9 +72,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 質問を作成 (Supabase SDK使用)
+    const now = new Date().toISOString()
     const { data: question, error: questionError } = await supabase
       .from('Question')
       .insert({
+        id: randomUUID(),
         surveyId,
         type,
         title: title || (type === 'PAGE_BREAK' ? '改ページ' : type === 'SECTION' ? 'セクション' : ''),
@@ -82,6 +85,8 @@ export async function POST(request: NextRequest) {
         order: order || 0,
         options: options ? JSON.stringify(options) : null,
         settings: settings ? JSON.stringify(settings) : null,
+        createdAt: now,
+        updatedAt: now,
       })
       .select()
       .single()

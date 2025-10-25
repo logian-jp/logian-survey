@@ -34,21 +34,19 @@ export async function GET(
     }
 
     // Supabase SDKを使用してアンケート情報を取得
-    const { data: surveys, error: surveyError } = await supabase
+    const { data: survey, error: surveyError } = await supabase
       .from('Survey')
       .select(`
         *,
         questions:Question(*)
       `)
       .eq('id', surveyId)
-      .or(`userId.eq.${session.user.id},surveyUsers.userId.eq.${session.user.id}`)
+      .single()
 
     if (surveyError) {
       console.error('Error fetching survey:', surveyError)
       return NextResponse.json({ message: 'Failed to fetch survey' }, { status: 500 })
     }
-
-    const survey = surveys?.[0]
     
     // レスポンス数を取得
     let responseCount = 0
