@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { QuestionType } from '@prisma/client'
+// Prisma型定義をSupabase型定義に置き換え
+type QuestionType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'NUMBER' | 'SELECT' | 'MULTISELECT' | 'RADIO' | 'CHECKBOX' | 'DATE' | 'TIME' | 'DATETIME' | 'FILE' | 'IMAGE' | 'URL' | 'PHONE' | 'RATING' | 'SCALE' | 'MATRIX' | 'RANKING' | 'LOCATION' | 'SECTION' | 'PAGE_BREAK'
 
 interface QuestionTemplate {
   id: string

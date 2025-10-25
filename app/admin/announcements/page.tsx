@@ -2,7 +2,26 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Announcement, AnnouncementType, AnnouncementStatus } from '@prisma/client'
+// Prisma型定義をSupabase型定義に置き換え
+type AnnouncementType = 'INFO' | 'WARNING' | 'URGENT' | 'FEATURE' | 'MAINTENANCE'
+type AnnouncementStatus = 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'
+
+interface Announcement {
+  id: string
+  type: AnnouncementType
+  status: AnnouncementStatus
+  title: string
+  content: string
+  priority: number
+  scheduledAt?: string | null
+  publishedAt?: string | null
+  archivedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  creatorId: string
+  totalRead: number
+  totalDelivered: number
+}
 
 interface AnnouncementWithStats extends Announcement {
   readRate: number

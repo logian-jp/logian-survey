@@ -1,16 +1,16 @@
 // PRISMA DISABLED - Supabase SDK migration in progress
 // NOTE: Prisma → Supabase SDK移行済み（一時無効化）
+
+console.log('⚠️  このスクリプトはSupabase SDK移行により一時無効化されています');
+console.log('🔒 セキュリティ: データベースURL情報も無効化されました');
+process.exit(0);
+
+/* ORIGINAL CODE DISABLED - Security: DB URL removed
 const { PrismaClient } = require('@prisma/client')
 const fs = require('fs')
-
-// Supabaseデータベースに接続
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: "postgresql://postgres:cPNyaj92Vk2S0MC@db.xoovzxmgmqtdtwgxwgcp.supabase.co:5432/postgres"
-    }
-  }
-})
+// Database URL removed for security
+const prisma = new PrismaClient()
+*/
 
 async function importData() {
   try {
