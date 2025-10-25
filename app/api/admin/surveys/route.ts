@@ -25,55 +25,76 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    // 検索条件を構築
-    const where: any = {}
+    // Supabaseクエリを構築
+    let surveysQuery = supabase
+      .from('Survey')
+      .select(`
+        *,
+        user:User!userId(id, name, email)
+      `)
+
+    let countQuery = supabase
+      .from('Survey')
+      .select('*', { count: 'exact', head: true })
+
+    // 検索条件を適用
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { user: { name: { contains: search, mode: 'insensitive' } } },
-        { user: { email: { contains: search, mode: 'insensitive' } } }
-      ]
+      const searchFilter = `title.ilike.%${search}%,user.name.ilike.%${search}%,user.email.ilike.%${search}%`
+      surveysQuery = surveysQuery.or(searchFilter)
+      countQuery = countQuery.or(searchFilter)
     }
 
     if (status) {
-      where.status = status
+      surveysQuery = surveysQuery.eq('status', status)
+      countQuery = countQuery.eq('status', status)
     }
 
-    // ソート条件を構築
-    const orderBy: any = {}
+    // ソート条件を適用
     if (sortBy === 'user.name') {
-      orderBy.user = { name: sortOrder }
+      surveysQuery = surveysQuery.order('user.name', { ascending: sortOrder === 'asc' })
     } else {
-      orderBy[sortBy] = sortOrder
+      surveysQuery = surveysQuery.order(sortBy, { ascending: sortOrder === 'asc' })
     }
 
-    // アンケート一覧を取得
-    const [surveys, totalCount] = await Promise.all([
-      prisma.survey.findMany({
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          _count: {
-            select: {
-              responses: true
-            }
-          }
-        },
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit
-      }),
-      prisma.survey.count({ where })
+    // ページネーションを適用
+    surveysQuery = surveysQuery.range((page - 1) * limit, page * limit - 1)
+
+    // アンケート一覧と総数を並行取得
+    const [surveysResult, countResult] = await Promise.all([
+      surveysQuery,
+      countQuery
     ])
 
+    const { data: surveys, error: surveysError } = surveysResult
+    const { count: totalCount, error: countError } = countResult
+
+    if (surveysError) {
+      console.error('Error fetching surveys:', surveysError)
+      return NextResponse.json({ message: 'Failed to fetch surveys' }, { status: 500 })
+    }
+
+    if (countError) {
+      console.error('Error fetching survey count:', countError)
+      return NextResponse.json({ message: 'Failed to fetch count' }, { status: 500 })
+    }
+
+    // レスポンス数を別途取得（_countの代替）
+    const surveysWithCounts = await Promise.all(
+      surveys?.map(async (survey) => {
+        const { count: responseCount } = await supabase
+          .from('Response')
+          .select('*', { count: 'exact', head: true })
+          .eq('surveyId', survey.id)
+        
+        return {
+          ...survey,
+          _count: { responses: responseCount || 0 }
+        }
+      }) || []
+    )
+
     return NextResponse.json({
-      surveys,
+      surveys: surveysWithCounts,
       pagination: {
         page,
         limit,

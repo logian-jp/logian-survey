@@ -25,67 +25,68 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    // 検索条件を構築
-    const where: any = {}
+    // Supabaseクエリを構築
+    let invitationsQuery = supabase
+      .from('Invitation')
+      .select(`
+        *,
+        inviter:User!inviterId(id, name, email),
+        usedByUser:User!usedByUserId(id, name, email)
+      `)
+
+    let countQuery = supabase
+      .from('Invitation')
+      .select('*', { count: 'exact', head: true })
+
+    // 検索条件を適用
     if (search) {
-      where.OR = [
-        { code: { contains: search, mode: 'insensitive' } },
-        { inviterName: { contains: search, mode: 'insensitive' } },
-        { inviterEmail: { contains: search, mode: 'insensitive' } },
-        { invitedName: { contains: search, mode: 'insensitive' } },
-        { invitedEmail: { contains: search, mode: 'insensitive' } }
-      ]
+      const searchFilter = `code.ilike.%${search}%,inviterName.ilike.%${search}%,inviterEmail.ilike.%${search}%,invitedName.ilike.%${search}%,invitedEmail.ilike.%${search}%`
+      invitationsQuery = invitationsQuery.or(searchFilter)
+      countQuery = countQuery.or(searchFilter)
     }
 
     // ステータスフィルター
     if (status === 'used') {
-      where.isUsed = true
+      invitationsQuery = invitationsQuery.eq('isUsed', true)
+      countQuery = countQuery.eq('isUsed', true)
     } else if (status === 'unused') {
-      where.isUsed = false
-      where.expiresAt = {
-        gt: new Date()
-      }
+      const now = new Date().toISOString()
+      invitationsQuery = invitationsQuery.eq('isUsed', false).gt('expiresAt', now)
+      countQuery = countQuery.eq('isUsed', false).gt('expiresAt', now)
     } else if (status === 'expired') {
-      where.isUsed = false
-      where.expiresAt = {
-        lte: new Date()
-      }
+      const now = new Date().toISOString()
+      invitationsQuery = invitationsQuery.eq('isUsed', false).lte('expiresAt', now)
+      countQuery = countQuery.eq('isUsed', false).lte('expiresAt', now)
     }
 
-    // ソート条件を構築
-    const orderBy: any = {}
+    // ソート条件を適用
     if (sortBy === 'inviter.name') {
-      orderBy.inviter = { name: sortOrder }
+      invitationsQuery = invitationsQuery.order('inviter.name', { ascending: sortOrder === 'asc' })
     } else {
-      orderBy[sortBy] = sortOrder
+      invitationsQuery = invitationsQuery.order(sortBy, { ascending: sortOrder === 'asc' })
     }
 
-    // 招待履歴を取得
-    const [invitations, totalCount] = await Promise.all([
-      prisma.invitation.findMany({
-        where,
-        include: {
-          inviter: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          usedByUser: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        },
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit
-      }),
-      prisma.invitation.count({ where })
+    // ページネーションを適用
+    invitationsQuery = invitationsQuery.range((page - 1) * limit, page * limit - 1)
+
+    // 招待履歴と総数を並行取得
+    const [invitationsResult, countResult] = await Promise.all([
+      invitationsQuery,
+      countQuery
     ])
+
+    const { data: invitations, error: invitationsError } = invitationsResult
+    const { count: totalCount, error: countError } = countResult
+
+    if (invitationsError) {
+      console.error('Error fetching invitations:', invitationsError)
+      return NextResponse.json({ message: 'Failed to fetch invitations' }, { status: 500 })
+    }
+
+    if (countError) {
+      console.error('Error fetching invitation count:', countError)
+      return NextResponse.json({ message: 'Failed to fetch count' }, { status: 500 })
+    }
 
     return NextResponse.json({
       invitations,
