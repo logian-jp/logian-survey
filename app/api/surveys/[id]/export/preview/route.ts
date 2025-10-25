@@ -55,12 +55,22 @@ export async function GET(
       )
     }
 
-    // アンケートの所有者を確認
+    // アンケートの存在確認と権限チェック
     console.log('Static prisma:', !!prisma, 'type:', typeof prisma)
     const survey = await prisma.survey.findFirst({
       where: {
         id: surveyId,
-        userId: session.user.id,
+        OR: [
+          { userId: session.user.id },
+          {
+            surveyUsers: {
+              some: {
+                userId: session.user.id,
+                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
+              }
+            }
+          }
+        ]
       },
       include: {
         questions: {

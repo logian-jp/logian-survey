@@ -16,9 +16,22 @@ export async function GET(
 
     const { id: surveyId } = await params
 
-    // アンケートの所有者かどうかチェック
-    const survey = await prisma.survey.findUnique({
-      where: { id: surveyId },
+    // アンケートの存在確認と権限チェック
+    const survey = await prisma.survey.findFirst({
+      where: {
+        id: surveyId,
+        OR: [
+          { userId: session.user.id },
+          {
+            surveyUsers: {
+              some: {
+                userId: session.user.id,
+                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
+              }
+            }
+          }
+        ]
+      },
       select: { userId: true, ticketType: true, ticketId: true, paymentId: true }
     })
 
@@ -26,8 +39,9 @@ export async function GET(
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 })
     }
 
-    if (survey.userId !== session.user?.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // 購入記録は所有者のみが閲覧可能
+    if (survey.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Only survey owner can view purchases' }, { status: 403 })
     }
 
     let purchases = []

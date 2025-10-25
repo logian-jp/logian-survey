@@ -68,6 +68,7 @@ export default function EditSurvey() {
   
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
+  const [surveyOwner, setSurveyOwner] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'edit' | 'collaborators' | 'settings'>('edit')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -238,6 +239,7 @@ export default function EditSurvey() {
       if (response.ok) {
         const data = await response.json()
         setCollaborators(data.survey.collaborators)
+        setSurveyOwner(data.survey.owner)
       }
     } catch (error) {
       console.error('Failed to fetch collaborators:', error)
@@ -1588,12 +1590,17 @@ export default function EditSurvey() {
                             {new Date(collaborator.invitedAt).toLocaleDateString('ja-JP')}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button
-                              onClick={() => removeCollaborator(collaborator.id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              削除
-                            </button>
+                            {collaborator.user.id !== surveyOwner?.id && (
+                              <button
+                                onClick={() => removeCollaborator(collaborator.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                削除
+                              </button>
+                            )}
+                            {collaborator.user.id === surveyOwner?.id && (
+                              <span className="text-gray-400 text-sm">所有者</span>
+                            )}
                           </td>
                         </tr>
                       ))}

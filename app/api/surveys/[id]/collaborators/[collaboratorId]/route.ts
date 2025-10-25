@@ -33,6 +33,30 @@ export async function PUT(
       return NextResponse.json({ message: 'このアンケートの管理者権限がありません' }, { status: 403 })
     }
 
+    // 更新対象の協力者情報を取得
+    const collaboratorToUpdate = await prisma.surveyUser.findUnique({
+      where: {
+        id: collaboratorId,
+        surveyId: surveyId
+      },
+      include: {
+        survey: {
+          select: {
+            userId: true // 所有者のIDを取得
+          }
+        }
+      }
+    })
+
+    if (!collaboratorToUpdate) {
+      return NextResponse.json({ message: '協力者が見つかりません' }, { status: 404 })
+    }
+
+    // 所有者の権限を変更しようとしている場合は拒否
+    if (collaboratorToUpdate.userId === collaboratorToUpdate.survey.userId) {
+      return NextResponse.json({ message: 'アンケートの所有者の権限は変更できません' }, { status: 403 })
+    }
+
     // 協力者を更新
     const updatedCollaborator = await prisma.surveyUser.update({
       where: {
@@ -82,6 +106,30 @@ export async function DELETE(
     const hasAdminPermission = await canAdminSurvey(session.user.id, surveyId)
     if (!hasAdminPermission) {
       return NextResponse.json({ message: 'このアンケートの管理者権限がありません' }, { status: 403 })
+    }
+
+    // 削除対象の協力者情報を取得
+    const collaboratorToDelete = await prisma.surveyUser.findUnique({
+      where: {
+        id: collaboratorId,
+        surveyId: surveyId
+      },
+      include: {
+        survey: {
+          select: {
+            userId: true // 所有者のIDを取得
+          }
+        }
+      }
+    })
+
+    if (!collaboratorToDelete) {
+      return NextResponse.json({ message: '協力者が見つかりません' }, { status: 404 })
+    }
+
+    // 所有者を削除しようとしている場合は拒否
+    if (collaboratorToDelete.userId === collaboratorToDelete.survey.userId) {
+      return NextResponse.json({ message: 'アンケートの所有者は削除できません' }, { status: 403 })
     }
 
     // 協力者を削除

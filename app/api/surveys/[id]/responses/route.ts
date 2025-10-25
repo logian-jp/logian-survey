@@ -20,7 +20,17 @@ export async function GET(
     const survey = await prisma.survey.findFirst({
       where: {
         id: surveyId,
-        userId: session.user.id,
+        OR: [
+          { userId: session.user.id },
+          {
+            surveyUsers: {
+              some: {
+                userId: session.user.id,
+                permission: { in: ['EDIT', 'ADMIN', 'VIEW'] }
+              }
+            }
+          }
+        ]
       },
       include: {
         questions: {
@@ -52,7 +62,7 @@ export async function GET(
     })
 
     // 質問のオプションをパース
-    const questionsWithParsedOptions = survey.questions.map(question => ({
+    const questionsWithParsedOptions = survey.questions.map((question: any) => ({
       id: question.id,
       type: question.type,
       title: question.title,
