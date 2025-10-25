@@ -108,10 +108,7 @@ export async function GET(request: NextRequest) {
         newUsers = Object.entries(usersByDate).map(([date, count]) => ({
           date,
           new_users: count
-        })) as Array<{
-        date: Date
-        new_users: bigint
-      }>
+        }))
       console.log('New users data:', newUsers)
     } catch (error) {
       console.error('Error getting new users:', error)
@@ -186,7 +183,7 @@ export async function GET(request: NextRequest) {
 
     // 新規ユーザー数を設定
     newUsers.forEach(item => {
-      const dateStr = item.date.toISOString().split('T')[0]
+      const dateStr = item.date // dateは既に文字列形式
       const existing = dateMap.get(dateStr)
       if (existing) {
         existing.newUsers = Number(item.new_users)
