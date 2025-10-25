@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,33 +54,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // アンケートの所有者を確認
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        userId: session.user.id,
-      },
-    })
+    // アンケートの所有者を確認 (Supabase SDK使用)
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select('*')
+      .eq('id', surveyId)
+      .eq('userId', session.user.id)
+      .single()
 
-    if (!survey) {
+    if (surveyError || !survey) {
+      console.error('Survey not found or access denied:', surveyError)
       return NextResponse.json(
         { message: 'Survey not found' },
         { status: 404 }
       )
     }
 
-    const question = await prisma.question.create({
-      data: {
+    // 質問を作成 (Supabase SDK使用)
+    const { data: question, error: questionError } = await supabase
+      .from('Question')
+      .insert({
         surveyId,
         type,
         title: title || (type === 'PAGE_BREAK' ? '改ページ' : type === 'SECTION' ? 'セクション' : ''),
         description: description || null,
         required: required || false,
         order: order || 0,
-        options: options ? JSON.stringify(options) : undefined,
-        settings: settings ? JSON.stringify(settings) : undefined,
-      },
-    })
+        options: options ? JSON.stringify(options) : null,
+        settings: settings ? JSON.stringify(settings) : null,
+      })
+      .select()
+      .single()
+
+    if (questionError) {
+      console.error('Failed to create question:', questionError)
+      return NextResponse.json({ message: 'Failed to create question' }, { status: 500 })
+    }
 
     return NextResponse.json(question, { status: 201 })
   } catch (error) {

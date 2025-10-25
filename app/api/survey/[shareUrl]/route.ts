@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(
   request: NextRequest,
@@ -8,24 +14,22 @@ export async function GET(
   try {
     const shareUrl = (await params).shareUrl
 
-    const survey = await prisma.survey.findUnique({
-      where: {
-        shareUrl: shareUrl,
-        status: 'ACTIVE',
-      },
-      include: {
-        questions: {
-          orderBy: {
-            order: 'asc',
-          },
-        },
-        user: {
-          select: {
-            customLogoUrl: true
-          }
-        }
-      },
-    })
+    // アンケートを取得 (Supabase SDK使用)
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        questions:Question(*),
+        user:User(customLogoUrl)
+      `)
+      .eq('shareUrl', shareUrl)
+      .eq('status', 'ACTIVE')
+      .single()
+    
+    if (surveyError) {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Survey not found or not active' }, { status: 404 })
+    }
 
     if (!survey) {
       return NextResponse.json(
@@ -42,8 +46,13 @@ export async function GET(
       )
     }
 
+    // Supabaseでは質問の順序を手動でソート
+    if (survey.questions) {
+      survey.questions.sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+    }
+
     // 質問のオプションをパース
-    const questionsWithParsedOptions = survey.questions.map(question => ({
+    const questionsWithParsedOptions = (survey.questions || []).map(question => ({
       ...question,
       options: question.options ? JSON.parse(question.options as string) : null,
       settings: question.settings ? JSON.parse(question.settings as string) : null,

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { checkResponseLimit } from '@/lib/plan-check'
 import { recordDataUsage } from '@/lib/plan-limits'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,16 +26,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // アンケートが存在し、公開中かチェック
-    const survey = await prisma.survey.findFirst({
-      where: {
-        id: surveyId,
-        status: 'ACTIVE',
-      },
-      include: {
-        questions: true,
-      },
-    })
+    // アンケートが存在し、公開中かチェック (Supabase SDK使用)
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        questions:Question(*)
+      `)
+      .eq('id', surveyId)
+      .eq('status', 'ACTIVE')
+      .single()
+    
+    if (surveyError) {
+      console.error('Error fetching survey:', surveyError)
+      return NextResponse.json({ message: 'Survey not found or not active' }, { status: 404 })
+    }
 
     if (!survey) {
       return NextResponse.json(
@@ -72,53 +83,63 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 回答と回答データをトランザクションで作成
-    const result = await prisma.$transaction(async (tx: any) => {
-      // 回答を作成
-      const response = await tx.response.create({
-        data: {
-          surveyId: surveyId,
-        },
+    // 回答と回答データを作成 (Supabase SDK使用)
+    // まず回答を作成
+    const { data: response, error: responseError } = await supabase
+      .from('Response')
+      .insert({
+        surveyId: surveyId
       })
+      .select()
+      .single()
 
-      // 各質問の回答を作成
-      const answerPromises = []
-      
-      for (const [questionId, value] of Object.entries(answers)) {
-        if (value !== null && value !== undefined && value !== '') {
-          // 質問の存在を再確認
-          const question = survey.questions.find((q: any) => q.id === questionId)
-          if (!question) {
-            console.error(`Question not found: ${questionId}`)
-            continue
-          }
-          
-          let answerValue: string
+    if (responseError) {
+      console.error('Failed to create response:', responseError)
+      return NextResponse.json({ message: 'Failed to create response' }, { status: 500 })
+    }
 
-          if (Array.isArray(value)) {
-            // 複数選択の場合、カンマ区切りで保存
-            answerValue = value.join(',')
-          } else {
-            answerValue = String(value)
-          }
-
-          answerPromises.push(
-            tx.answer.create({
-              data: {
-                questionId: questionId,
-                responseId: response.id,
-                value: answerValue,
-              },
-            })
-          )
+    // 各質問の回答データを準備
+    const answerData = []
+    
+    for (const [questionId, value] of Object.entries(answers)) {
+      if (value !== null && value !== undefined && value !== '') {
+        // 質問の存在を再確認
+        const question = survey.questions?.find((q: any) => q.id === questionId)
+        if (!question) {
+          console.error(`Question not found: ${questionId}`)
+          continue
         }
+        
+        let answerValue: string
+
+        if (Array.isArray(value)) {
+          // 複数選択の場合、カンマ区切りで保存
+          answerValue = value.join(',')
+        } else {
+          answerValue = String(value)
+        }
+
+        answerData.push({
+          questionId: questionId,
+          responseId: response.id,
+          value: answerValue,
+        })
       }
-      
-      // すべての回答を並行して作成
-      await Promise.all(answerPromises)
-      
-      return response
-    })
+    }
+    
+    // すべての回答を一括で作成
+    if (answerData.length > 0) {
+      const { error: answerError } = await supabase
+        .from('Answer')
+        .insert(answerData)
+
+      if (answerError) {
+        console.error('Failed to create answers:', answerError)
+        // 回答作成に失敗した場合、作成済みのResponseを削除
+        await supabase.from('Response').delete().eq('id', response.id)
+        return NextResponse.json({ message: 'Failed to create answers' }, { status: 500 })
+      }
+    }
 
     // データ使用量を記録（回答送信時）
     const responseDataSize = JSON.stringify(answers).length
