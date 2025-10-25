@@ -7,7 +7,7 @@ import { canAdminSurvey } from '@/lib/survey-permissions'
 // 協力者の権限を更新
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; collaboratorId: string } }
+  { params }: { params: Promise<{ id: string; collaboratorId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -90,7 +90,7 @@ export async function PUT(
 // 協力者を削除
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; collaboratorId: string } }
+  { params }: { params: Promise<{ id: string; collaboratorId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)

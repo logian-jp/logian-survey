@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 // POST: お知らせを既読にする
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -69,7 +69,7 @@ export async function POST(
 // DELETE: お知らせを非表示にする
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)

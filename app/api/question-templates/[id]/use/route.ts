@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth'
 // 質問テンプレートの使用回数を増加
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)

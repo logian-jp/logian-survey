@@ -7,7 +7,7 @@ import { canAdminSurvey } from '@/lib/survey-permissions'
 // アンケートの協力者一覧を取得
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -83,7 +83,7 @@ export async function GET(
 // 新しい協力者を招待
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)

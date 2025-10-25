@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { shareUrl: string } }
+  { params }: { params: Promise<{ shareUrl: string }> }
 ) {
   try {
     const shareUrl = params.shareUrl

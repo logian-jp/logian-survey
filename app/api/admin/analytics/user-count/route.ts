@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 日別の新規ユーザー数を取得（登録日時ベース）
-    let newUsers = []
+    let newUsers: any[] = []
     try {
       newUsers = await prisma.$queryRaw`
         SELECT 

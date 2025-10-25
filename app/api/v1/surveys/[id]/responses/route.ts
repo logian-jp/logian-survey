@@ -30,7 +30,7 @@ async function authenticateUser(request: NextRequest) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // APIキーまたはユーザー認証をチェック
@@ -60,11 +60,11 @@ export async function GET(
             order: 'asc',
           },
         },
-        user: { include: { userPlan: true } },
+        user: true, // TODO: userPlan参照を削除（チケット制度移行のため）
       },
     })
     // プランのAPI連携可否チェック（PROFESSIONAL/ENTERPRISE）
-    const planType = (survey as any).user.userPlan?.planType || 'FREE'
+    const planType = 'FREE' // TODO: チケット制度移行のため一時的にFREE扱い
     const limits = getPlanLimits(planType)
     if (!limits.features.includes('api_integration')) {
       return NextResponse.json(
@@ -160,7 +160,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const surveyId = params.id
@@ -179,10 +179,10 @@ export async function POST(
         id: surveyId,
         status: 'ACTIVE',
       },
-      include: { user: { include: { userPlan: true } } }
+      include: { user: true } // TODO: userPlan参照を削除
     })
     // プランのAPI連携可否チェック（PROFESSIONAL/ENTERPRISE）
-    const planType = (survey as any).user.userPlan?.planType || 'FREE'
+    const planType = 'FREE' // TODO: チケット制度移行のため一時的にFREE扱い
     const limits = getPlanLimits(planType)
     if (!limits.features.includes('api_integration')) {
       return NextResponse.json(

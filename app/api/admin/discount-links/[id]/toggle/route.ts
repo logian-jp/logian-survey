@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     console.log('=== Discount Link Toggle API ===')
@@ -23,7 +23,7 @@ export async function PUT(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
 
-    const { id } = params
+    const { id } = await params
     const { isActive } = await request.json()
     console.log('Toggle request:', { id, isActive })
 

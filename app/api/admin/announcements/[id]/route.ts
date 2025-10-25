@@ -36,12 +36,8 @@ export async function GET(
               select: {
                 id: true,
                 name: true,
-                email: true,
-                userPlan: {
-                  select: {
-                    planType: true
-                  }
-                }
+                email: true
+                // TODO: userPlan参照を削除（チケット制度移行のため）
               }
             }
           }
