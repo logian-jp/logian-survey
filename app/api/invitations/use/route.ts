@@ -19,19 +19,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 招待コードを検証
-    const invitation = await prisma.invitation.findUnique({
-      where: { code },
-      include: {
-        inviter: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+    // 招待コードを検証 (Supabase SDK使用)
+    const { data: invitation, error: invitationError } = await supabase
+      .from('Invitation')
+      .select(`
+        *,
+        inviter:User!inviterId(id, name, email)
+      `)
+      .eq('code', code)
+      .single()
+
+    if (invitationError) {
+      console.error('Error fetching invitation:', invitationError)
+    }
 
     if (!invitation) {
       return NextResponse.json(
@@ -54,12 +54,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // メールアドレスの重複チェック
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
+    // メールアドレスの重複チェック (Supabase SDK使用)
+    const { data: existingUser, error: userCheckError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', email)
+      .single()
 
-    if (existingUser) {
+    if (existingUser && !userCheckError) {
       return NextResponse.json(
         { message: 'このメールアドレスは既に登録されています' },
         { status: 400 }
@@ -69,89 +71,109 @@ export async function POST(request: NextRequest) {
     // パスワードをハッシュ化
     const hashedPassword = await hash(password, 12)
 
-    // トランザクションでユーザー作成と招待使用を処理
-    const result = await prisma.$transaction(async (tx) => {
-      // 新しいユーザーを作成
-      const newUser = await tx.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          invitedBy: invitation.inviterId,
-          invitationCode: code,
-          maxInvitations: 3, // 新規ユーザーは3人まで招待可能
-          usedInvitations: 0
-        }
+    // ユーザー作成と招待使用を順次処理 (Supabase SDK使用)
+    // 1. 新しいユーザーを作成
+    const { data: newUser, error: createUserError } = await supabase
+      .from('User')
+      .insert({
+        name,
+        email,
+        password: hashedPassword,
+        invitedBy: invitation.inviterId,
+        invitationCode: code,
+        maxInvitations: 3, // 新規ユーザーは3人まで招待可能
+        usedInvitations: 0
       })
+      .select()
+      .single()
 
-      // 招待を使用済みにマーク
-      await tx.invitation.update({
-        where: { id: invitation.id },
-        data: {
-          isUsed: true,
-          usedAt: new Date(),
-          usedByUserId: newUser.id
-        }
+    if (createUserError) {
+      console.error('Failed to create user:', createUserError)
+      return NextResponse.json({ message: 'ユーザー作成に失敗しました' }, { status: 500 })
+    }
+
+    // 2. 招待を使用済みにマーク
+    const { error: updateInvitationError } = await supabase
+      .from('Invitation')
+      .update({
+        isUsed: true,
+        usedAt: new Date().toISOString(),
+        usedByUserId: newUser.id
       })
+      .eq('id', invitation.id)
 
-      // 招待者の使用済み招待数は招待作成時に既に増加済みなので、ここでは何もしない
+    if (updateInvitationError) {
+      console.error('Failed to update invitation:', updateInvitationError)
+      // ユーザー作成をロールバック
+      await supabase.from('User').delete().eq('id', newUser.id)
+      return NextResponse.json({ message: '招待の更新に失敗しました' }, { status: 500 })
+    }
 
-      // 招待者にスタンダードチケットを1枚付与
-      const existingTicket = await tx.userTicket.findFirst({
-        where: {
-          userId: invitation.inviterId,
-          ticketType: 'STANDARD'
-        }
-      })
+    // 3. 招待者にスタンダードチケットを1枚付与
+    const { data: existingTicket, error: ticketCheckError } = await supabase
+      .from('UserTicket')
+      .select('*')
+      .eq('userId', invitation.inviterId)
+      .eq('ticketType', 'STANDARD')
+      .single()
 
-      if (existingTicket) {
-        // 既存のスタンダードチケットがある場合は追加
-        await tx.userTicket.update({
-          where: { id: existingTicket.id },
-          data: {
-            totalTickets: { increment: 1 },
-            remainingTickets: { increment: 1 }
-          }
+    if (existingTicket && !ticketCheckError) {
+      // 既存のスタンダードチケットがある場合は追加
+      const { error: updateTicketError } = await supabase
+        .from('UserTicket')
+        .update({
+          totalTickets: existingTicket.totalTickets + 1,
+          remainingTickets: existingTicket.remainingTickets + 1
         })
-      } else {
-        // 新しいスタンダードチケットを作成
-        await tx.userTicket.create({
-          data: {
-            userId: invitation.inviterId,
-            ticketType: 'STANDARD',
-            totalTickets: 1,
-            usedTickets: 0,
-            remainingTickets: 1
-          }
-        })
+        .eq('id', existingTicket.id)
+
+      if (updateTicketError) {
+        console.error('Failed to update ticket:', updateTicketError)
       }
-
-      // 招待リワードの購入履歴を記録
-      await tx.ticketPurchase.create({
-        data: {
+    } else {
+      // 新しいスタンダードチケットを作成
+      const { error: createTicketError } = await supabase
+        .from('UserTicket')
+        .insert({
           userId: invitation.inviterId,
           ticketType: 'STANDARD',
-          amount: 0,
-          currency: 'JPY',
-          checkoutSessionId: `invitation_reward_${invitation.id}_${Date.now()}`,
-          metadata: {
-            type: 'invitation_reward',
-            invitationId: invitation.id,
-            invitedUserEmail: email,
-            invitedUserName: name
-          }
-        }
+          totalTickets: 1,
+          usedTickets: 0,
+          remainingTickets: 1
+        })
+
+      if (createTicketError) {
+        console.error('Failed to create ticket:', createTicketError)
+      }
+    }
+
+    // 4. 招待リワードの購入履歴を記録
+    const { error: purchaseError } = await supabase
+      .from('TicketPurchase')
+      .insert({
+        userId: invitation.inviterId,
+        ticketType: 'STANDARD',
+        amount: 0,
+        currency: 'JPY',
+        checkoutSessionId: `invitation_reward_${invitation.id}_${Date.now()}`,
+        metadata: JSON.stringify({
+          type: 'invitation_reward',
+          invitationId: invitation.id,
+          invitedUserEmail: email,
+          invitedUserName: name
+        })
       })
 
-      return newUser
-    })
+    if (purchaseError) {
+      console.error('Failed to create purchase record:', purchaseError)
+    }
 
     return NextResponse.json({
       success: true,
       user: {
-        id: result.id,
-        name: result.name,
-        email: result.email
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email
       },
       message: 'アカウントが作成されました。招待者にスタンダードチケットが1枚付与されました。'
     })

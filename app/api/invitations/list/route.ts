@@ -17,23 +17,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // ユーザーの招待一覧を取得
-    const invitations = await prisma.invitation.findMany({
-      where: {
-        inviterId: session.user.id
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      include: {
-        usedByUser: {
-          select: {
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+    // ユーザーの招待一覧を取得 (Supabase SDK使用)
+    const { data: invitations, error: invitationsError } = await supabase
+      .from('Invitation')
+      .select(`
+        *,
+        usedByUser:User(name, email)
+      `)
+      .eq('inviterId', session.user.id)
+      .order('createdAt', { ascending: false })
+
+    if (invitationsError) {
+      console.error('Error fetching invitations:', invitationsError)
+      return NextResponse.json({ message: 'Failed to fetch invitations' }, { status: 500 })
+    }
 
     return NextResponse.json({ 
       invitations: invitations.map(invitation => ({
