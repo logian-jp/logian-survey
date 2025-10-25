@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { checkSurveyLimit } from '@/lib/plan-check'
 import { recordDataUsage, getUserMaxDataSize, getUserDataRetentionDays } from '@/lib/plan-limits'
 import { getTicketLimits } from '@/lib/ticket-check'
+import { randomBytes } from 'crypto'
 
 // Supabase クライアントの設定
 const supabase = createClient(
@@ -368,12 +369,15 @@ export async function POST(request: NextRequest) {
 
     // アンケートを作成
     const surveyId = crypto.randomUUID()
+    const shareUrl = randomBytes(16).toString('hex')
     const { data: survey, error: createSurveyError } = await supabase
       .from('Survey')
       .insert({
         id: surveyId,
         title,
         description: description || null,
+        status: 'DRAFT',
+        shareUrl: shareUrl,
         maxResponses: clampedMaxResponses,
         endDate: clampedEndDate,
         targetResponses: targetResponses || null,
@@ -381,6 +385,8 @@ export async function POST(request: NextRequest) {
         ticketType: validTicketType,
         ticketId: usedTicketId,
         paymentId: paymentId,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
       })
       .select()
       .single()
