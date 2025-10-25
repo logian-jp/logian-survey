@@ -8,7 +8,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-// QuestionType は文字列として直接使用
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -61,12 +60,6 @@ export async function POST() {
         return NextResponse.json({ message: 'No users found' }, { status: 404 })
       }
     }
-      where: {
-        email: {
-          in: adminEmails
-        }
-      }
-    })
 
     // 管理者ユーザーが見つからない場合は、最初のユーザーを使用
     if (!adminUser) {
@@ -111,7 +104,7 @@ export async function POST() {
       {
         title: '[デフォルト] お名前',
         description: '回答者のお名前を入力してください',
-        type: QuestionType.NAME,
+        type: 'NAME',
         required: true,
         isPublic: true,
         userId: adminUser.id
@@ -119,7 +112,7 @@ export async function POST() {
       {
         title: '[デフォルト] メールアドレス',
         description: '連絡先のメールアドレスを入力してください',
-        type: QuestionType.EMAIL,
+        type: 'EMAIL',
         required: true,
         isPublic: true,
         userId: adminUser.id
@@ -127,7 +120,7 @@ export async function POST() {
       {
         title: '[デフォルト] 電話番号',
         description: '連絡先の電話番号を入力してください',
-        type: QuestionType.PHONE,
+        type: 'PHONE',
         required: false,
         isPublic: true,
         userId: adminUser.id
@@ -135,7 +128,7 @@ export async function POST() {
       {
         title: '[デフォルト] 年齢',
         description: 'あなたの年齢を教えてください',
-        type: QuestionType.AGE_GROUP,
+        type: 'AGE_GROUP',
         required: true,
         isPublic: true,
         userId: adminUser.id
@@ -143,7 +136,7 @@ export async function POST() {
       {
         title: '[デフォルト] 性別',
         description: 'あなたの性別を教えてください',
-        type: QuestionType.RADIO,
+        type: 'RADIO',
         required: true,
         options: ['男性', '女性', 'その他', '回答しない'],
         isPublic: true,
@@ -152,7 +145,7 @@ export async function POST() {
       {
         title: '[デフォルト] 都道府県',
         description: 'お住まいの都道府県を教えてください',
-        type: QuestionType.PREFECTURE,
+        type: 'PREFECTURE',
         required: true,
         isPublic: true,
         userId: adminUser.id
@@ -160,7 +153,7 @@ export async function POST() {
       {
         title: '[デフォルト] 満足度評価',
         description: 'このサービスについてどの程度満足していますか？',
-        type: QuestionType.RADIO,
+        type: 'RADIO',
         required: true,
         options: ['非常に満足', '満足', 'どちらでもない', '不満', '非常に不満'],
         settings: { ordinalStructure: true },
@@ -170,7 +163,7 @@ export async function POST() {
       {
         title: '[デフォルト] 推奨度',
         description: 'このサービスを他の人に推奨しますか？',
-        type: QuestionType.RADIO,
+        type: 'RADIO',
         required: true,
         options: ['絶対に推奨する', '推奨する', 'どちらでもない', '推奨しない', '絶対に推奨しない'],
         settings: { ordinalStructure: true },
@@ -180,7 +173,7 @@ export async function POST() {
       {
         title: '[デフォルト] 改善点',
         description: '改善してほしい点があれば教えてください',
-        type: QuestionType.TEXTAREA,
+        type: 'TEXTAREA',
         required: false,
         isPublic: true,
         userId: adminUser.id
@@ -188,7 +181,7 @@ export async function POST() {
       {
         title: '[デフォルト] その他のご意見',
         description: 'その他ご意見やご要望がございましたらお聞かせください',
-        type: QuestionType.TEXTAREA,
+        type: 'TEXTAREA',
         required: false,
         isPublic: true,
         userId: adminUser.id
