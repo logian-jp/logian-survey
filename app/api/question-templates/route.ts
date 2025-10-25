@@ -1,7 +1,13 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 質問テンプレート一覧取得
 export async function GET(request: NextRequest) {
@@ -15,46 +21,45 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includePublic = searchParams.get('includePublic') === 'true'
 
-    // メールアドレスでユーザーを検索
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! }
-    })
+    // メールアドレスでユーザーを検索 (Supabase SDK使用)
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+      .single()
 
-    if (!user) {
-      console.error('User not found in database:', session.user.email)
+    if (userError || !user) {
+      console.error('User not found in database:', session.user.email, userError)
       return NextResponse.json({
         message: 'ユーザーがデータベースに存在しません',
         email: session.user.email
       }, { status: 400 })
     }
 
-    const whereClause: any = {
-      OR: [
-        { userId: user.id }, // 自分のテンプレート
-      ]
-    }
-
+    // 質問テンプレートを取得 (Supabase SDK使用)
+    let query = supabase
+      .from('QuestionTemplate')
+      .select(`
+        *,
+        user:User(id, name, email)
+      `)
+    
+    // フィルター条件を構築
     if (includePublic) {
-      whereClause.OR.push({ isPublic: true }) // 公開テンプレート
+      query = query.or(`userId.eq.${user.id},isPublic.eq.true`)
+    } else {
+      query = query.eq('userId', user.id)
     }
 
-    const templates = await prisma.questionTemplate.findMany({
-      where: whereClause,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      },
-      orderBy: [
-        { isPublic: 'desc' },
-        { usageCount: 'desc' },
-        { createdAt: 'desc' }
-      ]
-    })
+    const { data: templates, error: templatesError } = await query
+      .order('isPublic', { ascending: false })
+      .order('usageCount', { ascending: false })
+      .order('createdAt', { ascending: false })
+
+    if (templatesError) {
+      console.error('Error fetching templates:', templatesError)
+      return NextResponse.json({ message: '質問テンプレートの取得中にエラーが発生しました' }, { status: 500 })
+    }
 
     return NextResponse.json(templates)
   } catch (error) {
@@ -81,13 +86,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'タイトルとタイプは必須です' }, { status: 400 })
     }
 
-    // メールアドレスでユーザーを検索
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! }
-    })
+    // メールアドレスでユーザーを検索 (Supabase SDK使用)
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+      .single()
 
-    if (!user) {
-      console.error('User not found in database:', session.user.email)
+    if (userError || !user) {
+      console.error('User not found in database:', session.user.email, userError)
       return NextResponse.json({
         message: 'ユーザーがデータベースに存在しません',
         email: session.user.email
@@ -96,19 +103,27 @@ export async function POST(request: Request) {
 
     console.log('Creating template for user:', user.name, user.email, user.id)
 
-    const template = await prisma.questionTemplate.create({
-      data: {
+    // 質問テンプレートを作成 (Supabase SDK使用)
+    const { data: template, error: templateError } = await supabase
+      .from('QuestionTemplate')
+      .insert({
         title,
         description: description || null,
         type,
         required: required || false,
-        options: options !== undefined ? options : undefined,
-        settings: settings !== undefined ? settings : undefined,
-        conditions: conditions !== undefined ? conditions : undefined,
+        options: options !== undefined ? JSON.stringify(options) : null,
+        settings: settings !== undefined ? JSON.stringify(settings) : null,
+        conditions: conditions !== undefined ? JSON.stringify(conditions) : null,
         isPublic: isPublic || false,
         userId: user.id
-      }
-    })
+      })
+      .select()
+      .single()
+
+    if (templateError) {
+      console.error('Failed to create template:', templateError)
+      return NextResponse.json({ message: '質問テンプレートの作成中にエラーが発生しました' }, { status: 500 })
+    }
 
     return NextResponse.json(template, { status: 201 })
   } catch (error) {
