@@ -35,24 +35,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
-    // 以下はPrismaコードをコメントアウト
-    /*
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        maxInvitations: true,
-        usedInvitations: true
-      }
-    })
-
-    if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 })
-    }
-
+    // 招待統計を計算
     const stats = {
-      maxInvitations: user.maxInvitations,
-      usedInvitations: user.usedInvitations,
-      remainingInvitations: user.maxInvitations - user.usedInvitations
+      maxInvitations: user.maxInvitations || 0,
+      usedInvitations: user.usedInvitations || 0,
+      remainingInvitations: (user.maxInvitations || 0) - (user.usedInvitations || 0)
     }
 
     return NextResponse.json({ stats })
