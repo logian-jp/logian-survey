@@ -82,18 +82,18 @@ export async function GET() {
       console.log('Processing response:', response.id, 'with', response.answers?.length || 0, 'answers')
       
       // 名前やIDの情報を取得（NAMEタイプの質問から）
-      const nameAnswer = (response.answers || []).find(answer => 
-        answer.question?.type === 'NAME'
+      const nameAnswer = (response.answers || []).find((answer: any) => 
+        (answer.question as any)?.type === 'NAME'
       )
       
       // メールアドレスの情報を取得（EMAILタイプの質問から）
-      const emailAnswer = (response.answers || []).find(answer => 
-        answer.question?.type === 'EMAIL'
+      const emailAnswer = (response.answers || []).find((answer: any) => 
+        (answer.question as any)?.type === 'EMAIL'
       )
 
       // テキスト入力の回答からもIDを取得（最初のテキスト回答）
-      const textAnswer = (response.answers || []).find(answer => 
-        answer.question?.type === 'TEXT' && answer.value
+      const textAnswer = (response.answers || []).find((answer: any) => 
+        (answer.question as any)?.type === 'TEXT' && answer.value
       )
 
       const respondentId = nameAnswer?.value || 
@@ -105,8 +105,8 @@ export async function GET() {
 
       return {
         id: response.id,
-        surveyId: response.survey?.id,
-        surveyTitle: response.survey?.title,
+        surveyId: (response.survey as any)?.id,
+        surveyTitle: (response.survey as any)?.title || '',
         respondentId: respondentId,
         createdAt: response.createdAt,
         answerCount: response.answers?.length || 0

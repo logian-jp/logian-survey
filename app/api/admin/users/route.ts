@@ -144,10 +144,10 @@ export async function GET(request: NextRequest) {
     // 各ユーザーの統計を計算
     const usersWithStats = users.map(user => {
       const totalSurveys = user.surveys.length
-      const activeSurveys = user.surveys.filter(s => s.status === 'ACTIVE').length
-      const draftSurveys = user.surveys.filter(s => s.status === 'DRAFT').length
-      const closedSurveys = user.surveys.filter(s => s.status === 'CLOSED').length
-      const totalResponses = user.surveys.reduce((sum, survey) => sum + survey._count.responses, 0)
+      const activeSurveys = user.surveys.filter((s: any) => s.status === 'ACTIVE').length
+      const draftSurveys = user.surveys.filter((s: any) => s.status === 'DRAFT').length
+      const closedSurveys = user.surveys.filter((s: any) => s.status === 'CLOSED').length
+      const totalResponses = user.surveys.reduce((sum: number, survey: any) => sum + survey._count.responses, 0)
       const publishRate = totalSurveys > 0 ? Math.round((activeSurveys / totalSurveys) * 100) : 0
 
       return {
@@ -186,8 +186,8 @@ export async function GET(request: NextRequest) {
       pagination: {
         page,
         limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit)
+        total: totalCount ?? 0,
+        totalPages: Math.ceil((totalCount ?? 0) / limit)
       }
     })
   } catch (error) {

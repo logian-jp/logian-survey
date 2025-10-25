@@ -80,7 +80,7 @@ export async function GET(
 
     // Supabaseでは質問の順序を手動でソート
     if (survey?.questions) {
-      survey.questions.sort((a, b) => (a.order || 0) - (b.order || 0))
+      survey.questions.sort((a: {order?: number}, b: {order?: number}) => (a.order || 0) - (b.order || 0))
     }
 
     if (!survey) {

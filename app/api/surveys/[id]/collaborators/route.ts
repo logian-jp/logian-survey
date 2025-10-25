@@ -58,7 +58,7 @@ export async function GET(
         id: survey.id,
         title: survey.title,
         owner: survey.user,
-        collaborators: survey.surveyUsers.map(su => ({
+        collaborators: survey.surveyUsers.map((su: {id: string, user: any, permission: string, invitedAt?: string, acceptedAt?: string, invitedBy?: string}) => ({
           id: su.id,
           user: su.user,
           permission: su.permission,

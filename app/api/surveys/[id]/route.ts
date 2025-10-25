@@ -81,7 +81,7 @@ export async function GET(
     }
 
     // 質問のオプションをパース
-    const questionsWithParsedOptions = survey.questions.map(question => ({
+    const questionsWithParsedOptions = survey.questions.map((question: {id: string, type: string, title: string, description?: string, options?: string, settings?: string, order?: number, required?: boolean}) => ({
       id: question.id,
       type: question.type,
       title: question.title,

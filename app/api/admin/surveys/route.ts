@@ -93,13 +93,14 @@ export async function GET(request: NextRequest) {
       }) || []
     )
 
+    const safeTotalCount = totalCount ?? 0
     return NextResponse.json({
       surveys: surveysWithCounts,
       pagination: {
         page,
         limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit)
+        total: safeTotalCount,
+        totalPages: Math.ceil(safeTotalCount / limit)
       }
     })
   } catch (error) {
