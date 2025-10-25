@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 
 export async function GET() {
@@ -33,7 +33,7 @@ export async function GET() {
     if (userPlan.planType !== 'FREE') {
       try {
         // Stripe Customerを検索
-        const customers = await stripe.customers.list({
+        const customers = await getStripe().customers.list({
           email: session.user.email!,
           limit: 1
         })
@@ -42,7 +42,7 @@ export async function GET() {
           const customer = customers.data[0]
           
           // アクティブなサブスクリプションを取得
-          const subscriptions = await stripe.subscriptions.list({
+          const subscriptions = await getStripe().subscriptions.list({
             customer: customer.id,
             status: 'active',
             limit: 1

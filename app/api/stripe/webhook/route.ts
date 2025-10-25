@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
@@ -40,7 +40,7 @@ export async function POST_DISABLED(request: NextRequest) {
   let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET
@@ -286,7 +286,7 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
 
   try {
     // CustomerからユーザーIDを取得
-    const customer = await stripe.customers.retrieve(customerId)
+    const customer = await getStripe().customers.retrieve(customerId)
     if (customer.deleted) {
       console.error('Customer is deleted')
       return
@@ -399,7 +399,7 @@ async function handleSubscriptionCancelled(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string
   
   try {
-    const customer = await stripe.customers.retrieve(customerId)
+    const customer = await getStripe().customers.retrieve(customerId)
     if (customer.deleted) {
       console.error('Customer is deleted')
       return

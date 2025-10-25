@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { stripe, getOrCreateStripeCustomer } from '@/lib/stripe'
+import { getStripe, getOrCreateStripeCustomer } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Stripe price ID not configured for this addon' }, { status: 400 })
         }
 
-        const checkoutSession = await stripe.checkout.sessions.create({
+        const checkoutSession = await getStripe().checkout.sessions.create({
           customer: customer.id,
           payment_method_types: ['card'],
           line_items: [
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ url: checkoutSession.url })
       } else {
         // 買い切りの場合
-        const checkoutSession = await stripe.checkout.sessions.create({
+        const checkoutSession = await getStripe().checkout.sessions.create({
           customer: customer.id,
           payment_method_types: ['card'],
           line_items: [
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Stripe price ID not configured for this plan' }, { status: 400 })
       }
       
-      const checkoutSession = await stripe.checkout.sessions.create({
+      const checkoutSession = await getStripe().checkout.sessions.create({
         customer: customer.id,
         payment_method_types: ['card'],
         line_items: [
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Stripe price ID not configured for this plan' }, { status: 400 })
     }
 
-    const checkoutSession = await stripe.checkout.sessions.create({
+    const checkoutSession = await getStripe().checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ['card'],
       line_items: [

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { stripe, getOrCreateStripeCustomer } from '@/lib/stripe'
+import { getStripe, getOrCreateStripeCustomer } from '@/lib/stripe'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const customer = await getOrCreateStripeCustomer(session.user.id, session.user.email!)
 
     // 顧客ポータルセッションを作成
-    const portalSession = await stripe.billingPortal.sessions.create({
+    const portalSession = await getStripe().billingPortal.sessions.create({
       customer: customer.id,
       return_url: returnUrl || `${process.env.NEXTAUTH_URL}/settings`,
     })

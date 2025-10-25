@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
           let stripeProductId = plan.stripeProductId
 
           if (!stripeProductId) {
-            const product = await stripe.products.create({
+            const product = await getStripe().products.create({
               name: productName,
               description: plan.description || `${plan.planType}プラン`,
               metadata: {
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
           let stripePriceId = plan.stripePriceId
 
           if (!stripePriceId && plan.price > 0) {
-            const price = await stripe.prices.create({
+            const price = await getStripe().prices.create({
               product: stripeProductId,
               unit_amount: plan.price,
               currency: 'jpy',
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
 
           // Stripe商品を作成または取得
           if (!stripeProductId) {
-            const product = await stripe.products.create({
+            const product = await getStripe().products.create({
               name: addon.name,
               description: addon.description || `${addon.type === 'storage' ? '容量追加' : '保存期間延長'}`,
               metadata: {
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
 
           // 月額プランの場合のみ価格を作成
           if (addon.isMonthly && !stripePriceId) {
-            const price = await stripe.prices.create({
+            const price = await getStripe().prices.create({
               product: stripeProductId,
               unit_amount: addon.price,
               currency: 'jpy',

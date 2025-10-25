@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 
 export async function PUT(
   request: NextRequest,
@@ -99,11 +99,11 @@ export async function PUT(
           updateData.description = planConfig.description
         }
         
-        await stripe.products.update(currentPlan.stripeProductId, updateData)
+        await getStripe().products.update(currentPlan.stripeProductId, updateData)
 
         // 価格が変更された場合は新しい価格を作成
         if (currentPlan.price !== planConfig.price) {
-          const newPrice = await stripe.prices.create({
+          const newPrice = await getStripe().prices.create({
             product: currentPlan.stripeProductId,
             unit_amount: Math.round(planConfig.price),
             currency: 'jpy',
@@ -118,7 +118,7 @@ export async function PUT(
 
           // 古い価格を非アクティブ化
           if (currentPlan.stripePriceId) {
-            await stripe.prices.update(currentPlan.stripePriceId, {
+            await getStripe().prices.update(currentPlan.stripePriceId, {
               active: false
             })
           }
@@ -144,9 +144,9 @@ export async function PUT(
           productData.description = planConfig.description
         }
         
-        const product = await stripe.products.create(productData)
+        const product = await getStripe().products.create(productData)
 
-        const price = await stripe.prices.create({
+        const price = await getStripe().prices.create({
           product: product.id,
           unit_amount: Math.round(planConfig.price),
           currency: 'jpy',
