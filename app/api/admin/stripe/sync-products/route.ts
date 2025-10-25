@@ -22,13 +22,15 @@ export async function POST(request: NextRequest) {
 
     if (type === 'plans') {
       // 基本プランの同期
-      const plans = await prisma.planConfig.findMany({
-        where: {
-          planType: {
-            not: 'FREE'
-          }
-        }
-      })
+      const { data: plans, error: plansError } = await supabase
+        .from('PlanConfig')
+        .select('*')
+        .neq('planType', 'FREE')
+
+      if (plansError) {
+        console.error('Error fetching plans:', plansError)
+        return NextResponse.json({ message: 'Failed to fetch plans' }, { status: 500 })
+      }
 
       const results = []
       for (const plan of plans) {
@@ -67,13 +69,18 @@ export async function POST(request: NextRequest) {
           }
 
           // データベースを更新
-          await prisma.planConfig.update({
-            where: { id: plan.id },
-            data: {
+          const { error: updateError } = await supabase
+            .from('PlanConfig')
+            .update({
               stripeProductId,
               stripePriceId
-            }
-          })
+            })
+            .eq('id', plan.id)
+
+          if (updateError) {
+            console.error('Error updating plan config:', updateError)
+            throw new Error('Failed to update plan config')
+          }
 
           results.push({
             planType: plan.planType,
@@ -96,11 +103,15 @@ export async function POST(request: NextRequest) {
 
     if (type === 'addons') {
       // データアドオンの同期
-      const addons = await prisma.dataStorageAddon.findMany({
-        where: {
-          isActive: true
-        }
-      })
+      const { data: addons, error: addonsError } = await supabase
+        .from('DataStorageAddon')
+        .select('*')
+        .eq('isActive', true)
+
+      if (addonsError) {
+        console.error('Error fetching addons:', addonsError)
+        return NextResponse.json({ message: 'Failed to fetch addons' }, { status: 500 })
+      }
 
       const results = []
       for (const addon of addons) {
@@ -139,13 +150,18 @@ export async function POST(request: NextRequest) {
           }
 
           // データベースを更新
-          await prisma.dataStorageAddon.update({
-            where: { id: addon.id },
-            data: {
+          const { error: addonUpdateError } = await supabase
+            .from('DataStorageAddon')
+            .update({
               stripeProductId,
               stripePriceId
-            }
-          })
+            })
+            .eq('id', addon.id)
+
+          if (addonUpdateError) {
+            console.error('Error updating data addon:', addonUpdateError)
+            throw new Error('Failed to update data addon')
+          }
 
           results.push({
             addonId: addon.id,

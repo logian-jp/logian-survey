@@ -122,22 +122,28 @@ export async function GET(request: NextRequest) {
     let activeUsersData = []
     try {
       // まず、アクティブなユーザーのリストを取得
-      const activeUserIds = await prisma.user.findMany({
-        where: {
-          surveys: {
-            some: {
-              status: {
-                in: ['ACTIVE', 'CLOSED']
-              }
-            }
-          }
-        },
-        select: {
-          id: true,
-          createdAt: true
+      const { data: activeUserIds, error: activeUsersError } = await supabase
+        .from('User')
+        .select(`
+          id, createdAt,
+          surveys:Survey!inner(status)
+        `)
+        .in('surveys.status', ['ACTIVE', 'CLOSED'])
+
+      if (activeUsersError) {
+        console.error('Error fetching active users:', activeUsersError)
+        // エラーでも処理を続行（空配列として扱う）
+        activeUserIds = []
+      }
+
+      // 重複ユーザーを除去（複数のアクティブアンケートを持つユーザー対応）
+      const uniqueActiveUsers = activeUserIds?.reduce((acc, user) => {
+        if (!acc.find(u => u.id === user.id)) {
+          acc.push({ id: user.id, createdAt: user.createdAt })
         }
-      })
-      console.log('Active user IDs:', activeUserIds.length)
+        return acc
+      }, []) || []
+      console.log('Active user IDs:', uniqueActiveUsers.length)
 
       // 日付別にアクティブユーザー数を計算
       for (let i = 0; i < days; i++) {
@@ -145,7 +151,7 @@ export async function GET(request: NextRequest) {
         currentDate.setDate(currentDate.getDate() - (days - 1 - i))
         currentDate.setHours(23, 59, 59, 999) // その日の終了時刻
         
-        const activeCount = activeUserIds.filter(user => user.createdAt <= currentDate).length
+        const activeCount = uniqueActiveUsers.filter(user => new Date(user.createdAt) <= currentDate).length
         activeUsersData.push({
           date: currentDate.toISOString().split('T')[0],
           active_users: activeCount
