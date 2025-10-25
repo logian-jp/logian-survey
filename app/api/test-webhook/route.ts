@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,39 +13,55 @@ export async function POST(request: NextRequest) {
     
     console.log(`Test webhook: userId=${userId}, ticketType=${ticketType}, quantity=${quantity}`)
     
-    // 既存のチケットを検索
-    const existingTicket = await prisma.userTicket.findFirst({
-      where: {
-        userId,
-        ticketType: ticketType as any
-      }
-    })
+    // 既存のチケットを検索 (Supabase SDK使用)
+    const { data: existingTicket, error: ticketError } = await supabase
+      .from('UserTicket')
+      .select('*')
+      .eq('userId', userId)
+      .eq('ticketType', ticketType)
+      .single()
     
     console.log(`Existing ticket found:`, existingTicket)
 
-    if (existingTicket) {
+    if (existingTicket && !ticketError) {
       // 既存のチケットを更新
-      const updatedTicket = await prisma.userTicket.update({
-        where: { id: existingTicket.id },
-        data: {
+      const { data: updatedTicket, error: updateError } = await supabase
+        .from('UserTicket')
+        .update({
           totalTickets: existingTicket.totalTickets + quantity,
           remainingTickets: existingTicket.remainingTickets + quantity
-        }
-      })
+        })
+        .eq('id', existingTicket.id)
+        .select()
+        .single()
+
+      if (updateError) {
+        console.error('Failed to update ticket:', updateError)
+        return NextResponse.json({ success: false, error: updateError.message }, { status: 500 })
+      }
+
       console.log(`Updated existing ticket:`, updatedTicket)
       return NextResponse.json({ success: true, ticket: updatedTicket })
     } else {
-      // 新しいチケットを作成
-      const newTicket = await prisma.userTicket.create({
-        data: {
+      // 新しいチケットを作成 (Supabase SDK使用)
+      const { data: newTicket, error: createError } = await supabase
+        .from('UserTicket')
+        .insert({
           userId,
-          ticketType: ticketType as any,
+          ticketType: ticketType,
           totalTickets: quantity,
           usedTickets: 0,
           remainingTickets: quantity,
           expiresAt: null // 永続
-        }
-      })
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('Failed to create ticket:', createError)
+        return NextResponse.json({ success: false, error: createError.message }, { status: 500 })
+      }
+
       console.log(`Created new ticket:`, newTicket)
       return NextResponse.json({ success: true, ticket: newTicket })
     }

@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
@@ -8,16 +14,14 @@ export async function GET() {
   try {
     console.log('Checking users in database...')
     
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        password: true,
-        role: true,
-        createdAt: true
-      }
-    })
+    // ユーザー一覧を取得 (Supabase SDK使用)
+    const { data: users, error } = await supabase
+      .from('User')
+      .select('id, name, email, password, role, createdAt')
+
+    if (error) {
+      throw error
+    }
 
     console.log(`Found ${users.length} users:`)
     users.forEach(user => {

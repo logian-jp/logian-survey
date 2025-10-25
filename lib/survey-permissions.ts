@@ -1,4 +1,10 @@
-import { prisma } from './prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export type SurveyPermission = 'EDIT' | 'VIEW' | 'ADMIN'
 
@@ -17,17 +23,19 @@ export async function checkSurveyPermissions(
   surveyId: string
 ): Promise<SurveyAccess> {
   try {
-    const survey = await prisma.survey.findUnique({
-      where: { id: surveyId },
-      include: {
-        surveyUsers: {
-          where: { userId },
-          select: { permission: true }
-        }
-      }
-    })
+    // アンケートとユーザー権限を取得 (Supabase SDK使用)
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select(`
+        *,
+        surveyUsers:SurveyUser(permission)
+      `)
+      .eq('id', surveyId)
+      .eq('surveyUsers.userId', userId)
+      .single()
 
-    if (!survey) {
+    if (surveyError || !survey) {
+      console.error('Survey not found:', surveyError)
       return {
         canView: false,
         canEdit: false,
@@ -37,7 +45,7 @@ export async function checkSurveyPermissions(
     }
 
     const isOwner = survey.userId === userId
-    const userPermission = survey.surveyUsers[0]?.permission
+    const userPermission = survey.surveyUsers?.[0]?.permission
 
     // 作成者の場合は常に全権限を持つ
     if (isOwner) {

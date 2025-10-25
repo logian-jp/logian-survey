@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // 動的ルートとして設定
 export const dynamic = 'force-dynamic'
@@ -14,57 +20,67 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // ユーザーがアクセス可能なアンケートのIDを取得
-    const userSurveys = await prisma.surveyUser.findMany({
-      where: {
-        userId: session.user.id,
-        permission: {
-          in: ['ADMIN', 'EDIT', 'VIEW']
-        }
-      },
-      select: {
-        surveyId: true
-      }
-    })
+    // ユーザーがアクセス可能なアンケートのIDを取得 (Supabase SDK使用)
+    const { data: userSurveys, error: userSurveyError } = await supabase
+      .from('SurveyUser')
+      .select('surveyId')
+      .eq('userId', session.user.id)
+      .in('permission', ['ADMIN', 'EDIT', 'VIEW'])
 
-    // ユーザーが所有者のアンケートも取得
-    const ownedSurveys = await prisma.survey.findMany({
-      where: {
-        userId: session.user.id
-      },
-      select: {
-        id: true
-      }
-    })
+    if (userSurveyError) {
+      console.error('Error fetching user surveys:', userSurveyError)
+    }
 
-    const ownedSurveyIds = ownedSurveys.map(s => s.id)
-    const userSurveyIds = userSurveys.map(su => su.surveyId)
+    // ユーザーが所有者のアンケートも取得 (Supabase SDK使用)
+    const { data: ownedSurveys, error: ownedSurveyError } = await supabase
+      .from('Survey')
+      .select('id')
+      .eq('userId', session.user.id)
+
+    if (ownedSurveyError) {
+      console.error('Error fetching owned surveys:', ownedSurveyError)
+    }
+
+    const ownedSurveyIds = (ownedSurveys || []).map(s => s.id)
+    const userSurveyIds = (userSurveys || []).map(su => su.surveyId)
     const allSurveyIds = Array.from(new Set([...userSurveyIds, ...ownedSurveyIds]))
 
     if (allSurveyIds.length === 0) {
       return NextResponse.json([])
     }
 
-    // アンケートの詳細情報と回答数を取得
-    const surveys = await prisma.survey.findMany({
-      where: {
-        id: {
-          in: allSurveyIds
-        },
-        status: 'ACTIVE' // アクティブなアンケートのみ
-      },
-      include: {
-        _count: {
-          select: {
-            responses: true
+    // アンケートの詳細情報を取得 (Supabase SDK使用)
+    const { data: surveys, error: surveyError } = await supabase
+      .from('Survey')
+      .select('*')
+      .in('id', allSurveyIds)
+      .eq('status', 'ACTIVE')
+
+    if (surveyError) {
+      console.error('Error fetching surveys:', surveyError)
+      return NextResponse.json({ error: 'Failed to fetch survey alerts' }, { status: 500 })
+    }
+
+    // 各アンケートの回答数を別途取得
+    const surveysWithCounts = await Promise.all(
+      (surveys || []).map(async (survey) => {
+        const { count } = await supabase
+          .from('Response')
+          .select('*', { count: 'exact', head: true })
+          .eq('surveyId', survey.id)
+
+        return {
+          ...survey,
+          _count: {
+            responses: count || 0
           }
         }
-      }
-    })
+      })
+    )
 
     const alerts = []
 
-    for (const survey of surveys) {
+    for (const survey of surveysWithCounts) {
       const currentResponses = survey._count.responses
       const now = new Date()
 

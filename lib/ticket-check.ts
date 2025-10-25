@@ -1,5 +1,11 @@
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
 import { getPlanLimits } from '@/lib/plan-limits'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // チケット制限の定義（プラン制限と同じ構造を使用）
 export const TICKET_LIMITS = {

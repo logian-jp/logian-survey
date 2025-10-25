@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,12 +26,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 割引リンクを検索
-    const discountLink = await prisma.discountLink.findUnique({
-      where: { code: discountCode }
-    })
+    // 割引リンクを検索 (Supabase SDK使用)
+    const { data: discountLink, error: discountError } = await supabase
+      .from('DiscountLink')
+      .select('*')
+      .eq('code', discountCode)
+      .single()
 
-    if (!discountLink) {
+    if (discountError || !discountLink) {
+      console.error('Discount code not found:', discountError)
       return NextResponse.json(
         { message: 'Invalid discount code' },
         { status: 404 }
