@@ -59,7 +59,6 @@ export async function GET() {
         }
 
         return NextResponse.json(fallbackLinks)
-        return NextResponse.json(discountLinks)
       }
       throw error
     }
@@ -83,12 +82,6 @@ export async function POST(request: NextRequest) {
     // 管理者権限のチェック（メールアドレスで判定）
     if (session.user.role !== 'ADMIN') {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
-    }
-
-    // Prismaクライアントの確認
-    if (!prisma) {
-      console.error('Prisma client is not initialized')
-      return NextResponse.json({ message: 'Database connection error' }, { status: 500 })
     }
 
     console.log('Supabase client available:', !!supabase)
