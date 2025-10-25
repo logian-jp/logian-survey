@@ -288,7 +288,9 @@ export default function SurveyPage() {
       if (response.ok) {
         setSubmitted(true)
       } else {
-        setError('送信に失敗しました')
+        const errorData = await response.json()
+        console.error('Response submission failed:', errorData)
+        setError(errorData.message || '送信に失敗しました')
       }
     } catch (error) {
       setError('送信に失敗しました')

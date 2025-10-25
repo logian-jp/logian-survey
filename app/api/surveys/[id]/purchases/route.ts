@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -14,12 +14,12 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const { id: surveyId } = await params
 
     // アンケートの所有者かどうかチェック
     const survey = await prisma.survey.findUnique({
       where: { id: surveyId },
-      select: { userId: true }
+      select: { userId: true, ticketType: true, ticketId: true, paymentId: true }
     })
 
     if (!survey) {
@@ -30,21 +30,31 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const purchases = await prisma.surveyPurchase.findMany({
-      where: { surveyId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
+    let purchases = []
+    
+    // 無料チケット以外の場合のみ購入記録を取得
+    if (survey?.ticketType && survey.ticketType !== 'FREE') {
+      const ticketPurchases = await prisma.ticketPurchase.findMany({
+        where: { 
+          userId: session.user.id,
+          ticketType: survey.ticketType
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
           }
+        },
+        orderBy: {
+          purchasedAt: 'desc'
         }
-      },
-      orderBy: {
-        purchasedAt: 'desc'
-      }
-    })
+      })
+      
+      purchases = ticketPurchases
+    }
 
     return NextResponse.json({ purchases })
   } catch (error) {

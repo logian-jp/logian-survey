@@ -3,14 +3,15 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 
 interface Props {
-  params: { shareUrl: string }
+  params: Promise<{ shareUrl: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
+    const { shareUrl } = await params
     const survey = await prisma.survey.findUnique({
       where: {
-        shareUrl: params.shareUrl,
+        shareUrl: shareUrl,
         status: 'ACTIVE',
       },
       include: {
@@ -52,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       openGraph: {
         title,
         description,
-        url: `${process.env.NEXTAUTH_URL || 'https://logian-survey.vercel.app'}/survey/${params.shareUrl}`,
+        url: `${process.env.NEXTAUTH_URL || 'https://logian-survey.vercel.app'}/survey/${shareUrl}`,
         siteName: 'LogianSurvey',
         images: [
           {

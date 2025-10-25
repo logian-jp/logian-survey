@@ -47,7 +47,7 @@ export default function CreateSurvey() {
   const [planSlots, setPlanSlots] = useState<any[]>([])
   const [selectedPlanType, setSelectedPlanType] = useState<string | null>(null)
   const [showPlanSelection, setShowPlanSelection] = useState(true)
-  const [activeTab, setActiveTab] = useState<'questions' | 'settings' | 'sharing'>('questions')
+  const [activeTab, setActiveTab] = useState<'edit' | 'collaborators' | 'settings'>('edit')
   const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   useEffect(() => {
@@ -288,6 +288,7 @@ export default function CreateSurvey() {
         },
         body: JSON.stringify({
           ...survey,
+          maxResponses: selectedPlanType === 'FREE' ? 100 : survey.maxResponses,
           ticketType: selectedPlanType || 'FREE'
         }),
       })
@@ -305,16 +306,33 @@ export default function CreateSurvey() {
       // 質問作成
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i]
+        
+        // 都道府県の設問の場合、optionsとsettingsを除外
+        const questionData: any = {
+          surveyId: createdSurvey.id,
+          type: question.type,
+          title: question.title,
+          description: question.description,
+          required: question.required,
+          order: i,
+        }
+        
+        // 都道府県以外の設問の場合のみoptionsとsettingsを含める
+        if (question.type !== 'PREFECTURE' && question.type !== 'NAME' && question.type !== 'AGE_GROUP') {
+          if (question.options) {
+            questionData.options = question.options
+          }
+          if (question.settings) {
+            questionData.settings = question.settings
+          }
+        }
+        
         await fetch('/api/questions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            surveyId: createdSurvey.id,
-            ...question,
-            order: i,
-          }),
+          body: JSON.stringify(questionData),
         })
       }
 
@@ -348,9 +366,10 @@ export default function CreateSurvey() {
   // プラン選択画面
   if (showPlanSelection) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-sm border p-8">
+      <div className="min-h-screen bg-gray-50 flex">
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="bg-white rounded-lg shadow-sm border p-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-6">アンケート作成 - チケット選択</h1>
             <p className="text-gray-600 mb-8">どのチケットでアンケートを作成しますか？</p>
             
@@ -417,6 +436,7 @@ export default function CreateSurvey() {
                 </div>
               )}
             </div>
+            </div>
           </div>
         </div>
       </div>
@@ -445,14 +465,24 @@ export default function CreateSurvey() {
             {/* タブ */}
             <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
               <button
-                onClick={() => setActiveTab('questions')}
+                onClick={() => setActiveTab('edit')}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'questions'
+                  activeTab === 'edit'
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 質問
+              </button>
+              <button
+                onClick={() => setActiveTab('collaborators')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'collaborators'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                協力者
               </button>
               <button
                 onClick={() => setActiveTab('settings')}
@@ -463,16 +493,6 @@ export default function CreateSurvey() {
                 }`}
               >
                 設定
-              </button>
-              <button
-                onClick={() => setActiveTab('sharing')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'sharing'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                共有
               </button>
             </div>
           </div>
@@ -533,7 +553,7 @@ export default function CreateSurvey() {
           )}
 
           {/* タブコンテンツ */}
-          {activeTab === 'questions' && (
+          {activeTab === 'edit' && (
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">
@@ -1118,17 +1138,34 @@ export default function CreateSurvey() {
                   <label htmlFor="maxResponses" className="block text-sm font-medium text-gray-700 mb-2">
                     最大回答数
                   </label>
-                  <input
-                    type="number"
-                    id="maxResponses"
-                    value={survey.maxResponses || ''}
-                    onChange={(e) => setSurvey({ ...survey, maxResponses: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="制限なし"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    回答数の上限を設定できます。空欄の場合は制限なしです。
-                  </p>
+                  {selectedPlanType === 'FREE' ? (
+                    <div>
+                      <input
+                        type="number"
+                        id="maxResponses"
+                        value="100"
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        無料チケットでは100件まで回答を受け付けます
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="number"
+                        id="maxResponses"
+                        value={survey.maxResponses || ''}
+                        onChange={(e) => setSurvey({ ...survey, maxResponses: e.target.value ? parseInt(e.target.value) : null })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="制限なし"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        回答数の上限を設定できます。空欄の場合は制限なしです。
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* 募集期間 */}
@@ -1169,30 +1206,30 @@ export default function CreateSurvey() {
             </div>
           )}
 
-          {/* 共有タブ */}
-          {activeTab === 'sharing' && (
+          {/* 協力者タブ */}
+          {activeTab === 'collaborators' && (
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">共有設定</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">協力者管理</h2>
               
               <div className="space-y-6">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-blue-900 mb-2">共有URL</h3>
+                  <h3 className="text-sm font-medium text-blue-900 mb-2">協力者管理について</h3>
                   <p className="text-sm text-blue-700 mb-3">
-                    アンケートを作成すると、共有用のURLが生成されます。
+                    アンケートを作成後、他のユーザーを協力者として招待し、編集権限や閲覧権限を付与できます。
                   </p>
                   <div className="bg-white border border-blue-200 rounded-md p-3">
-                    <code className="text-sm text-gray-600">
-                      {survey.id ? `https://your-domain.com/survey/${survey.id}` : 'アンケート作成後に表示されます'}
-                    </code>
+                    <p className="text-sm text-gray-600">
+                      アンケート作成後に協力者管理機能が利用可能になります
+                    </p>
                   </div>
                 </div>
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-yellow-900 mb-2">注意事項</h3>
+                  <h3 className="text-sm font-medium text-yellow-900 mb-2">権限について</h3>
                   <ul className="text-sm text-yellow-700 space-y-1">
-                    <li>• アンケートを作成してから共有URLが有効になります</li>
-                    <li>• • 共有URLは誰でもアクセス可能です</li>
-                    <li>• 回答データは設定した保存期間中保持されます</li>
+                    <li>• <strong>編集権限</strong>: アンケートの質問や設定を編集できます</li>
+                    <li>• <strong>閲覧権限</strong>: アンケートの内容と回答データを閲覧できます</li>
+                    <li>• <strong>管理者権限</strong>: すべての権限に加えて、協力者の管理ができます</li>
                   </ul>
                 </div>
               </div>

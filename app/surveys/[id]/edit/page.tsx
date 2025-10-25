@@ -547,16 +547,33 @@ export default function EditSurvey() {
       // 質問を作成
       for (let i = 0; i < survey.questions.length; i++) {
         const question = survey.questions[i]
+        
+        // 都道府県の設問の場合、optionsとsettingsを除外
+        const questionData: any = {
+          surveyId: surveyId,
+          type: question.type,
+          title: question.title,
+          description: question.description,
+          required: question.required,
+          order: i,
+        }
+        
+        // 都道府県以外の設問の場合のみoptionsとsettingsを含める
+        if (question.type !== 'PREFECTURE' && question.type !== 'NAME' && question.type !== 'AGE_GROUP') {
+          if (question.options) {
+            questionData.options = question.options
+          }
+          if (question.settings) {
+            questionData.settings = question.settings
+          }
+        }
+        
         await fetch('/api/questions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            surveyId: surveyId,
-            ...question,
-            order: i,
-          }),
+          body: JSON.stringify(questionData),
         })
       }
 
@@ -1263,23 +1280,44 @@ export default function EditSurvey() {
                     回答数上限
                   </label>
                   <div className="flex items-center space-x-4">
-                    <input
-                      type="number"
-                      min="1"
-                      value={survey.maxResponses || ''}
-                      onChange={(e) => setSurvey({
-                        ...survey,
-                        maxResponses: e.target.value ? parseInt(e.target.value) : null
-                      })}
-                      className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="制限なし"
-                    />
-                    <span className="text-sm text-gray-500">
-                      件（空白で制限なし）
-                    </span>
+                    {survey.ticketType === 'FREE' ? (
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value="100"
+                          disabled
+                          className="w-32 px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+                        />
+                        <span className="text-sm text-gray-500">
+                          件（無料チケットの上限）
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          min="1"
+                          value={survey.maxResponses || ''}
+                          onChange={(e) => setSurvey({
+                            ...survey,
+                            maxResponses: e.target.value ? parseInt(e.target.value) : null
+                          })}
+                          className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                          placeholder="制限なし"
+                        />
+                        <span className="text-sm text-gray-500">
+                          件（空白で制限なし）
+                        </span>
+                      </>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    設定した件数に達すると、自動的に回答受付を終了します
+                    {survey.ticketType === 'FREE' 
+                      ? '無料チケットでは100件まで回答を受け付けます'
+                      : '設定した件数に達すると、自動的に回答受付を終了します'
+                    }
                   </p>
                 </div>
 

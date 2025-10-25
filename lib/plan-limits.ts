@@ -46,7 +46,7 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
   PROFESSIONAL: {
     maxSurveys: -1,
     maxResponsesPerSurvey: 1000,
-    exportFormats: ['raw', 'normalized', 'standardized'],
+    exportFormats: ['raw', 'onehot', 'normalized', 'standardized'],
     features: [
       'all_question_types',
       'conditional_logic',
@@ -64,7 +64,7 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
   ENTERPRISE: {
     maxSurveys: -1,
     maxResponsesPerSurvey: -1,
-    exportFormats: ['raw', 'normalized', 'standardized'],
+    exportFormats: ['raw', 'onehot', 'normalized', 'standardized'],
     features: [
       'all_question_types',
       'conditional_logic',

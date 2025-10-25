@@ -173,7 +173,7 @@ export default function SurveyResponsesPage() {
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedFormat, setSelectedFormat] = useState<'raw' | 'normalized' | 'standardized'>('raw')
+  const [selectedFormat, setSelectedFormat] = useState<'raw' | 'onehot' | 'normalized' | 'standardized'>('raw')
   const [includePersonalData, setIncludePersonalData] = useState(false)
   const [convertToEnglish, setConvertToEnglish] = useState(false)
   const [csvPreview, setCsvPreview] = useState<string>('')
@@ -356,9 +356,9 @@ export default function SurveyResponsesPage() {
   const downloadCSV = async () => {
     try {
       // プラン制限チェック
-      if (userPlan) {
+      if (userPlan && userPlan.planType) {
         const limits = PLAN_LIMITS[userPlan.planType]
-        if (!limits.exportFormats.includes(selectedFormat)) {
+        if (limits && limits.exportFormats && !limits.exportFormats.includes(selectedFormat)) {
           setExportError(`${selectedFormat}形式のエクスポートは${userPlan.planType}プランでは利用できません。プランをアップグレードしてください。`)
           return
         }
@@ -640,6 +640,7 @@ export default function SurveyResponsesPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
               >
                 <option value="raw">通常データ</option>
+                <option value="onehot">OHEデータ</option>
                 <option value="normalized">正規化データ</option>
                 <option value="standardized">標準化データ</option>
               </select>

@@ -7,6 +7,12 @@ export async function POST(request: NextRequest) {
   try {
     const { surveyId, answers } = await request.json()
 
+    console.log('Response submission request:', {
+      surveyId,
+      answers: Object.keys(answers || {}),
+      answersCount: Object.keys(answers || {}).length
+    })
+
     if (!surveyId || !answers) {
       return NextResponse.json(
         { message: 'Survey ID and answers are required' },
@@ -41,8 +47,11 @@ export async function POST(request: NextRequest) {
     }
 
     // プラン制限チェック
+    console.log('Checking response limit for survey:', surveyId)
     const limitCheck = await checkResponseLimit(surveyId)
+    console.log('Response limit check result:', limitCheck)
     if (!limitCheck.allowed) {
+      console.log('Response limit check failed:', limitCheck.message)
       return NextResponse.json(
         { message: limitCheck.message },
         { status: 403 }
@@ -50,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 質問IDの存在確認
-    const validQuestionIds = new Set(survey.questions.map(q => q.id))
+    const validQuestionIds = new Set(survey.questions.map((q: any) => q.id))
     const submittedQuestionIds = Object.keys(answers)
     
     for (const questionId of submittedQuestionIds) {
@@ -63,48 +72,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 回答を作成
-    const response = await prisma.response.create({
-      data: {
-        surveyId: surveyId,
-      },
-    })
+    // 回答と回答データをトランザクションで作成
+    const result = await prisma.$transaction(async (tx: any) => {
+      // 回答を作成
+      const response = await tx.response.create({
+        data: {
+          surveyId: surveyId,
+        },
+      })
 
-    // 各質問の回答を作成（トランザクション内で実行）
-    const answerPromises = []
-    
-    for (const [questionId, value] of Object.entries(answers)) {
-      if (value !== null && value !== undefined && value !== '') {
-        // 質問の存在を再確認
-        const question = survey.questions.find(q => q.id === questionId)
-        if (!question) {
-          console.error(`Question not found: ${questionId}`)
-          continue
+      // 各質問の回答を作成
+      const answerPromises = []
+      
+      for (const [questionId, value] of Object.entries(answers)) {
+        if (value !== null && value !== undefined && value !== '') {
+          // 質問の存在を再確認
+          const question = survey.questions.find((q: any) => q.id === questionId)
+          if (!question) {
+            console.error(`Question not found: ${questionId}`)
+            continue
+          }
+          
+          let answerValue: string
+
+          if (Array.isArray(value)) {
+            // 複数選択の場合、カンマ区切りで保存
+            answerValue = value.join(',')
+          } else {
+            answerValue = String(value)
+          }
+
+          answerPromises.push(
+            tx.answer.create({
+              data: {
+                questionId: questionId,
+                responseId: response.id,
+                value: answerValue,
+              },
+            })
+          )
         }
-        
-        let answerValue: string
-
-        if (Array.isArray(value)) {
-          // 複数選択の場合、カンマ区切りで保存
-          answerValue = value.join(',')
-        } else {
-          answerValue = String(value)
-        }
-
-        answerPromises.push(
-          prisma.answer.create({
-            data: {
-              questionId: questionId,
-              responseId: response.id,
-              value: answerValue,
-            },
-          })
-        )
       }
-    }
-    
-    // すべての回答を並行して作成
-    await Promise.all(answerPromises)
+      
+      // すべての回答を並行して作成
+      await Promise.all(answerPromises)
+      
+      return response
+    })
 
     // データ使用量を記録（回答送信時）
     const responseDataSize = JSON.stringify(answers).length
@@ -114,7 +128,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Failed to submit response:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }

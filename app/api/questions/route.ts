@@ -22,6 +22,17 @@ export async function POST(request: NextRequest) {
       order,
     } = await request.json()
 
+    console.log('Question creation request:', {
+      surveyId,
+      type,
+      title,
+      description,
+      required,
+      options,
+      settings,
+      order,
+    })
+
     if (!surveyId || !type) {
       return NextResponse.json(
         { message: 'Survey ID and type are required' },
@@ -69,7 +80,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Failed to create question:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }

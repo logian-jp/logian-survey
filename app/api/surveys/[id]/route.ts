@@ -140,10 +140,22 @@ export async function PUT(
       )
     }
 
+    // 無料チケットの制限チェック
+    const surveyTicketType = existingSurvey.ticketType || 'FREE'
+    
+    // 無料チケットの回答上限制限
+    let finalMaxResponses = maxResponses
+    if (surveyTicketType === 'FREE' && maxResponses !== undefined) {
+      const { getPlanLimits } = await import('@/lib/plan-limits')
+      const limits = getPlanLimits('FREE')
+      if (limits.maxResponsesPerSurvey !== -1) {
+        finalMaxResponses = Math.min(maxResponses, limits.maxResponsesPerSurvey)
+      }
+    }
+
     // 無料チケットのYouTube埋め込み禁止（iframe除去）
     let sanitizedDescription = description
     try {
-      const surveyTicketType = existingSurvey.ticketType || 'FREE'
       const { canUseVideoEmbedding } = await import('@/lib/ticket-check')
       const canEmbed = canUseVideoEmbedding(surveyTicketType)
       if (!canEmbed && typeof sanitizedDescription === 'string' && sanitizedDescription.includes('<iframe')) {
@@ -160,7 +172,7 @@ export async function PUT(
         ...(title && { title }),
         ...(description !== undefined && { description: sanitizedDescription }),
         ...(status && { status }),
-        maxResponses: maxResponses !== undefined ? maxResponses : null,
+        maxResponses: finalMaxResponses !== undefined ? finalMaxResponses : null,
         endDate: endDate !== undefined ? endDate : null,
         targetResponses: targetResponses !== undefined ? targetResponses : null,
         headerImageUrl: headerImageUrl !== undefined ? headerImageUrl : null,

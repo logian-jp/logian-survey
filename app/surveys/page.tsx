@@ -16,6 +16,31 @@ function stripHtmlTags(html: string): string {
   return html.replace(/<[^>]*>/g, '')
 }
 
+function calculateRemainingRetentionDays(survey: Survey): { remaining: number; isExpired: boolean; expirationDate: Date | null } {
+  if (!survey.dataRetentionDays) {
+    return { remaining: 0, isExpired: false, expirationDate: null }
+  }
+
+  // アンケートがまだ公開されていない場合は、公開日が未定
+  if (survey.status === 'DRAFT') {
+    return { remaining: 0, isExpired: false, expirationDate: null }
+  }
+
+  // 公開日は作成日とする（実際の公開日を取得できないため）
+  const publishDate = new Date(survey.createdAt)
+  const expirationDate = new Date(publishDate.getTime() + survey.dataRetentionDays * 24 * 60 * 60 * 1000)
+  const now = new Date()
+  
+  const remainingMs = expirationDate.getTime() - now.getTime()
+  const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
+  
+  return {
+    remaining: Math.max(0, remainingDays),
+    isExpired: remainingMs <= 0,
+    expirationDate
+  }
+}
+
 interface Survey {
   id: string
   title: string
@@ -235,13 +260,10 @@ export default function SurveysPage() {
                     チケット情報
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    データ使用量
+                    残り保存期間
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    保存期間
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    作成日
+                    作成日/公開日
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     操作
@@ -391,32 +413,50 @@ export default function SurveysPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex flex-col">
-                        <div className="font-medium">
-                          {survey.dataUsageMB}MB / {survey.maxDataSizeMB === -1 ? '∞' : `${survey.maxDataSizeMB}MB`}
-                        </div>
-                        <div className="w-20 bg-gray-200 rounded-full h-1.5 mt-1">
-                          <div 
-                            className={`h-1.5 rounded-full ${
-                              survey.maxDataSizeMB === -1 || (survey.dataUsageMB / survey.maxDataSizeMB) < 0.8 
-                                ? 'bg-green-500' 
-                                : (survey.dataUsageMB / survey.maxDataSizeMB) < 0.95 
-                                ? 'bg-yellow-500' 
-                                : 'bg-red-500'
-                            }`}
-                            style={{ 
-                              width: survey.maxDataSizeMB === -1 
-                                ? '0%' 
-                                : `${Math.min(100, (survey.dataUsageMB / survey.maxDataSizeMB) * 100)}%` 
-                            }}
-                          ></div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex flex-col">
-                        <div className="font-medium">
-                          {survey.dataRetentionDays}日
-                        </div>
+                        {(() => {
+                          const retentionInfo = calculateRemainingRetentionDays(survey)
+                          
+                          if (!survey.dataRetentionDays) {
+                            return (
+                              <div className="font-medium text-gray-400">
+                                未設定
+                              </div>
+                            )
+                          }
+                          
+                          if (survey.status === 'DRAFT') {
+                            return (
+                              <div className="font-medium text-gray-400">
+                                未公開
+                              </div>
+                            )
+                          }
+                          
+                          if (retentionInfo.isExpired) {
+                            return (
+                              <div className="font-medium text-red-600">
+                                期限切れ
+                              </div>
+                            )
+                          }
+                          
+                          return (
+                            <div className="flex flex-col">
+                              <div className={`font-medium ${
+                                retentionInfo.remaining <= 7 ? 'text-red-600' :
+                                retentionInfo.remaining <= 30 ? 'text-yellow-600' :
+                                'text-gray-900'
+                              }`}>
+                                残り{retentionInfo.remaining}日
+                              </div>
+                              {retentionInfo.expirationDate && (
+                                <div className="text-xs text-gray-400">
+                                  期限: {formatToTokyoTime(retentionInfo.expirationDate.toISOString()).split(' ')[0]}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
                         {survey.hasAddons && (
                           <div className="flex items-center mt-1">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -427,7 +467,16 @@ export default function SurveysPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatToTokyoTime(survey.createdAt).split(' ')[0]}
+                      <div className="flex flex-col">
+                        <div className="font-medium">
+                          {formatToTokyoTime(survey.createdAt).split(' ')[0]}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {survey.status === 'ACTIVE' ? '公開済み' : 
+                           survey.status === 'DRAFT' ? '下書き' : 
+                           survey.status === 'CLOSED' ? '終了' : '不明'}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                       {(survey.userPermission === 'OWNER' || survey.userPermission === 'ADMIN' || survey.userPermission === 'EDIT') && (
