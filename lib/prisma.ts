@@ -7,12 +7,14 @@ const globalForPrisma = globalThis as unknown as {
 let prisma: PrismaClient
 
 if (process.env.NODE_ENV === 'production') {
+  // Vercelサーバーレス環境用の最適化設定
   prisma = new PrismaClient({
     datasources: {
       db: {
         url: process.env.DATABASE_URL
       }
-    }
+    },
+    log: ['error']
   })
 } else {
   if (!globalForPrisma.prisma) {
@@ -21,7 +23,8 @@ if (process.env.NODE_ENV === 'production') {
         db: {
           url: process.env.DATABASE_URL
         }
-      }
+      },
+      log: ['query', 'error']
     })
   }
   prisma = globalForPrisma.prisma
