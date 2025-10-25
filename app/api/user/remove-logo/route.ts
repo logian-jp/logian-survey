@@ -29,11 +29,16 @@ export async function POST(request: NextRequest) {
     // Base64データの場合はファイルシステムから削除する必要がない
     // データベースから直接削除するだけ
 
-    // データベースを更新
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { customLogoUrl: null },
-    })
+    // データベースを更新 - Supabase SDK使用
+    const { error: updateError } = await supabase
+      .from('User')
+      .update({ customLogoUrl: null })
+      .eq('id', session.user.id)
+
+    if (updateError) {
+      console.error('Error removing user logo:', updateError)
+      return NextResponse.json({ message: 'Failed to remove logo' }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

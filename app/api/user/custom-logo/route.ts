@@ -19,10 +19,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { customLogoUrl: true }
-    })
+    const { data: users, error: userError } = await supabase
+      .from('User')
+      .select('customLogoUrl')
+      .eq('id', session.user.id)
+      .single()
+
+    if (userError) {
+      console.error('Error fetching user:', userError)
+      return NextResponse.json({ message: 'Failed to fetch user data' }, { status: 500 })
+    }
+
+    const user = users
 
     return NextResponse.json({ logoUrl: user?.customLogoUrl || null })
   } catch (error) {

@@ -10,7 +10,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const prisma = new PrismaClient()
+// PrismaClient removed - using Supabase SDK instead
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,14 +25,16 @@ export async function GET(request: NextRequest) {
     // ユーザーのデータ使用量を取得
     const totalUsage = await getUserDataUsage(userId)
 
-    // データ種別別の使用量を取得
-    const usageByType = await prisma.dataUsage.groupBy({
-      by: ['dataType'],
-      where: { userId },
-      _sum: {
-        sizeBytes: true
-      }
-    })
+    // データ種別別の使用量を取得 (Supabase SDK使用)
+    const { data: usageData, error: usageError } = await supabase
+      .from('DataUsage')
+      .select('dataType, sizeBytes')
+      .eq('userId', userId)
+
+    if (usageError) {
+      console.error('Error fetching usage by type:', usageError)
+      return NextResponse.json({ error: 'Failed to fetch usage data' }, { status: 500 })
+    }
 
     const usageByTypeMap = {
       survey_data: 0,
@@ -40,10 +42,10 @@ export async function GET(request: NextRequest) {
       export_data: 0
     }
 
-    usageByType.forEach(usage => {
+    usageData?.forEach(usage => {
       const dataType = usage.dataType as keyof typeof usageByTypeMap
       if (dataType in usageByTypeMap) {
-        usageByTypeMap[dataType] = Math.round((usage._sum.sizeBytes || 0) / (1024 * 1024) * 100) / 100
+        usageByTypeMap[dataType] += Math.round((usage.sizeBytes || 0) / (1024 * 1024) * 100) / 100
       }
     })
 
@@ -56,6 +58,6 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching data usage:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   } finally {
-    await prisma.$disconnect()
+    // Supabase connection automatically managed
   }
 }

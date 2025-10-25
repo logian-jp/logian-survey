@@ -27,19 +27,21 @@ export async function GET(
     }
 
     const { id } = await params
-    const discountLink = await prisma.discountLink.findUnique({
-      where: { id },
-      include: {
-        users: true, // TODO: userPlan参照を削除（チケット制度移行のため）
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    })
+    const { data: discountLinks, error: linkError } = await supabase
+      .from('DiscountLink')
+      .select(`
+        *,
+        creator:User!createdBy(id, name, email)
+      `)
+      .eq('id', id)
+      .single()
+
+    if (linkError) {
+      console.error('Error fetching discount link:', linkError)
+      return NextResponse.json({ message: 'Failed to fetch discount link' }, { status: 500 })
+    }
+
+    const discountLink = discountLinks
 
     if (!discountLink) {
       return NextResponse.json({ message: 'Discount link not found' }, { status: 404 })

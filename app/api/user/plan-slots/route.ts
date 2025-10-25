@@ -20,6 +20,17 @@ export async function GET(request: NextRequest) {
     const userId = session.user.id
 
     // ユーザーのチケット情報を取得
+    const { data: userTickets, error: ticketsError } = await supabase
+      .from('UserTicket')
+      .select('*')
+      .eq('userId', session.user.id)
+
+    if (ticketsError) {
+      console.error('Error fetching user tickets:', ticketsError)
+      return NextResponse.json({ message: 'Failed to fetch tickets' }, { status: 500 })
+    }
+
+    /* Original Prisma code:
     const userTickets = await prisma.userTicket.findMany({
       where: { userId },
       orderBy: { ticketType: 'desc' }

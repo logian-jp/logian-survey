@@ -37,141 +37,120 @@ export async function GET() {
       // 総回答数
       supabase.from('Response').select('*', { count: 'exact', head: true }),
       
-      // アクティブユーザー数（過去30日以内にログイン） - 一時的に簡略化
-      Promise.resolve({ count: 0 }) // TODO: 複雑な日付フィルターは後で実装
-        where: {
-          updatedAt: {
-            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-          }
-        }
-      }),
+      // アクティブユーザー数（過去30日以内に更新されたユーザー）
+      supabase.from('User')
+        .select('*', { count: 'exact', head: true })
+        .gte('updatedAt', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
       
-      // ステータス別アンケート数
-      prisma.survey.groupBy({
-        by: ['status'],
-        _count: {
-          status: true
-        }
-      }),
+      // ステータス別アンケート数（手動集計）
+      supabase.from('Survey').select('status'),
       
       // 最近登録されたユーザー（上位10件）
-      prisma.user.findMany({
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          createdAt: true
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
-        take: 10
-      }),
+      supabase.from('User')
+        .select('id, name, email, createdAt')
+        .order('createdAt', { ascending: false })
+        .limit(10),
       
       // 最近作成されたアンケート（上位10件）
-      prisma.survey.findMany({
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          createdAt: true,
-          user: {
-            select: {
-              name: true,
-              email: true
-            }
-          },
-          _count: {
-            select: {
-              responses: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
-        take: 10
-      }),
+      supabase.from('Survey')
+        .select(`
+          id, title, status, createdAt,
+          user:User(name, email)
+        `)
+        .order('createdAt', { ascending: false })
+        .limit(10),
       
       // アンケート作成数上位ユーザー
-      prisma.user.findMany({
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          _count: {
-            select: {
-              surveys: true
-            }
-          }
-        },
-        orderBy: {
-          surveys: {
-            _count: 'desc'
-          }
-        },
-        take: 10
-      })
+      supabase.from('User')
+        .select(`
+          id, name, email,
+          surveys:Survey(id)
+        `)
     ])
     
     // ユーザー別の詳細統計（上位10件）
-    const userStats = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-        updatedAt: true,
-        surveys: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            createdAt: true,
-            _count: {
-              select: {
-                responses: true
-              }
-            }
-          }
+    const { data: userStats, error: userStatsError } = await supabase
+      .from('User')
+      .select(`
+        id, name, email, createdAt, updatedAt,
+        surveys:Survey(id, title, status, createdAt)
+      `)
+      .order('createdAt', { ascending: false })
+      .limit(10)
+
+    if (userStatsError) {
+      console.error('Error fetching user stats:', userStatsError)
+      return NextResponse.json({ message: 'Failed to fetch user statistics' }, { status: 500 })
+    }
+    
+    // 各ユーザーの統計を計算（レスポンス数は別途取得が必要）
+    const userStatistics = await Promise.all(
+      userStats?.map(async (user) => {
+        const activeSurveys = user.surveys?.filter(survey => survey.status === 'ACTIVE').length || 0
+        const draftSurveys = user.surveys?.filter(survey => survey.status === 'DRAFT').length || 0
+        const closedSurveys = user.surveys?.filter(survey => survey.status === 'CLOSED').length || 0
+        
+        // ユーザーのアンケートのレスポンス数を取得
+        const surveyIds = user.surveys?.map(s => s.id) || []
+        let totalSurveyResponses = 0
+        
+        if (surveyIds.length > 0) {
+          const { count } = await supabase
+            .from('Response')
+            .select('*', { count: 'exact', head: true })
+            .in('surveyId', surveyIds)
+          
+          totalSurveyResponses = count || 0
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 10
-    })
+        
+        return {
+          ...user,
+          totalSurveyResponses,
+          activeSurveys,
+          draftSurveys,
+          closedSurveys
+        }
+      }) || []
+    )
     
-    // 各ユーザーの統計を計算
-    const userStatistics = userStats.map(user => {
-      const totalSurveyResponses = user.surveys.reduce((sum, survey) => sum + survey._count.responses, 0)
-      const activeSurveys = user.surveys.filter(survey => survey.status === 'ACTIVE').length
-      const draftSurveys = user.surveys.filter(survey => survey.status === 'DRAFT').length
-      const closedSurveys = user.surveys.filter(survey => survey.status === 'CLOSED').length
-      
-      return {
-        ...user,
-        totalSurveyResponses,
-        activeSurveys,
-        draftSurveys,
-        closedSurveys
-      }
-    })
-    
+    // ステータス別アンケート数を手動で集計
+    const statusCounts = surveysByStatus.data?.reduce((acc, survey) => {
+      acc[survey.status] = (acc[survey.status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>) || {}
+
+    // トップユーザー（アンケート数順）を手動ソート
+    const sortedTopUsers = topUsers.data?.map(user => ({
+      ...user,
+      surveyCount: user.surveys?.length || 0
+    })).sort((a, b) => b.surveyCount - a.surveyCount).slice(0, 10) || []
+
+    // レスポンス数を各アンケートに追加
+    const surveysWithResponses = await Promise.all(
+      recentSurveys.data?.map(async (survey) => {
+        const { count: responseCount } = await supabase
+          .from('Response')
+          .select('*', { count: 'exact', head: true })
+          .eq('surveyId', survey.id)
+        
+        return {
+          ...survey,
+          responseCount: responseCount || 0
+        }
+      }) || []
+    )
+
     return NextResponse.json({
       overview: {
-        totalUsers,
-        totalSurveys,
-        totalResponses,
-        activeUsers,
-        surveysByStatus: surveysByStatus.reduce((acc, item) => {
-          acc[item.status] = item._count.status
-          return acc
-        }, {} as Record<string, number>)
+        totalUsers: totalUsers.count || 0,
+        totalSurveys: totalSurveys.count || 0,
+        totalResponses: totalResponses.count || 0,
+        activeUsers: activeUsers.count || 0,
+        surveysByStatus: statusCounts
       },
-      recentUsers,
-      recentSurveys,
-      topUsers,
+      recentUsers: recentUsers.data || [],
+      recentSurveys: surveysWithResponses,
+      topUsers: sortedTopUsers,
       userStatistics
     })
   } catch (error) {

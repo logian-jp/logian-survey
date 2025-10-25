@@ -19,80 +19,103 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // ユーザーに関連するすべてのデータを削除
-    await prisma.$transaction(async (tx: any) => {
-      const userId = session.user.id
+    // ユーザーに関連するすべてのデータを削除 (Supabase SDK使用)
+    // NOTE: Supabaseではトランザクションの代わりに順次削除を実行
+    const userId = session.user.id
 
-      // 1. アンケートの回答を削除
-      await tx.response.deleteMany({
-        where: {
-          survey: {
-            userId: userId
-          }
-        }
-      })
+    try {
+      // 1. ユーザーのアンケートIDを取得
+      console.log('Getting user surveys...')
+      const { data: userSurveys } = await supabase
+        .from('Survey')
+        .select('id')
+        .eq('userId', userId)
+      
+      const surveyIds = userSurveys?.map(s => s.id) || []
 
-      // 2. アンケートの質問を削除
-      await tx.question.deleteMany({
-        where: {
-          survey: {
-            userId: userId
-          }
-        }
-      })
+      // 2. アンケートの回答を削除
+      if (surveyIds.length > 0) {
+        console.log('Deleting responses...')
+        await supabase
+          .from('Response')
+          .delete()
+          .in('surveyId', surveyIds)
+      }
 
-      // 3. 協力者関係を削除
-      await tx.surveyUser.deleteMany({
-        where: {
-          OR: [
-            { userId: userId },
-            { invitedBy: userId }
-          ]
-        }
-      })
+      // 3. アンケートの質問を削除
+      if (surveyIds.length > 0) {
+        console.log('Deleting questions...')
+        await supabase
+          .from('Question')
+          .delete()
+          .in('surveyId', surveyIds)
+      }
 
-      // 4. アンケートを削除
-      await tx.survey.deleteMany({
-        where: { userId: userId }
-      })
+      // 4. 協力者関係を削除
+      console.log('Deleting survey collaborations...')
+      await supabase
+        .from('SurveyUser')
+        .delete()
+        .or(`userId.eq.${userId},invitedBy.eq.${userId}`)
 
-      // 5. 質問テンプレートを削除
-      await tx.questionTemplate.deleteMany({
-        where: { userId: userId }
-      })
+      // 5. アンケートを削除
+      console.log('Deleting surveys...')
+      await supabase
+        .from('Survey')
+        .delete()
+        .eq('userId', userId)
 
-      // 6. ディスカウントリンクを削除
-      await tx.discountLink.deleteMany({
-        where: {
-          createdBy: userId
-        }
-      })
+      // 6. 質問テンプレートを削除
+      console.log('Deleting question templates...')
+      await supabase
+        .from('QuestionTemplate')
+        .delete()
+        .eq('userId', userId)
 
-      // 7. お知らせ配信履歴を削除
-      await tx.announcementDelivery.deleteMany({
-        where: { userId: userId }
-      })
+      // 7. ディスカウントリンクを削除
+      console.log('Deleting discount links...')
+      await supabase
+        .from('DiscountLink')
+        .delete()
+        .eq('createdBy', userId)
 
-      // 8. ユーザープランを削除（チケット制度移行により不要）
-      // await tx.userPlan.deleteMany({
-      //   where: { userId: userId }
-      // })
+      // 8. お知らせ配信履歴を削除
+      console.log('Deleting announcement deliveries...')
+      await supabase
+        .from('AnnouncementDelivery')
+        .delete()
+        .eq('userId', userId)
 
-      // 9. セッションを削除
-      await tx.session.deleteMany({
-        where: { userId: userId }
-      })
+      // 9. セッションを削除 (NextAuth関連)
+      console.log('Deleting sessions...')
+      await supabase
+        .from('Session')
+        .delete()
+        .eq('userId', userId)
 
-      // 10. アカウント情報を削除
-      await tx.account.deleteMany({
-        where: { userId: userId }
-      })
+      // 10. アカウント情報を削除 (NextAuth関連)
+      console.log('Deleting accounts...')
+      await supabase
+        .from('Account')
+        .delete()
+        .eq('userId', userId)
 
       // 11. 最後にユーザーを削除
-      await tx.user.delete({
-        where: { id: userId }
-      })
-    })
+      console.log('Deleting user...')
+      const { error: userDeleteError } = await supabase
+        .from('User')
+        .delete()
+        .eq('id', userId)
+
+      if (userDeleteError) {
+        throw userDeleteError
+      }
+
+      console.log('Account deletion completed successfully')
+    } catch (error) {
+      console.error('Error during account deletion:', error)
+      throw error
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -54,11 +54,16 @@ export async function POST(request: NextRequest) {
     // データベースにBase64データとして保存
     const logoData = `data:${mimeType};base64,${base64Data}`
 
-    // データベースを更新（Base64データを直接保存）
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { customLogoUrl: logoData },
-    })
+    // データベースを更新（Base64データを直接保存） - Supabase SDK使用
+    const { error: updateError } = await supabase
+      .from('User')
+      .update({ customLogoUrl: logoData })
+      .eq('id', session.user.id)
+
+    if (updateError) {
+      console.error('Error updating user logo:', updateError)
+      return NextResponse.json({ message: 'Failed to update logo' }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true, logoUrl: logoData })
   } catch (error) {

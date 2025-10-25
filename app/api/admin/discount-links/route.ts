@@ -24,25 +24,20 @@ export async function GET() {
     }
 
     console.log('Fetching discount links...')
-    console.log('Prisma client available:', !!prisma)
-    console.log('DiscountLink model available:', !!prisma.discountLink)
 
     try {
-      const discountLinks = await prisma.discountLink.findMany({
-        include: {
-          users: true,
-          creator: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      })
+      const { data: discountLinks, error: linksError } = await supabase
+        .from('DiscountLink')
+        .select(`
+          *,
+          creator:User!createdBy(id, name, email)
+        `)
+        .order('createdAt', { ascending: false })
+
+      if (linksError) {
+        console.error('Error fetching discount links:', linksError)
+        return NextResponse.json({ message: 'Failed to fetch discount links' }, { status: 500 })
+      }
 
       console.log('Found discount links:', discountLinks.length)
       discountLinks.forEach(link => {
@@ -53,11 +48,17 @@ export async function GET() {
       if (error.code === 'P2022') {
         // カラムが存在しない場合、古いスキーマで取得
         console.log('New columns do not exist, using old schema')
-        const discountLinks = await prisma.discountLink.findMany({
-          orderBy: {
-            createdAt: 'desc'
-          }
-        })
+        const { data: fallbackLinks, error: fallbackError } = await supabase
+          .from('DiscountLink')
+          .select('*')
+          .order('createdAt', { ascending: false })
+
+        if (fallbackError) {
+          console.error('Error fetching fallback discount links:', fallbackError)
+          throw fallbackError
+        }
+
+        return NextResponse.json(fallbackLinks)
         return NextResponse.json(discountLinks)
       }
       throw error

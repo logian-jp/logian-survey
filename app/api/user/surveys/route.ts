@@ -16,6 +16,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { data: surveys, error: surveysError } = await supabase
+      .from('Survey')
+      .select('*')
+      .eq('userId', session.user.id)
+      .order('createdAt', { ascending: false })
+
+    if (surveysError) {
+      console.error('Error fetching surveys:', surveysError)
+      return NextResponse.json({ message: 'Failed to fetch surveys' }, { status: 500 })
+    }
+
+    /* Original Prisma code:
     const surveys = await prisma.survey.findMany({
       where: {
         userId: session.user.id

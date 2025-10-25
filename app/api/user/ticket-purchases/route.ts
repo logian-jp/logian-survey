@@ -24,24 +24,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // ユーザーのチケット購入履歴を取得
-    const purchases = await prisma.ticketPurchase.findMany({
-      where: {
-        userId: session.user.id
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      include: {
-        survey: {
-          select: {
-            id: true,
-            title: true,
-            shareUrl: true
-          }
-        }
-      }
-    })
+    // ユーザーのチケット購入履歴を取得 (Supabase SDK使用)
+    const { data: purchases, error: purchasesError } = await supabase
+      .from('TicketPurchase')
+      .select(`
+        *,
+        survey:Survey(id, title, shareUrl)
+      `)
+      .eq('userId', session.user.id)
+      .order('createdAt', { ascending: false })
+
+    if (purchasesError) {
+      console.error('Error fetching ticket purchases:', purchasesError)
+      return NextResponse.json({ message: 'Failed to fetch ticket purchases' }, { status: 500 })
+    }
 
     console.log('Found ticket purchases:', purchases.length, 'purchases')
     console.log('Purchase details:', purchases)

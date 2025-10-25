@@ -16,18 +16,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userAddons = await prisma.userDataAddon.findMany({
-      where: {
-        userId: session.user.id,
-        status: 'ACTIVE'
-      },
-      include: {
-        addon: true
-      },
-      orderBy: {
-        purchasedAt: 'desc'
-      }
-    })
+    const { data: userAddons, error: addonsError } = await supabase
+      .from('UserDataAddon')
+      .select(`
+        *,
+        addon:DataStorageAddon(*)
+      `)
+      .eq('userId', session.user.id)
+      .eq('status', 'ACTIVE')
+      .order('purchasedAt', { ascending: false })
+
+    if (addonsError) {
+      console.error('Error fetching user addons:', addonsError)
+      return NextResponse.json({ message: 'Failed to fetch data addons' }, { status: 500 })
+    }
 
     return NextResponse.json(userAddons)
   } catch (error) {
