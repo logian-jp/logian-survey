@@ -367,9 +367,11 @@ export async function POST(request: NextRequest) {
     }
 
     // アンケートを作成
+    const surveyId = crypto.randomUUID()
     const { data: survey, error: createSurveyError } = await supabase
       .from('Survey')
       .insert({
+        id: surveyId,
         title,
         description: description || null,
         maxResponses: clampedMaxResponses,
