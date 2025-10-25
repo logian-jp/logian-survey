@@ -111,13 +111,18 @@ export default function SurveysPage() {
       if (response.ok) {
         const data = await response.json()
         console.log('Fetched surveys:', data)
-        setSurveys(data)
+        // 配列であることを確認してからセット
+        setSurveys(Array.isArray(data) ? data : [])
       } else {
         const errorData = await response.json().catch(() => ({}))
         console.error('Failed to fetch surveys, status:', response.status, 'Error:', errorData)
+        // エラー時は空配列をセット
+        setSurveys([])
       }
     } catch (error) {
       console.error('Failed to fetch surveys:', error)
+      // ネットワークエラー時も空配列をセット
+      setSurveys([])
     } finally {
       setIsLoading(false)
     }
@@ -271,7 +276,7 @@ export default function SurveysPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {surveys.map((survey) => (
+                {(surveys || []).map((survey) => (
                   <tr key={survey.id} className="hover:bg-gray-50">
                     <td className="sticky left-0 bg-white px-6 py-4 z-10" style={{ width: '300px', maxWidth: '300px' }}>
                       <div className="flex items-center">

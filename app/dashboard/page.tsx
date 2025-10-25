@@ -80,12 +80,17 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json()
         console.log('Dashboard tickets data:', data)
-        setTickets(data.tickets || [])
+        // 配列であることを確認してからセット
+        setTickets(Array.isArray(data.tickets) ? data.tickets : [])
       } else {
         console.error('Failed to fetch tickets:', response.status, response.statusText)
+        // エラー時は空配列をセット
+        setTickets([])
       }
     } catch (error) {
       console.error('Failed to fetch tickets:', error)
+      // ネットワークエラー時も空配列をセット
+      setTickets([])
     }
   }
 
@@ -160,12 +165,17 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json()
         console.log('Dashboard: Fetched surveys:', data)
-        setSurveys(data)
+        // 配列であることを確認してからセット
+        setSurveys(Array.isArray(data) ? data : [])
       } else {
         console.error('Dashboard: Failed to fetch surveys, status:', response.status)
+        // エラー時は空配列をセット
+        setSurveys([])
       }
     } catch (error) {
       console.error('Dashboard: Failed to fetch surveys:', error)
+      // ネットワークエラー時も空配列をセット
+      setSurveys([])
     } finally {
       setIsLoading(false)
     }
@@ -213,7 +223,7 @@ export default function Dashboard() {
                   <p className="text-xs sm:text-sm text-blue-700">
                     <span className="block sm:inline">
                       {tickets.length > 0 ? (
-                        tickets.map((ticket, index) => (
+                        (tickets || []).map((ticket, index) => (
                           <span key={ticket.ticketType}>
                             {ticket.ticketType === 'FREE' && '無料チケット'}
                             {ticket.ticketType === 'STANDARD' && 'スタンダードチケット'}
@@ -270,7 +280,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {surveys.map((survey) => (
+            {(surveys || []).map((survey) => (
               <div key={survey.id} className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
