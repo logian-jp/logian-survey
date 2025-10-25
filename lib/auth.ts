@@ -92,7 +92,7 @@ export const authOptions: NextAuthOptions = {
                 id: user.id,
                 email: profile.email,
                 name: profile.name || '',
-                role: 'user',
+                role: 'USER',
                 emailVerified: new Date(),
               }
             })
