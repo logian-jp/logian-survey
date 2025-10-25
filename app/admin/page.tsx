@@ -1065,7 +1065,7 @@ export default function AdminDashboard() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {survey._count.responses}件
+                      {survey._count?.responses || 0}件
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatToTokyoTime(survey.createdAt)}
@@ -1103,7 +1103,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {stats.userStatistics.map((user) => (
+                {(stats?.userStatistics || []).map((user) => (
                   <tr key={user.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div>
@@ -1112,7 +1112,7 @@ export default function AdminDashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.surveys.length}
+                      {(user.surveys || []).length}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {user.totalSurveyResponses}

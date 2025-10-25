@@ -244,7 +244,7 @@ export default function AdminSurveysPage() {
                         {new Date(survey.createdAt).toLocaleString('ja-JP')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {survey._count.responses}件
+                        {survey._count?.responses || 0}件
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex space-x-2">

@@ -182,7 +182,7 @@ export default function UserDetailPage() {
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">招待作成数</dt>
-                  <dd className="text-sm text-gray-900">{user._count.invitations}件</dd>
+                  <dd className="text-sm text-gray-900">{user._count?.invitations || 0}件</dd>
                 </div>
               </dl>
             </div>
@@ -195,15 +195,15 @@ export default function UserDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">統計情報</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{user._count.surveys}</div>
+                  <div className="text-2xl font-bold text-blue-600">{user._count?.surveys || 0}</div>
                   <div className="text-sm text-gray-500">アンケート数</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{user._count.invitations}</div>
+                  <div className="text-2xl font-bold text-purple-600">{user._count?.invitations || 0}</div>
                   <div className="text-sm text-gray-500">招待作成数</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{user._count.ticketPurchases}</div>
+                  <div className="text-2xl font-bold text-orange-600">{user._count?.ticketPurchases || 0}</div>
                   <div className="text-sm text-gray-500">チケット購入数</div>
                 </div>
               </div>
@@ -212,16 +212,16 @@ export default function UserDetailPage() {
             {/* 最近のアンケート */}
             <div className="bg-white shadow-sm rounded-lg p-6 mb-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">最近のアンケート</h2>
-              {user.surveys.length === 0 ? (
+              {(user.surveys || []).length === 0 ? (
                 <p className="text-gray-500">アンケートがありません</p>
               ) : (
                 <div className="space-y-3">
-                  {user.surveys.slice(0, 5).map((survey) => (
+                  {(user.surveys || []).slice(0, 5).map((survey) => (
                     <div key={survey.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
                         <div className="font-medium text-gray-900">{survey.title}</div>
                         <div className="text-sm text-gray-500">
-                          {new Date(survey.createdAt).toLocaleString('ja-JP')} • {survey._count.responses}件の回答
+                          {new Date(survey.createdAt).toLocaleString('ja-JP')} • {survey._count?.responses || 0}件の回答
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
