@@ -207,7 +207,7 @@ export async function getUserMaxDataSize(userId: string, planType: string): Prom
       .from('UserDataAddon')
       .select(`
         *,
-        addon:DataAddon(*)
+        addon:DataStorageAddon(*)
       `)
       .eq('userId', userId)
       .eq('status', 'ACTIVE')
@@ -242,7 +242,7 @@ export async function getUserDataRetentionDays(userId: string, planType: string)
       .from('UserDataAddon')
       .select(`
         *,
-        addon:DataAddon(*)
+        addon:DataStorageAddon(*)
       `)
       .eq('userId', userId)
       .eq('status', 'ACTIVE')
