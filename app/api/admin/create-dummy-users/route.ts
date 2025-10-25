@@ -82,20 +82,8 @@ export async function POST() {
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
         
-        // TODO: userPlanテーブル削除により一時的に無効化
-        /*
-        // ランダムなプランを割り当て
-        const planTypes = ['STANDARD', 'PROFESSIONAL', 'ENTERPRISE', 'ONETIME_UNLIMITED'] as const
-        const randomPlan = planTypes[Math.floor(Math.random() * planTypes.length)]
-        
-        await prisma.userPlan.create({
-          data: {
-            userId: user.id,
-            planType: randomPlan,
-            status: 'ACTIVE',
-            startDate: startOfMonth
-          }
-        })
+        // NOTE: userPlanテーブル削除により無効化済み（チケット制度移行）
+        // プラン割り当ては無効化
         
         console.log(`  -> Assigned plan: ${randomPlan}`)
         createdUsers.push({ name: user.name, email: user.email, plan: randomPlan })

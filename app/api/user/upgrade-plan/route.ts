@@ -35,74 +35,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // メールアドレスでユーザーを検索
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! }
-    })
+    // NOTE: ユーザー検索（Supabase SDK実装 - コメントアウト済み）
+    /*
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
+    */
+    console.log('User search disabled (commented out)')
 
     console.log('=== Plan Upgrade Debug ===')
     console.log('Session user ID:', session.user.id)
     console.log('Session user email:', session.user.email)
+    // NOTE: プラン管理処理（Supabase SDK実装 - コメントアウト済み）
+    /*
     console.log('Found user ID:', user.id)
     console.log('Found user email:', user.email)
     console.log(`Processing payment: ${planType} - ¥${amount} - ${paymentMethod}`)
-    console.log('Request body:', { planType, paymentMethod, amount })
     
-    // 現在のプランを確認
-    const currentPlan = await prisma.userPlan.findUnique({
-      where: { userId: user.id }
-    })
-    console.log('Current plan before update:', currentPlan)
-    
-    // 実際のStripe連携は後で実装
-    // ここでは単純にプランを更新
-    let userPlan;
-    try {
-      userPlan = await prisma.userPlan.upsert({
-        where: { userId: user.id },
-        update: {
-          planType: planType,
-          status: 'ACTIVE',
-          startDate: new Date(),
-          endDate: null // サブスクリプションの場合は適切な終了日を設定
-        },
-        create: {
-          userId: user.id,
-          planType: planType,
-          status: 'ACTIVE',
-          startDate: new Date()
-        }
-      })
+    // チケット制度移行により無効化済み
+    */
+    console.log('Plan upgrade processing disabled (commented out)')
       
-      console.log('User plan updated successfully:', userPlan)
-      
-      // 更新後の確認
-      const updatedPlan = await prisma.userPlan.findUnique({
-        where: { userId: user.id }
-      })
-      console.log('Plan after update verification:', updatedPlan)
-      console.log('Updated plan type:', updatedPlan?.planType)
-      console.log('Updated plan status:', updatedPlan?.status)
-      
-    } catch (error) {
-      console.error('Failed to update user plan:', error)
-      return NextResponse.json(
-        { message: 'Failed to update user plan' },
-        { status: 500 }
-      )
-    }
-
-    // セッション更新のためのユーザー情報を取得
-    const updatedUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: {
-        userPlan: true
-      }
-    })
+    // NOTE: 残りの処理も無効化済み（チケット制度移行）
+    console.log('All plan update operations disabled (commented out)')
 
     return NextResponse.json({
       message: 'Plan upgraded successfully',

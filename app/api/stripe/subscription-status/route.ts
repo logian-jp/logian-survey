@@ -19,14 +19,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // ユーザーのプラン情報を取得
-    const userPlan = await prisma.userPlan.findUnique({
-      where: { userId: session.user.id }
-    })
+    // NOTE: ユーザープラン情報取得（Supabase SDK実装 - コメントアウト済み）
+    /*
+    const { data: userPlan, error } = await supabase
+      .from('UserPlan')
+      .select('*')
+      .eq('userId', session.user.id)
+      .single()
 
-    if (!userPlan) {
+    if (error || !userPlan) {
       return NextResponse.json({ error: 'User plan not found' }, { status: 404 })
     }
+    */
+    console.log('User plan lookup disabled (commented out)')
 
     // 有料プランの場合、Stripeのサブスクリプション情報も取得
     if (userPlan.planType !== 'FREE') {

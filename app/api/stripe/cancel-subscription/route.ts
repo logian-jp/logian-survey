@@ -28,14 +28,17 @@ export async function POST(request: NextRequest) {
       cancel_at_period_end: true
     })
 
-    // データベースのプラン情報を更新
-    await prisma.userPlan.update({
-      where: { userId: session.user.id },
-      data: {
+    // NOTE: プラン情報更新（Supabase SDK実装 - コメントアウト済み）
+    /*
+    await supabase
+      .from('UserPlan')
+      .update({
         status: 'CANCELLED',
-        endDate: new Date(subscription.current_period_end * 1000)
-      }
-    })
+        endDate: new Date(subscription.current_period_end * 1000).toISOString()
+      })
+      .eq('userId', session.user.id)
+    */
+    console.log('Plan update disabled (commented out)')
 
     return NextResponse.json({
       message: 'Subscription cancelled successfully',

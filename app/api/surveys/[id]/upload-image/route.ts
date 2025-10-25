@@ -49,17 +49,8 @@ export async function POST(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
 
-    // TODO: チケット制度移行により、プランチェックを一時的に無効化
+    // NOTE: チケット制度移行により、プランチェックを無効化済み
     // 画像アップロード機能は全ユーザーが利用可能
-    /*
-    const userPlan = await prisma.userPlan.findFirst({
-      where: { userId: session.user.id }
-    })
-
-    if (userPlan?.planType !== 'ENTERPRISE') {
-      return NextResponse.json({ message: 'Enterprise plan required' }, { status: 403 })
-    }
-    */
 
     const formData = await request.formData()
     const file = formData.get('file') as File

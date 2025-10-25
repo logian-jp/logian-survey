@@ -299,23 +299,19 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
       return
     }
 
-    // サブスクリプション情報を更新
-    await prisma.userPlan.upsert({
-      where: { userId },
-      update: {
-        planType: planType as any,
-        status: subscription.status === 'active' ? 'ACTIVE' : 'CANCELLED',
-        startDate: new Date((subscription as any).current_period_start * 1000),
-        endDate: new Date((subscription as any).current_period_end * 1000)
-      },
-      create: {
+    // NOTE: サブスクリプション情報更新（Supabase SDK実装 - コメントアウト済み）
+    /*
+    await supabase
+      .from('UserPlan')
+      .upsert({
         userId,
-        planType: planType as any,
+        planType,
         status: subscription.status === 'active' ? 'ACTIVE' : 'CANCELLED',
-        startDate: new Date((subscription as any).current_period_start * 1000),
-        endDate: new Date((subscription as any).current_period_end * 1000)
-      }
-    })
+        startDate: new Date((subscription as any).current_period_start * 1000).toISOString(),
+        endDate: new Date((subscription as any).current_period_end * 1000).toISOString()
+      })
+    */
+    console.log('Subscription update disabled (commented out)')
 
     console.log(`Subscription updated for user ${userId}`)
   } catch (error) {
@@ -397,15 +393,18 @@ async function handleSubscriptionCancelled(subscription: Stripe.Subscription) {
       return
     }
 
-    // プランをFREEに戻す
-    await prisma.userPlan.update({
-      where: { userId },
-      data: {
+    // NOTE: プランをFREEに戻す（Supabase SDK実装 - コメントアウト済み）
+    /*
+    await supabase
+      .from('UserPlan')
+      .update({
         planType: 'FREE',
         status: 'CANCELLED',
-        endDate: new Date()
-      }
-    })
+        endDate: new Date().toISOString()
+      })
+      .eq('userId', userId)
+    */
+    console.log('Plan downgrade disabled (commented out)')
 
     console.log(`Subscription cancelled for user ${userId}`)
   } catch (error) {
