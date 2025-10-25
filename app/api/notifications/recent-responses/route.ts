@@ -105,8 +105,8 @@ export async function GET() {
 
       return {
         id: response.id,
-        surveyId: (response.survey as any)?.id,
-        surveyTitle: (response.survey as any)?.title || '',
+        surveyId: (response.survey as any)[0]?.id,
+        surveyTitle: (response.survey as any)[0]?.title || '',
         respondentId: respondentId,
         createdAt: response.createdAt,
         answerCount: response.answers?.length || 0
