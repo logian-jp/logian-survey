@@ -40,7 +40,7 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
 
     const survey = await prisma.survey.findFirst({
       where: {
@@ -114,7 +114,7 @@ export async function PUT(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
     const { title, description, status } = await request.json()
 
     // アンケートの存在確認と権限チェック
@@ -166,7 +166,7 @@ export async function DELETE(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
 
     // アンケートの存在確認と権限チェック
     const existingSurvey = await prisma.survey.findFirst({

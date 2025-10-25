@@ -17,7 +17,7 @@ export async function POST(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
 
     // アンケートの所有者権限を確認
     const survey = await prisma.survey.findUnique({
@@ -35,7 +35,9 @@ export async function POST(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
 
-    // エンタープライズプランの確認
+    // TODO: チケット制度移行により、プランチェックを一時的に無効化
+    // 画像アップロード機能は全ユーザーが利用可能
+    /*
     const userPlan = await prisma.userPlan.findFirst({
       where: { userId: session.user.id }
     })
@@ -43,6 +45,7 @@ export async function POST(
     if (userPlan?.planType !== 'ENTERPRISE') {
       return NextResponse.json({ message: 'Enterprise plan required' }, { status: 403 })
     }
+    */
 
     const formData = await request.formData()
     const file = formData.get('file') as File

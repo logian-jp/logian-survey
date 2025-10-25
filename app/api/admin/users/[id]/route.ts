@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     console.log('=== User Detail API Called ===')
-    console.log('User ID:', params.id)
+    console.log('User ID:', (await params).id)
     
     const session = await getServerSession(authOptions)
     console.log('Session:', session?.user?.email, session?.user?.role)
@@ -19,7 +19,7 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const userId = params.id
+    const userId = (await params).id
     console.log('Fetching user with ID:', userId)
 
     // ユーザー詳細情報を取得

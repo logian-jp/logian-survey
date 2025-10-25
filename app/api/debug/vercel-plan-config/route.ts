@@ -5,6 +5,14 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  // TODO: userPlanテーブル削除により一時的に無効化
+  return NextResponse.json({
+    message: 'Vercel plan config debugging disabled - migrated to ticket system',
+    userPlans: [],
+    planConfigs: []
+  })
+  
+  /* 元の実装（userPlanテーブル削除により一時的に無効化）
   try {
     console.log('Checking Vercel plan configuration...')
     
@@ -50,4 +58,5 @@ export async function GET() {
       { status: 500 }
     )
   }
+  */
 }

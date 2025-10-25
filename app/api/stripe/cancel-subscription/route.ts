@@ -5,6 +5,12 @@ import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
+  // TODO: チケット制度移行により一時的に無効化
+  return NextResponse.json({
+    message: 'Subscription cancellation disabled - migrated to ticket system'
+  }, { status: 400 })
+  
+  /* 元の実装（userPlanテーブル削除により一時的に無効化）
   try {
     const session = await getServerSession(authOptions)
     
@@ -48,4 +54,5 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+  */
 }

@@ -44,7 +44,7 @@ export async function PUT(
     const existingPlan = await prisma.planConfig.findFirst({
       where: {
         planType,
-        id: { not: params.id }
+        id: { not: (await params).id }
       }
     })
 
@@ -57,7 +57,7 @@ export async function PUT(
 
     // 既存のプラン設定を取得
     const currentPlan = await prisma.planConfig.findUnique({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     if (!currentPlan) {
@@ -69,7 +69,7 @@ export async function PUT(
 
     // データベースを更新
     const planConfig = await prisma.planConfig.update({
-      where: { id: params.id },
+      where: { id: (await params).id },
       data: {
         planType,
         name,
@@ -125,7 +125,7 @@ export async function PUT(
 
           // データベースに新しい価格IDを保存
           await prisma.planConfig.update({
-            where: { id: params.id },
+            where: { id: (await params).id },
             data: { stripePriceId: newPrice.id }
           })
         }
@@ -161,7 +161,7 @@ export async function PUT(
 
         // データベースにStripe情報を保存
         await prisma.planConfig.update({
-          where: { id: params.id },
+          where: { id: (await params).id },
           data: {
             stripeProductId: product.id,
             stripePriceId: price.id
@@ -201,7 +201,7 @@ export async function DELETE(
     }
 
     await prisma.planConfig.delete({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     return NextResponse.json({ message: 'Plan config deleted successfully' })

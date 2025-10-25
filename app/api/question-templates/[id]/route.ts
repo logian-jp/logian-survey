@@ -30,7 +30,7 @@ export async function GET(
 
     const template = await prisma.questionTemplate.findFirst({
       where: {
-        id: params.id,
+        id: (await params).id,
         OR: [
           { userId: user.id },
           { isPublic: true }
@@ -91,7 +91,7 @@ export async function PUT(
     // テンプレートの所有者かチェック
     const existingTemplate = await prisma.questionTemplate.findFirst({
       where: {
-        id: params.id,
+        id: (await params).id,
         userId: user.id
       }
     })
@@ -101,7 +101,7 @@ export async function PUT(
     }
 
     const template = await prisma.questionTemplate.update({
-      where: { id: params.id },
+      where: { id: (await params).id },
       data: {
         title,
         description: description || null,
@@ -152,7 +152,7 @@ export async function DELETE(
     // テンプレートの所有者かチェック
     const existingTemplate = await prisma.questionTemplate.findFirst({
       where: {
-        id: params.id,
+        id: (await params).id,
         userId: user.id
       }
     })
@@ -162,7 +162,7 @@ export async function DELETE(
     }
 
     await prisma.questionTemplate.delete({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     return NextResponse.json({ message: '質問テンプレートが削除されました' })

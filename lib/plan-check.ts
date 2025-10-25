@@ -2,51 +2,16 @@ import { prisma } from '@/lib/prisma'
 import { getPlanLimits, checkPlanFeature, checkPlanLimit } from '@/lib/plan-limits'
 
 export async function getUserPlan(userId: string) {
-  try {
-    let userPlan = await prisma.userPlan.findUnique({
-      where: { userId }
-    })
-
-    // プランが存在しない場合は無料プランを作成
-    if (!userPlan) {
-      try {
-        userPlan = await prisma.userPlan.create({
-          data: {
-            userId,
-            planType: 'FREE',
-            status: 'ACTIVE'
-          }
-        })
-      } catch (error) {
-        console.error('Failed to create user plan:', error)
-        // エラーの場合は仮想的な無料プランを返す
-        return {
-          id: 'temp',
-          userId,
-          planType: 'FREE',
-          status: 'ACTIVE',
-          startDate: new Date(),
-          endDate: null,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      }
-    }
-
-    return userPlan
-  } catch (error) {
-    console.error('Failed to get user plan:', error)
-    // データベースエラーの場合は仮想的な無料プランを返す
-    return {
-      id: 'fallback',
-      userId,
-      planType: 'FREE',
-      status: 'ACTIVE',
-      startDate: new Date(),
-      endDate: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
+  // TODO: チケット制度移行により、常にFREEプランを返す
+  return {
+    id: 'ticket-system',
+    userId,
+    planType: 'FREE',
+    status: 'ACTIVE',
+    startDate: new Date(),
+    endDate: null,
+    createdAt: new Date(),
+    updatedAt: new Date()
   }
 }
 
@@ -94,79 +59,19 @@ export async function checkSurveyLimit(userId: string): Promise<{ allowed: boole
   }
 }
 
-// プラン枠数のチェック
+// プラン枠数のチェック（チケット制度移行により常に許可）
 export async function checkPlanSlotLimit(userId: string, planType: string): Promise<{ allowed: boolean; message?: string; remainingSlots?: number }> {
-  try {
-    // ユーザーの該当プランの枠数を取得
-    const planSlot = await prisma.userPlanSlot.findFirst({
-      where: {
-        userId,
-        planType: planType as any,
-        remainingSlots: { gt: 0 }
-      },
-      orderBy: {
-        purchasedAt: 'desc'
-      }
-    })
-
-    if (!planSlot) {
-      return {
-        allowed: false,
-        message: `${planType}プランの枠がありません。プランを購入してください。`
-      }
-    }
-
-    return {
-      allowed: true,
-      remainingSlots: planSlot.remainingSlots
-    }
-  } catch (error) {
-    console.error('Error checking plan slot limit:', error)
-    return {
-      allowed: false,
-      message: '枠数の確認中にエラーが発生しました'
-    }
+  // TODO: チケット制度移行により、常に許可
+  return {
+    allowed: true,
+    remainingSlots: 999
   }
 }
 
-// プラン枠の消費
+// プラン枠の消費（チケット制度移行により常に成功）
 export async function consumePlanSlot(userId: string, planType: string): Promise<{ success: boolean; message?: string }> {
-  try {
-    const planSlot = await prisma.userPlanSlot.findFirst({
-      where: {
-        userId,
-        planType: planType as any,
-        remainingSlots: { gt: 0 }
-      },
-      orderBy: {
-        purchasedAt: 'desc'
-      }
-    })
-
-    if (!planSlot) {
-      return {
-        success: false,
-        message: `${planType}プランの枠がありません`
-      }
-    }
-
-    // 枠数を1つ消費
-    await prisma.userPlanSlot.update({
-      where: { id: planSlot.id },
-      data: {
-        usedSlots: { increment: 1 },
-        remainingSlots: { decrement: 1 }
-      }
-    })
-
-    return { success: true }
-  } catch (error) {
-    console.error('Error consuming plan slot:', error)
-    return {
-      success: false,
-      message: '枠数の消費中にエラーが発生しました'
-    }
-  }
+  // TODO: チケット制度移行により、常に成功
+  return { success: true }
 }
 
 export async function checkResponseLimit(surveyId: string): Promise<{ allowed: boolean; message?: string }> {

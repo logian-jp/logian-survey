@@ -68,6 +68,8 @@ export async function POST() {
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
         
+        // TODO: userPlanテーブル削除により一時的に無効化
+        /*
         // ランダムなプランを割り当て
         const planTypes = ['STANDARD', 'PROFESSIONAL', 'ENTERPRISE', 'ONETIME_UNLIMITED'] as const
         const randomPlan = planTypes[Math.floor(Math.random() * planTypes.length)]
@@ -83,6 +85,10 @@ export async function POST() {
         
         console.log(`  -> Assigned plan: ${randomPlan}`)
         createdUsers.push({ name: user.name, email: user.email, plan: randomPlan })
+        */
+        
+        console.log(`  -> User created (no plan assigned - ticket system)`)
+        createdUsers.push({ name: user.name, email: user.email, plan: 'TICKET_SYSTEM' })
         
       } catch (error: any) {
         if (error.code === 'P2002') {

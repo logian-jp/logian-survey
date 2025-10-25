@@ -44,7 +44,7 @@ export async function GET(
       return NextResponse.json({ error: 'Only survey owner can view purchases' }, { status: 403 })
     }
 
-    let purchases = []
+    let purchases: any[] = []
     
     // 無料チケット以外の場合のみ購入記録を取得
     if (survey?.ticketType && survey.ticketType !== 'FREE') {

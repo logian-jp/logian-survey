@@ -4,6 +4,16 @@ import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
 export async function POST(request: NextRequest) {
+  // TODO: チケット制度移行により一時的に無効化
+  console.log('Stripe webhook received but disabled - migrated to ticket system')
+  return NextResponse.json({ 
+    received: true,
+    message: 'Webhook disabled - migrated to ticket system'
+  })
+}
+
+/* 元の実装（userPlanテーブル削除により一時的に無効化）
+export async function POST_DISABLED(request: NextRequest) {
   console.log('Webhook received:', new Date().toISOString())
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
@@ -555,3 +565,4 @@ async function handleTicketPurchase(userId: string, ticketType: string, quantity
     console.error('Failed to handle ticket purchase:', error)
   }
 }
+*/

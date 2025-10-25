@@ -21,7 +21,7 @@ export async function POST(
     // 配信レコードを更新
     const delivery = await prisma.announcementDelivery.updateMany({
       where: {
-        announcementId: params.id,
+        announcementId: (await params).id,
         userId: session.user.id,
         status: 'SENT'
       },
@@ -40,7 +40,7 @@ export async function POST(
 
     // お知らせの統計を更新
     await prisma.announcement.update({
-      where: { id: params.id },
+      where: { id: (await params).id },
       data: {
         totalRead: {
           increment: 1
@@ -81,7 +81,7 @@ export async function DELETE(
     // 配信レコードを非表示に更新
     const delivery = await prisma.announcementDelivery.updateMany({
       where: {
-        announcementId: params.id,
+        announcementId: (await params).id,
         userId: session.user.id
       },
       data: {

@@ -31,7 +31,7 @@ export async function POST(
     // テンプレートが存在し、アクセス可能かチェック
     const template = await prisma.questionTemplate.findFirst({
       where: {
-        id: params.id,
+        id: (await params).id,
         OR: [
           { userId: user.id },
           { isPublic: true }
@@ -45,7 +45,7 @@ export async function POST(
 
     // 使用回数を増加
     const updatedTemplate = await prisma.questionTemplate.update({
-      where: { id: params.id },
+      where: { id: (await params).id },
       data: {
         usageCount: {
           increment: 1

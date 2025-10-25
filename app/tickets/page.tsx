@@ -241,7 +241,7 @@ export default function TicketsPage() {
       }
     } catch (error) {
       console.error('Test webhook error:', error)
-      alert('テストWebhookに失敗しました: ' + error.message)
+      alert('テストWebhookに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
 
@@ -283,7 +283,7 @@ export default function TicketsPage() {
       }
     } catch (error) {
       console.error('Webhook simulation error:', error)
-      alert('Webhookシミュレーションに失敗しました: ' + error.message)
+      alert('Webhookシミュレーションに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
 

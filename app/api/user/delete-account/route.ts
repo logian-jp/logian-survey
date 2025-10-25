@@ -14,7 +14,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // ユーザーに関連するすべてのデータを削除
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       const userId = session.user.id
 
       // 1. アンケートの回答を削除
@@ -67,10 +67,10 @@ export async function DELETE(request: NextRequest) {
         where: { userId: userId }
       })
 
-      // 8. ユーザープランを削除
-      await tx.userPlan.deleteMany({
-        where: { userId: userId }
-      })
+      // 8. ユーザープランを削除（チケット制度移行により不要）
+      // await tx.userPlan.deleteMany({
+      //   where: { userId: userId }
+      // })
 
       // 9. セッションを削除
       await tx.session.deleteMany({

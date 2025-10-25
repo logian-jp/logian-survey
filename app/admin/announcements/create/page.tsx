@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AnnouncementType } from '@prisma/client'
+// Define AnnouncementType locally since it may not be exported from Prisma
+type AnnouncementType = 'MANUAL' | 'SCHEDULED' | 'CONDITIONAL'
 import RichTextEditor from '@/components/RichTextEditor'
 
 interface ConditionConfig {

@@ -110,20 +110,14 @@ export function checkPlanLimit(planType: string, limitType: 'maxSurveys' | 'maxR
   return currentCount < limit
 }
 
-// ユーザーのプラン情報を取得する関数
+// ユーザーのプラン情報を取得する関数（チケット制度移行により簡易版）
 export async function getUserPlan(userId: string) {
   try {
-    const userPlan = await prisma.userPlan.findUnique({
-      where: { userId },
-      select: {
-        id: true,
-        planType: true,
-        status: true,
-      }
-    })
-    
-    if (!userPlan) {
-      return null
+    // TODO: チケット制度移行により、常にFREEプランを返す
+    const userPlan = {
+      id: 'ticket-system',
+      planType: 'FREE',
+      status: 'ACTIVE'
     }
     
     // プラン制限情報を追加
@@ -141,6 +135,7 @@ export async function getUserPlan(userId: string) {
     return null
   }
 }
+
 
 // データ使用量を記録する関数
 export async function recordDataUsage(

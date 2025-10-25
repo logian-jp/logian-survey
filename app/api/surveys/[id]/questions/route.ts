@@ -14,7 +14,7 @@ export async function DELETE(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
 
     // アンケートの存在確認と権限チェック
     const survey = await prisma.survey.findFirst({

@@ -16,7 +16,7 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
 
     // 権限チェック
     const hasViewPermission = await canViewSurvey(session.user.id, surveyId)
@@ -116,7 +116,7 @@ export async function PUT(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
     const { title, description, status, maxResponses, endDate, targetResponses, headerImageUrl, ogImageUrl, useCustomLogo } = await request.json()
 
     // 権限チェック

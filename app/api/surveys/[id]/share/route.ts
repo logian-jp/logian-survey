@@ -15,7 +15,7 @@ export async function POST(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
 
     // アンケートの所有者を確認
     const survey = await prisma.survey.findFirst({
@@ -68,7 +68,7 @@ export async function DELETE(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
 
     // アンケートの所有者を確認
     const survey = await prisma.survey.findFirst({

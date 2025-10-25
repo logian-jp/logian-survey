@@ -7,6 +7,17 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  // TODO: userPlanテーブル削除により一時的に無効化
+  return NextResponse.json({
+    message: 'User plan debugging disabled - migrated to ticket system',
+    currentPlan: null,
+    allPlans: [],
+    debug: {
+      hasUserPlan: false
+    }
+  })
+  
+  /* 元の実装（userPlanテーブル削除により一時的に無効化）
   try {
     const session = await getServerSession(authOptions)
 
@@ -21,9 +32,7 @@ export async function GET() {
     // メールアドレスでユーザーを検索
     const user = await prisma.user.findUnique({
       where: { email: session.user.email! },
-      include: {
-        userPlan: true
-      }
+      // TODO: userPlan参照を削除（チケット制度移行のため）
     })
 
     if (!user) {
@@ -69,4 +78,5 @@ export async function GET() {
       { status: 500 }
     )
   }
+  */
 }

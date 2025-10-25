@@ -57,7 +57,6 @@ export function translateVariableName(japaneseName: string): string {
     '地域': 'region',
     '都道府県': 'prefecture',
     '市区町村': 'city',
-    '住所': 'address',
     '最寄り駅': 'nearest_station',
     
     // 商品・サービス関連

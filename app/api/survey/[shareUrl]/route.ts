@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ shareUrl: string }> }
 ) {
   try {
-    const shareUrl = params.shareUrl
+    const shareUrl = (await params).shareUrl
 
     const survey = await prisma.survey.findUnique({
       where: {

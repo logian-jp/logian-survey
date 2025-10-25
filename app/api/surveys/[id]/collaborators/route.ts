@@ -16,7 +16,7 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
 
     // アンケートの管理者権限があるかチェック
     const hasAdminPermission = await canAdminSurvey(session.user.id, surveyId)
@@ -92,7 +92,7 @@ export async function POST(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
     const { email, permission } = await request.json()
 
     if (!email || !permission) {

@@ -24,9 +24,7 @@ export async function POST() {
     // メールアドレスでユーザーを検索
     const user = await prisma.user.findUnique({
       where: { email: session.user.email! },
-      include: {
-        userPlan: true
-      }
+      // TODO: userPlan参照を削除（チケット制度移行のため）
     })
 
     if (!user) {
@@ -35,7 +33,7 @@ export async function POST() {
     }
 
     console.log('Found user:', user.name, user.email)
-    console.log('User plan:', user.userPlan)
+    console.log('User plan: disabled (ticket system)')
 
     // 更新されたユーザー情報を返す
     return NextResponse.json({
@@ -44,7 +42,7 @@ export async function POST() {
         name: user.name,
         email: user.email,
         role: user.role,
-        userPlan: user.userPlan
+        userPlan: null // TODO: チケット制度移行により無効化
       }
     })
   } catch (error) {

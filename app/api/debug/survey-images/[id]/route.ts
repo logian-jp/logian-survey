@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const survey = await prisma.survey.findUnique({
-      where: { id: params.id },
+      where: { id: (await params).id },
       select: {
         id: true,
         title: true,

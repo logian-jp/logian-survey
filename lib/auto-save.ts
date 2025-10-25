@@ -1,5 +1,29 @@
-import debounce from 'lodash/debounce.js'
 import { useState, useEffect, useMemo } from 'react'
+
+// Simple debounce implementation with cancel and flush
+function debounce<T extends (...args: any[]) => any>(func: T, delay: number): T & { cancel: () => void; flush: () => void } {
+  let timeoutId: NodeJS.Timeout
+  let lastArgs: Parameters<T>
+  
+  const debouncedFunc = ((...args: Parameters<T>) => {
+    lastArgs = args
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => func(...args), delay)
+  }) as T & { cancel: () => void; flush: () => void }
+  
+  debouncedFunc.cancel = () => {
+    clearTimeout(timeoutId)
+  }
+  
+  debouncedFunc.flush = () => {
+    clearTimeout(timeoutId)
+    if (lastArgs) {
+      func(...lastArgs)
+    }
+  }
+  
+  return debouncedFunc
+}
 
 interface AutoSaveOptions {
   delay?: number // デバウンス時間（ミリ秒）
@@ -9,7 +33,7 @@ interface AutoSaveOptions {
 }
 
 export class AutoSaveManager {
-  private debouncedSave: (data: any) => void
+  private debouncedSave: ((data: any) => void) & { cancel: () => void; flush: () => void }
   private lastSavedData: any = null
   private isSaving = false
 

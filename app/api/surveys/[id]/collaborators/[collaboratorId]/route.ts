@@ -16,8 +16,8 @@ export async function PUT(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
-    const collaboratorId = params.collaboratorId
+    const surveyId = (await params).id
+    const collaboratorId = (await params).collaboratorId
     const { permission } = await request.json()
 
     if (!permission) {
@@ -99,8 +99,8 @@ export async function DELETE(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
-    const collaboratorId = params.collaboratorId
+    const surveyId = (await params).id
+    const collaboratorId = (await params).collaboratorId
 
     // アンケートの管理者権限があるかチェック
     const hasAdminPermission = await canAdminSurvey(session.user.id, surveyId)

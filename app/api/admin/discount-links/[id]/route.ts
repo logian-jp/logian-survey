@@ -24,11 +24,7 @@ export async function GET(
     const discountLink = await prisma.discountLink.findUnique({
       where: { id },
       include: {
-        users: {
-          include: {
-            userPlan: true
-          }
-        },
+        users: true, // TODO: userPlan参照を削除（チケット制度移行のため）
         creator: {
           select: {
             id: true,

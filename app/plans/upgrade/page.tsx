@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { PLAN_LIMITS } from '@/lib/plan-limits'
 
-export default function UpgradePage() {
+function UpgradeContent() {
   const { data: session } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -494,5 +494,13 @@ export default function UpgradePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function UpgradePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <UpgradeContent />
+    </Suspense>
   )
 }

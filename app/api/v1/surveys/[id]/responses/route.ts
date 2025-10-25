@@ -41,7 +41,7 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const surveyId = params.id
+    const surveyId = (await params).id
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '100')
     const offset = parseInt(searchParams.get('offset') || '0')
@@ -123,9 +123,9 @@ export async function GET(
     }
 
     // JSON形式で出力
-    const responsesWithAnswers = responses.map(response => {
+    const responsesWithAnswers = responses.map((response: any) => {
       const answersMap: { [key: string]: string } = {}
-      response.answers.forEach(answer => {
+      response.answers.forEach((answer: any) => {
         answersMap[answer.questionId] = answer.value || ''
       })
 
@@ -163,7 +163,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const surveyId = params.id
+    const surveyId = (await params).id
     const { answers } = await request.json()
 
     if (!answers) {

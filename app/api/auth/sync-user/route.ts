@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // デフォルトの無料プランを設定
+      // TODO: チケット制度移行により、プラン設定を削除
+      // デフォルトでチケット制度を使用（プラン設定不要）
+      /*
       await prisma.userPlan.create({
         data: {
           userId: id,
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
           startDate: new Date()
         }
       })
+      */
     }
 
     return NextResponse.json({ success: true })

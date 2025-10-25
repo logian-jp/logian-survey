@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
           results.push({
             planType: plan.planType,
             status: 'error',
-            error: error.message
+            error: error instanceof Error ? error.message : 'Unknown error'
           })
         }
       }
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
             addonId: addon.id,
             addonName: addon.name,
             status: 'error',
-            error: error.message
+            error: error instanceof Error ? error.message : 'Unknown error'
           })
         }
       }

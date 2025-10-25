@@ -55,9 +55,9 @@ export async function GET() {
       console.log('Found announcements:', announcements.length)
 
       // 統計情報を計算
-      const announcementsWithStats = announcements.map(announcement => {
+      const announcementsWithStats = announcements.map((announcement: any) => {
         const totalSent = announcement.deliveries.length
-        const totalRead = announcement.deliveries.filter(d => d.readAt).length
+        const totalRead = announcement.deliveries.filter((d: any) => d.readAt).length
         const readRate = totalSent > 0 ? (totalRead / totalSent) * 100 : 0
 
         return {
@@ -243,7 +243,7 @@ async function distributeAnnouncement(announcementId: string) {
     }
 
     // 既に配信済みのユーザーを除外
-    const deliveredUserIds = announcement.deliveries.map(d => d.userId)
+    const deliveredUserIds = announcement.deliveries.map((d: any) => d.userId)
     if (deliveredUserIds.length > 0) {
       whereCondition.id = {
         notIn: deliveredUserIds
@@ -252,13 +252,11 @@ async function distributeAnnouncement(announcementId: string) {
 
     const targetUsers = await prisma.user.findMany({
       where: whereCondition,
-      include: {
-        userPlan: true
-      }
+      // TODO: userPlan参照を削除（チケット制度移行のため）
     })
 
     // 配信レコードを作成
-    const deliveryData = targetUsers.map(user => ({
+    const deliveryData = targetUsers.map((user: any) => ({
       announcementId,
       userId: user.id,
       status: 'SENT' as const

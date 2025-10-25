@@ -10,7 +10,7 @@ export async function GET(
   try {
     // アンケートIDから画像データを取得
     const survey = await prisma.survey.findUnique({
-      where: { id: params.id },
+      where: { id: (await params).id },
       select: {
         ogImageUrl: true,
         headerImageUrl: true,
