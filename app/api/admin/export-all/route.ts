@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     // 質問を手動でソート
     surveys?.forEach(survey => {
       if (survey.questions) {
-        survey.questions.sort((a, b) => (a.order || 0) - (b.order || 0))
+        survey.questions.sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
       }
     })
     
