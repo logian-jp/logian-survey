@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -20,8 +20,9 @@ export async function GET(
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
+    const { id } = await params
     const discountLink = await prisma.discountLink.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         users: {
           include: {
@@ -54,7 +55,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -69,10 +70,11 @@ export async function PATCH(
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
+    const { id } = await params
     const { isActive } = await request.json()
 
     const discountLink = await prisma.discountLink.update({
-      where: { id: params.id },
+      where: { id },
       data: { isActive }
     })
 
