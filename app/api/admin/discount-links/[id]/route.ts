@@ -77,10 +77,17 @@ export async function PATCH(
     const { id } = await params
     const { isActive } = await request.json()
 
-    const discountLink = await prisma.discountLink.update({
-      where: { id },
-      data: { isActive }
-    })
+    const { data: discountLink, error: updateError } = await supabase
+      .from('DiscountLink')
+      .update({ isActive })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Error updating discount link:', updateError)
+      return NextResponse.json({ message: 'Failed to update discount link' }, { status: 500 })
+    }
 
     return NextResponse.json(discountLink)
   } catch (error) {

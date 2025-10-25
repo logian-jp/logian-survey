@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Database connection error' }, { status: 500 })
     }
 
-    console.log('Prisma client available:', !!prisma.discountLink)
+    console.log('Supabase client available:', !!supabase)
 
       const {
         name,
@@ -143,11 +143,13 @@ export async function POST(request: NextRequest) {
     }
 
     // コードの重複チェック
-    const existingLink = await prisma.discountLink.findUnique({
-      where: { code }
-    })
+    const { data: existingLink, error: linkError } = await supabase
+      .from('DiscountLink')
+      .select('*')
+      .eq('code', code)
+      .single()
     
-    if (existingLink) {
+    if (!linkError && existingLink) {
       return NextResponse.json(
         { message: 'This discount code already exists' },
         { status: 400 }
@@ -155,11 +157,13 @@ export async function POST(request: NextRequest) {
     }
 
     // ユーザーをメールアドレスで検索して正しいIDを取得
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! }
-    })
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
@@ -179,8 +183,9 @@ export async function POST(request: NextRequest) {
       createdByEmail: user.email
     })
 
-    const discountLink = await prisma.discountLink.create({
-      data: {
+    const { data: discountLink, error: createError } = await supabase
+      .from('DiscountLink')
+      .insert({
         code,
         name,
         description,
@@ -190,13 +195,20 @@ export async function POST(request: NextRequest) {
         originalPrice,
         discountedPrice,
         maxUses: maxUses || null,
-        validFrom: new Date(validFrom),
-        validUntil: new Date(validUntil),
+        validFrom: new Date(validFrom).toISOString(),
+        validUntil: new Date(validUntil).toISOString(),
         subscriptionDiscountMonths: subscriptionDiscountMonths || null,
         totalSavings: totalSavings || null,
-        createdBy: user.id
-      }
-    })
+        createdBy: user.id,
+        createdByEmail: user.email
+      })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Error creating discount link:', createError)
+      return NextResponse.json({ message: 'Failed to create discount link' }, { status: 500 })
+    }
 
     console.log('Created discount link:', {
       id: discountLink.id,

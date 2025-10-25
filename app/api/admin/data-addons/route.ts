@@ -17,12 +17,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const addons = await prisma.dataStorageAddon.findMany({
-      orderBy: [
-        { type: 'asc' },
-        { amount: 'asc' }
-      ]
-    })
+    const { data: addons, error: fetchError } = await supabase
+      .from('DataStorageAddon')
+      .select('*')
+      .order('type', { ascending: true })
+      .order('amount', { ascending: true })
+
+    if (fetchError) {
+      console.error('Error fetching data addons:', fetchError)
+      return NextResponse.json({ message: 'Failed to fetch addons' }, { status: 500 })
+    }
 
     return NextResponse.json(addons)
   } catch (error) {
@@ -41,8 +45,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, description, type, amount, price, stripeProductId, stripePriceId, isActive, isMonthly } = body
 
-    const addon = await prisma.dataStorageAddon.create({
-      data: {
+    const { data: addon, error: createError } = await supabase
+      .from('DataStorageAddon')
+      .insert({
         name,
         description,
         type,
@@ -52,8 +57,14 @@ export async function POST(request: NextRequest) {
         stripePriceId,
         isActive: isActive !== undefined ? isActive : true,
         isMonthly: isMonthly !== undefined ? isMonthly : false
-      }
-    })
+      })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Error creating data addon:', createError)
+      return NextResponse.json({ message: 'Failed to create addon' }, { status: 500 })
+    }
 
     return NextResponse.json(addon)
   } catch (error) {

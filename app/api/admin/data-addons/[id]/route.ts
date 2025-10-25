@@ -24,9 +24,9 @@ export async function PUT(
     const body = await request.json()
     const { name, description, type, amount, price, stripeProductId, stripePriceId, isActive, isMonthly } = body
 
-    const addon = await prisma.dataStorageAddon.update({
-      where: { id },
-      data: {
+    const { data: addon, error: updateError } = await supabase
+      .from('DataStorageAddon')
+      .update({
         name,
         description,
         type,
@@ -36,8 +36,15 @@ export async function PUT(
         stripePriceId,
         isActive,
         isMonthly
-      }
-    })
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Error updating data addon:', updateError)
+      return NextResponse.json({ message: 'Failed to update addon' }, { status: 500 })
+    }
 
     return NextResponse.json(addon)
   } catch (error) {
@@ -57,9 +64,15 @@ export async function DELETE(
     }
 
     const { id } = await params
-    await prisma.dataStorageAddon.delete({
-      where: { id }
-    })
+    const { error: deleteError } = await supabase
+      .from('DataStorageAddon')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      console.error('Error deleting data addon:', deleteError)
+      return NextResponse.json({ message: 'Failed to delete addon' }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
