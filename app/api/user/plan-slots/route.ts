@@ -30,22 +30,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Failed to fetch tickets' }, { status: 500 })
     }
 
-    /* Original Prisma code:
-    const userTickets = await prisma.userTicket.findMany({
-      where: { userId },
-      orderBy: { ticketType: 'desc' }
-    })
+    // データをソート（ticketType降順）
+    const sortedTickets = (userTickets || []).sort((a, b) => b.ticketType.localeCompare(a.ticketType))
 
     // プランスロット情報を構築
     const planSlots = {
-      used: userTickets.reduce((sum, ticket) => sum + ticket.usedTickets, 0),
-      total: userTickets.reduce((sum, ticket) => sum + ticket.totalTickets, 0),
-      remaining: userTickets.reduce((sum, ticket) => sum + ticket.remainingTickets, 0),
-      tickets: userTickets.map(ticket => ({
+      used: sortedTickets.reduce((sum, ticket) => sum + (ticket.usedTickets || 0), 0),
+      total: sortedTickets.reduce((sum, ticket) => sum + (ticket.totalTickets || 0), 0),
+      remaining: sortedTickets.reduce((sum, ticket) => sum + (ticket.remainingTickets || 0), 0),
+      tickets: sortedTickets.map(ticket => ({
         ticketType: ticket.ticketType,
-        used: ticket.usedTickets,
-        total: ticket.totalTickets,
-        remaining: ticket.remainingTickets
+        used: ticket.usedTickets || 0,
+        total: ticket.totalTickets || 0,
+        remaining: ticket.remainingTickets || 0
       }))
     }
 
