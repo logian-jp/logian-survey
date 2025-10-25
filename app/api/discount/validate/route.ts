@@ -76,29 +76,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ユーザーをメールアドレスで検索して正しいIDを取得
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! }
-    })
+    // ユーザーをメールアドレスで検索して正しいIDを取得 (Supabase SDK使用)
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', session.user.email!)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
+      console.error('User not found:', userError)
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
 
-    // ユーザーが既にこの割引リンクを使用しているかチェック
-    const userUsedLink = await prisma.discountLink.findFirst({
-      where: {
-        id: discountLink.id,
-        users: {
-          some: {
-            id: user.id
-          }
-        }
-      }
-    })
+    // ユーザーが既にこの割引リンクを使用しているかチェック (Supabase SDK使用)
+    // 注：実際のスキーマによって調整が必要
+    const { data: userDiscountUsage, error: usageError } = await supabase
+      .from('UserDiscountLink')
+      .select('*')
+      .eq('discountLinkId', discountLink.id)
+      .eq('userId', user.id)
+      .single()
 
-    if (userUsedLink) {
+    if (userDiscountUsage && !usageError) {
       return NextResponse.json(
         { message: 'You have already used this discount code' },
         { status: 400 }

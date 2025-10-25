@@ -13,12 +13,15 @@ export async function POST() {
   try {
     console.log('Fixing user ID mismatch...')
     
-    // 現在のユーザーを取得
-    const currentUser = await prisma.user.findUnique({
-      where: { email: 'noutomi0729@gmail.com' }
-    })
-    
-    if (!currentUser) {
+    // 現在のユーザーを取得 (Supabase SDK使用)
+    const { data: currentUser, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('email', 'noutomi0729@gmail.com')
+      .single()
+
+    if (userError || !currentUser) {
+      console.error('User not found:', userError)
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
     
@@ -27,11 +30,17 @@ export async function POST() {
     // セッションのユーザーID
     const sessionUserId = 'cmgvyqjv70000tlq7oi97ukxe'
     
-    // ユーザーIDを更新
-    const updatedUser = await prisma.user.update({
-      where: { id: currentUser.id },
-      data: { id: sessionUserId }
-    })
+    // ユーザーIDを更新 (Supabase SDK使用)
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('User')
+      .update({ id: sessionUserId })
+      .eq('id', currentUser.id)
+      .select()
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
     
     console.log('Updated user:', updatedUser)
     

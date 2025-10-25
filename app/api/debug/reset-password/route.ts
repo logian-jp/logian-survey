@@ -21,15 +21,19 @@ export async function POST() {
     
     console.log('Hashed password:', hashedPassword)
     
-    // ユーザーのパスワードを更新
-    const updatedUser = await prisma.user.update({
-      where: {
-        email: 'noutomi0729@gmail.com'
-      },
-      data: {
+    // ユーザーのパスワードを更新 (Supabase SDK使用)
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('User')
+      .update({
         password: hashedPassword
-      }
-    })
+      })
+      .eq('email', 'noutomi0729@gmail.com')
+      .select()
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
     
     console.log('Password updated successfully')
     

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase クライアントの設定
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export const dynamic = 'force-dynamic'
 
@@ -8,18 +14,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const survey = await prisma.survey.findUnique({
-      where: { id: (await params).id },
-      select: {
-        id: true,
-        title: true,
-        ogImageUrl: true,
-        headerImageUrl: true,
-        useCustomLogo: true
-      }
-    })
+    // アンケート情報を取得 (Supabase SDK使用)
+    const { data: survey, error: surveyError } = await supabase
+      .from('Survey')
+      .select('id, title, ogImageUrl, headerImageUrl, useCustomLogo')
+      .eq('id', (await params).id)
+      .single()
 
-    if (!survey) {
+    if (surveyError || !survey) {
+      console.error('Survey not found:', surveyError)
       return NextResponse.json({ message: 'Survey not found' }, { status: 404 })
     }
 

@@ -138,11 +138,43 @@ export async function POST() {
     const results = []
     
     for (const config of planConfigs) {
-      const result = await prisma.planConfig.upsert({
-        where: { planType: config.planType },
-        update: config,
-        create: config
-      })
+      // 既存のプラン設定を確認 (Supabase SDK使用)
+      const { data: existing } = await supabase
+        .from('PlanConfig')
+        .select('*')
+        .eq('planType', config.planType)
+        .single()
+
+      let result
+      if (existing) {
+        // 更新
+        const { data: updated, error: updateError } = await supabase
+          .from('PlanConfig')
+          .update(config)
+          .eq('planType', config.planType)
+          .select()
+          .single()
+        
+        if (updateError) {
+          console.error(`Failed to update ${config.planType}:`, updateError)
+          throw updateError
+        }
+        result = updated
+      } else {
+        // 新規作成
+        const { data: created, error: createError } = await supabase
+          .from('PlanConfig')
+          .insert(config)
+          .select()
+          .single()
+        
+        if (createError) {
+          console.error(`Failed to create ${config.planType}:`, createError)
+          throw createError
+        }
+        result = created
+      }
+      
       results.push(result)
       console.log(`✓ ${config.name} (${config.planType}) initialized`)
     }

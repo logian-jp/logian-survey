@@ -27,21 +27,16 @@ export async function GET() {
 
     console.log('=== Debug Discount Links ===')
     
-    const discountLinks = await prisma.discountLink.findMany({
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        isActive: true,
-        validFrom: true,
-        validUntil: true,
-        createdAt: true,
-        updatedAt: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+    // 割引リンクを取得 (Supabase SDK使用)
+    const { data: discountLinks, error: discountError } = await supabase
+      .from('DiscountLink')
+      .select('id, code, name, isActive, validFrom, validUntil, createdAt, updatedAt')
+      .order('createdAt', { ascending: false })
+
+    if (discountError) {
+      console.error('Error fetching discount links:', discountError)
+      return NextResponse.json({ error: 'Failed to fetch discount links' }, { status: 500 })
+    }
 
     console.log('Found discount links:', discountLinks.length)
     discountLinks.forEach(link => {
