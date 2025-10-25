@@ -29,12 +29,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 現在の管理者のパスワードを確認
-    const currentAdmin = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { password: true }
-    })
+    const { data: currentAdmin, error: adminError } = await supabase
+      .from('User')
+      .select('password')
+      .eq('id', session.user.id)
+      .single()
 
-    if (!currentAdmin?.password) {
+    if (adminError || !currentAdmin?.password) {
       return NextResponse.json({ message: 'Admin password not found' }, { status: 400 })
     }
 
@@ -45,12 +46,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 変更対象のユーザーを取得
-    const targetUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, name: true, email: true, role: true }
-    })
+    const { data: targetUser, error: userError } = await supabase
+      .from('User')
+      .select('id, name, email, role')
+      .eq('id', userId)
+      .single()
 
-    if (!targetUser) {
+    if (userError || !targetUser) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
@@ -60,10 +62,15 @@ export async function POST(request: NextRequest) {
     }
 
     // ロールを変更
-    await prisma.user.update({
-      where: { id: userId },
-      data: { role: newRole }
-    })
+    const { error: updateError } = await supabase
+      .from('User')
+      .update({ role: newRole })
+      .eq('id', userId)
+
+    if (updateError) {
+      console.error('Error updating user role:', updateError)
+      return NextResponse.json({ message: 'Failed to update user role' }, { status: 500 })
+    }
 
     console.log(`Role changed for user ${targetUser.email}: ${targetUser.role} -> ${newRole} by admin ${session.user.email}`)
 

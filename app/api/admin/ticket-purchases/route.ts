@@ -28,77 +28,50 @@ export async function GET(request: NextRequest) {
     const maxAmount = searchParams.get('maxAmount')
     const search = searchParams.get('search')
 
-    // フィルター条件を構築
-    const where: any = {}
+    // フィルター条件はSupabaseクエリで直接適用（下記で実装）
 
-    if (userId) {
-      where.userId = userId
-    }
+    // チケット購入履歴を取得 (Supabase SDK完全実装)
+    let purchasesQuery = supabase
+      .from('TicketPurchase')
+      .select(`
+        *,
+        user:User!userId(id, name, email, createdAt),
+        survey:Survey!surveyId(id, title, shareUrl, createdAt)
+      `)
+      .order('createdAt', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1)
 
-    if (ticketType) {
-      where.ticketType = ticketType
-    }
-
-    if (startDate || endDate) {
-      where.createdAt = {}
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate)
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate)
-      }
-    }
-
-    if (minAmount || maxAmount) {
-      where.amount = {}
-      if (minAmount) {
-        where.amount.gte = parseInt(minAmount)
-      }
-      if (maxAmount) {
-        where.amount.lte = parseInt(maxAmount)
-      }
-    }
-
-    // 検索条件（ユーザー名、メール、Stripe決済ID）
+    // フィルター条件を適用
+    if (userId) purchasesQuery = purchasesQuery.eq('userId', userId)
+    if (ticketType) purchasesQuery = purchasesQuery.eq('ticketType', ticketType)
+    if (startDate) purchasesQuery = purchasesQuery.gte('createdAt', new Date(startDate).toISOString())
+    if (endDate) purchasesQuery = purchasesQuery.lte('createdAt', new Date(endDate).toISOString())
+    if (minAmount) purchasesQuery = purchasesQuery.gte('amount', parseInt(minAmount))
+    if (maxAmount) purchasesQuery = purchasesQuery.lte('amount', parseInt(maxAmount))
     if (search) {
-      where.OR = [
-        { user: { name: { contains: search, mode: 'insensitive' } } },
-        { user: { email: { contains: search, mode: 'insensitive' } } },
-        { checkoutSessionId: { contains: search, mode: 'insensitive' } }
-      ]
+      purchasesQuery = purchasesQuery.or(`user.name.ilike.%${search}%,user.email.ilike.%${search}%,checkoutSessionId.ilike.%${search}%`)
     }
 
-    // チケット購入履歴を取得
-    const [purchases, totalCount] = await Promise.all([
-      prisma.ticketPurchase.findMany({
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              createdAt: true
-            }
-          },
-          survey: {
-            select: {
-              id: true,
-              title: true,
-              shareUrl: true,
-              createdAt: true
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit
-      }),
+    // 購入履歴とカウントを並行取得
+    const [purchasesResult, totalCountResult] = await Promise.all([
+      purchasesQuery,
       supabase.from('TicketPurchase').select('*', { count: 'exact', head: true })
     ])
 
-    // Supabaseでは上記のPrismaスタイルが使えないため、別途修正が必要
-    // TODO: 後でSupabase SDKに完全移行
+    const { data: purchases, error: purchasesError } = purchasesResult
+    const { count: totalCount, error: countError } = totalCountResult
+
+    if (purchasesError) {
+      console.error('Error fetching purchases:', purchasesError)
+      return NextResponse.json({ message: 'Failed to fetch purchases' }, { status: 500 })
+    }
+
+    if (countError) {
+      console.error('Error fetching total count:', countError)
+      return NextResponse.json({ message: 'Failed to fetch count' }, { status: 500 })
+    }
+
+    // ✅ Supabase SDK完全移行完了
 
     // 統計情報を取得 (Supabase SDK使用)
     let statsQuery = supabase
