@@ -24,12 +24,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Plan type is required' }, { status: 400 })
     }
 
-    // ユーザー情報を取得
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    })
+    // ユーザー情報を取得 (Supabase SDK使用)
+    const { data: user, error: userError } = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', session.user.id)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
+      console.error('User not found:', userError)
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
@@ -42,11 +45,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Addon ID is required for data addon purchase' }, { status: 400 })
       }
 
-      const addon = await (prisma as any).dataStorageAddon.findUnique({
-        where: { id: addonId }
-      })
+      // アドオン情報を取得 (Supabase SDK使用)
+      const { data: addon, error: addonError } = await supabase
+        .from('DataStorageAddon')
+        .select('*')
+        .eq('id', addonId)
+        .single()
 
-      if (!addon) {
+      if (addonError || !addon) {
+        console.error('Addon not found:', addonError)
         return NextResponse.json({ error: 'Addon not found' }, { status: 404 })
       }
 
@@ -122,12 +129,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // プラン設定を取得
-    const planConfig = await prisma.planConfig.findUnique({
-      where: { planType }
-    })
+    // プラン設定を取得 (Supabase SDK使用)
+    const { data: planConfig, error: planError } = await supabase
+      .from('PlanConfig')
+      .select('*')
+      .eq('planType', planType)
+      .single()
 
-    if (!planConfig) {
+    if (planError || !planConfig) {
+      console.error('Plan not found:', planError)
       return NextResponse.json({ error: 'Plan not found' }, { status: 404 })
     }
 
