@@ -27,23 +27,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Failed to fetch surveys' }, { status: 500 })
     }
 
-    /* Original Prisma code:
-    const surveys = await prisma.survey.findMany({
-      where: {
-        userId: session.user.id
-      },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        createdAt: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+    // レスポンス形式を元のコードに合わせて調整
+    const formattedSurveys = (surveys || []).map(survey => ({
+      id: survey.id,
+      title: survey.title,
+      status: survey.status,
+      createdAt: survey.createdAt
+    }))
 
-    return NextResponse.json(surveys)
+    return NextResponse.json(formattedSurveys)
   } catch (error) {
     console.error('Error fetching user surveys:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
