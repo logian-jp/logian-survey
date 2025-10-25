@@ -52,7 +52,7 @@ interface Survey {
   maxResponses: number | null
   endDate: string | null
   targetResponses: number | null
-  owner: {
+  user: {
     id: string
     name: string | null
     email: string
@@ -299,7 +299,7 @@ export default function SurveysPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {survey.owner.name || survey.owner.email}
+                        {survey.user?.name || survey.user?.email || '不明'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

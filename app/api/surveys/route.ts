@@ -35,7 +35,10 @@ export async function GET(request: NextRequest) {
     // 1. ユーザーが所有するサーベイを取得
     const { data: ownSurveys, error: ownSurveysError } = await supabase
       .from('Survey')
-      .select('*')
+      .select(`
+        *,
+        user:User(id, name, email)
+      `)
       .eq('userId', session.user.id)
       .order('createdAt', { ascending: false })
     
@@ -47,7 +50,14 @@ export async function GET(request: NextRequest) {
     // 2. ユーザーが共有されているサーベイを取得
     const { data: sharedSurveys, error: sharedSurveysError } = await supabase
       .from('SurveyUser')
-      .select('surveyId, permission, Survey(*)')
+      .select(`
+        surveyId, 
+        permission, 
+        Survey(
+          *,
+          user:User(id, name, email)
+        )
+      `)
       .eq('userId', session.user.id)
     
     if (sharedSurveysError) {
@@ -164,7 +174,7 @@ export async function GET(request: NextRequest) {
         useCustomLogo: survey.useCustomLogo,
         customDomain: survey.customDomain,
         dataRetentionDays: survey.dataRetentionDays,
-        user: userData,
+        user: survey.user,
         permission: survey.permission || 'ADMIN',
         isOwner: survey.isOwner || false
       })),
