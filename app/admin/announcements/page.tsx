@@ -98,18 +98,19 @@ export default function AnnouncementsPage() {
     const badges = {
       DRAFT: 'bg-gray-100 text-gray-800',
       SCHEDULED: 'bg-blue-100 text-blue-800',
-      SENDING: 'bg-yellow-100 text-yellow-800',
-      SENT: 'bg-green-100 text-green-800',
-      PAUSED: 'bg-red-100 text-red-800'
+      PUBLISHED: 'bg-green-100 text-green-800',
+      ARCHIVED: 'bg-red-100 text-red-800'
     }
     return badges[status] || 'bg-gray-100 text-gray-800'
   }
 
   const getTypeLabel = (type: AnnouncementType) => {
     const labels = {
-      MANUAL: '手動配信',
-      SCHEDULED: '時間型配信',
-      CONDITIONAL: '条件型配信'
+      INFO: '情報',
+      WARNING: '警告',
+      URGENT: '緊急',
+      FEATURE: '機能',
+      MAINTENANCE: 'メンテナンス'
     }
     return labels[type] || type
   }
@@ -216,10 +217,10 @@ export default function AnnouncementsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {announcement.totalSent}
+                        {announcement.totalDelivered}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {announcement.totalSent > 0 ? `${Math.round(announcement.readRate)}%` : '-'}
+                        {announcement.totalDelivered > 0 ? `${Math.round(announcement.readRate)}%` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {announcement.creator ? (
