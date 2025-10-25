@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       .from('User')
       .select(`
         *,
-        invitations:Invitation(
+        invitations:Invitation!Invitation_inviterId_fkey(
           *,
           usedByUser:User!usedByUserId(id, name, email)
         )
@@ -65,9 +65,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Failed to fetch inviter stats' }, { status: 500 })
     }
 
-    const inviterBreakdown = inviterStats.map(inviter => {
-      const totalInvited = inviter.invitations.length
-      const successfulInvites = inviter.invitations.filter((inv: any) => inv.isUsed).length
+    const inviterBreakdown = (inviterStats || []).map(inviter => {
+      const invitations = inviter.invitations || []
+      const totalInvited = invitations.length
+      const successfulInvites = invitations.filter((inv: any) => inv.isUsed).length
       return {
         inviterId: inviter.id,
         inviterName: inviter.name || inviter.email,

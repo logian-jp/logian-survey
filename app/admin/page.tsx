@@ -271,10 +271,17 @@ export default function AdminDashboard() {
       if (invitationStatsResponse.ok) {
         const invitationStatsData = await invitationStatsResponse.json()
         console.log('Invitation stats data received:', invitationStatsData)
-        setInvitationStats(invitationStatsData)
+        // データが正常に取得できた場合のみ設定
+        if (invitationStatsData.summary && invitationStatsData.inviterBreakdown) {
+          setInvitationStats(invitationStatsData)
+        } else {
+          console.error('Invalid invitation stats data structure:', invitationStatsData)
+          setInvitationStats(null)
+        }
       } else {
         const errorData = await invitationStatsResponse.json().catch(() => ({}))
         console.error('Failed to fetch invitation stats:', invitationStatsResponse.status, invitationStatsResponse.statusText, errorData)
+        setInvitationStats(null)
       }
     } catch (error) {
       console.error('Failed to fetch admin data:', error)
@@ -580,7 +587,7 @@ export default function AdminDashboard() {
               <div className="bg-white shadow rounded-lg p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">招待者別統計</h3>
                 <div className="space-y-3">
-                  {invitationStats.inviterBreakdown.map((inviter) => (
+                  {(invitationStats.inviterBreakdown || []).map((inviter) => (
                     <div key={inviter.inviterId} className="border rounded-lg p-3">
                       <div className="flex justify-between items-center mb-2">
                         <div>
