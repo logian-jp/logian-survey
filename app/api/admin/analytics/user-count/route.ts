@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     let activeUsersData = []
     try {
       // まず、アクティブなユーザーのリストを取得
-      const { data: activeUserIds, error: activeUsersError } = await supabase
+      let { data: activeUserIds, error: activeUsersError } = await supabase
         .from('User')
         .select(`
           id, createdAt,
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
       }
 
       // 重複ユーザーを除去（複数のアクティブアンケートを持つユーザー対応）
-      const uniqueActiveUsers = activeUserIds?.reduce((acc, user) => {
+      const uniqueActiveUsers = activeUserIds?.reduce((acc: any[], user: any) => {
         if (!acc.find(u => u.id === user.id)) {
           acc.push({ id: user.id, createdAt: user.createdAt })
         }
